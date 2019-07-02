@@ -30,3 +30,11 @@
 *.exe
 *.out
 *.app
+bin
+
+# videos
+*gevbuf
+*.raw
+*.avi
+*.mp4
+
