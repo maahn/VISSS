@@ -163,6 +163,7 @@ void PrintMenu()
 void *ImageCaptureThread( void *context)
 {
     MY_CONTEXT *captureContext = (MY_CONTEXT *)context;
+    bool was_active = FALSE;
 
     if (captureContext != NULL)
     {
@@ -216,6 +217,7 @@ void *ImageCaptureThread( void *context)
             {
                 if (img->status == 0)
                 {
+                    was_active = TRUE;
                     m_latestBuffer = img->address;
                     if ((last_id>=0) && (img->id != last_id+1) ){
                         printf("MISSED %06d %06d\n",img->id, last_id);
@@ -397,31 +399,7 @@ if (pNumUsed>0) {
                             sequence_init = 0;
 
                             // writer.release();
-                                // We're done reading, cancel all the queues
-                            for (auto& q : queue) {
-                                q.cancel();
-                            }
 
-                            // And join all the worker threads, waiting for them to finish
-                            storage_thread[0].join();
-                            // for (auto& st2 : storage_thread) {
-                            //     st2.join();
-                            // }
-                            // Report the timings
-                            total_read_time /= 1000.0;
-                            double total_write_time_a(storage[0].total_time_ms());
-                            // double total_write_time_b(storage[1].total_time_ms());
-
-                            std::cout << "Completed processing " << frame_count << " images:\n"
-                                << "  average capture time = " << (total_read_time / frame_count) << " ms\n"
-                                << "  average write time A = " << (total_write_time_a / frame_count) << " ms\n";
-                                // << "  average write time B = " << (total_write_time_b / frame_count) << " ms\n";
-
-
-
-
-
-                            printf("RELEASED\n");
                         }
 
                     }
@@ -453,6 +431,11 @@ if (pNumUsed>0) {
                     printf("Frame %llu : Status = %d\n", (unsigned long long)img->id, img->status);
                 }
             }
+            else
+            {
+                printf("camera not running...\n");
+
+            }
             // See if a sequence in progress needs to be stopped here.
             if ((!captureContext->enable_sequence) && (sequence_init == 1))
             {
@@ -472,9 +455,33 @@ if (pNumUsed>0) {
             }
 #endif
         }
+        printf("LOOP stopped");
+
+        if (was_active) {
+
+                // We're done reading, cancel all the queues
+            for (auto& q : queue) {
+                q.cancel();
+            }
+
+            // And join all the worker threads, waiting for them to finish
+            storage_thread[0].join();
+            // for (auto& st2 : storage_thread) {
+            //     st2.join();
+            // }
+            // Report the timings
+            total_read_time /= 1000.0;
+            double total_write_time_a(storage[0].total_time_ms());
+            // double total_write_time_b(storage[1].total_time_ms());
+
+            std::cout << "Completed processing " << frame_count << " images:\n"
+                << "  average capture time = " << (total_read_time / frame_count) << " ms\n"
+                << "  average write time A = " << (total_write_time_a / frame_count) << " ms\n";
+                // << "  average write time B = " << (total_write_time_b / frame_count) << " ms\n";
 
 
-
+            printf("RELEASED\n");
+        }
     }
     pthread_exit(0);
 }
@@ -985,20 +992,32 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                             if ((c == 0x1b) || (c == 'q') || (c == 'Q'))
                             {
                                 context.enable_sequence = 0; // End sequence if active.
+                                printf("1\n");
                                 GevStopTransfer(handle);
+                                printf("2\n");
                                 done = TRUE;
+                                printf("3\n");
                                 context.exit = TRUE;
+                                printf("4\n");
+                                usleep(1000000); 
+                                printf("4a\n");
+
                                 pthread_join( tid, NULL);
+                                printf("5\n");
                             }
                         }
+                                printf("6\n");
 
                         GevAbortTransfer(handle);
                         status = GevFreeTransfer(handle);
+                                printf("7\n");
 
                         for (i = 0; i < numBuffers; i++)
                         {
                             free(bufAddress[i]);
                         }
+                                                        printf("8\n");
+
                     }
                 }
                 GevCloseCamera(&handle);
