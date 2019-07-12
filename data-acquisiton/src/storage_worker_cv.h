@@ -72,7 +72,7 @@ void storage_worker_cv::run()
 
 {
 
-    int firstImage = -1;
+    char hostname[HOST_NAME_MAX];
 
     // 6.91 ms
     cv::VideoWriter writer(file_name_, cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
@@ -98,7 +98,6 @@ void storage_worker_cv::run()
 
 
       std::chrono::milliseconds ms = duration_cast<std::chrono::milliseconds>(t_reset.time_since_epoch());
-
       std::chrono::seconds s = duration_cast<std::chrono::seconds>(ms);
       std::time_t t = s.count();
       std::size_t fractional_seconds = ms.count() % 1000;
@@ -106,13 +105,21 @@ void storage_worker_cv::run()
     ctime_no_newline = strtok(ctime(&t), "\n");
       fMeta << "# Camera start time: " << ctime_no_newline << ' '
             << fractional_seconds  << "\n";
-    fMeta << "# ns since epoche: " 
-          << t_reset.time_since_epoch().count() << "\n";
+    unsigned long t_reset_uint = t_reset.time_since_epoch().count()/1000;
+    fMeta << "# us since epoche: " 
+          << t_reset_uint << "\n";
     
     fMeta << "# Camera serial number: "
           << DeviceID << "\n";
      
-    fMeta << "# Computer time, Camera time, Frame id \n";
+    fMeta << "# Camera configuration: "
+          <<  "CONFIG FILE"<< "\n";
+
+    gethostname(hostname, HOST_NAME_MAX);
+    fMeta << "# Hostname: "
+          <<  hostname<< "\n";
+     
+    fMeta << "# Capture time, Record time, Frame id \n";
     try {
         int32_t frame_count(0);
         for (;;) {
@@ -121,7 +128,7 @@ void storage_worker_cv::run()
                 high_resolution_clock::time_point t1(high_resolution_clock::now());
                 if (frame_count % 100 == 0)
                 {
-                    fMeta  <<image.timestamp 
+                    fMeta  <<image.timestamp +t_reset_uint << ", " << t1.time_since_epoch().count()/1000
                           << ", " << image.id << "\n";
                 }
                 ++frame_count;

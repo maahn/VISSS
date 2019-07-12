@@ -788,7 +788,7 @@ else
 }
 
 
-t_reset=  high_resolution_clock::now();
+t_reset = std::chrono::system_clock::now();
 
 std::cout << "Camera clock reset around " << t_reset.time_since_epoch().count()/1000 <<" \n"  << std::endl;
 
