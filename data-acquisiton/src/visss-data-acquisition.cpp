@@ -2,8 +2,9 @@
 
 #include "visss-data-acquisition.h"   
 //============================================================================
-
-#include "opencv_writer.h"   
+#include "frame_queue.h"   
+#include "storage_worker_cv.h"   
+// #include "storage_worker_ffmpeg.h"   
 
 
 // using namespace cv;
@@ -36,6 +37,8 @@ const char* params
     = "{ help h         |                   | Print usage }"
       "{ output o       | ./                | Output Path }"
       "{ camera n       | 0                 | camera number }"
+      "{ quality q      | 53                | quality 0-100% }"
+      "{ preset p       | 0                 | preset (0 ultrafast - 9 placebo) }"
       "{ @config        | <none>            | camera configuration file }";
 
 // ====================================
@@ -50,6 +53,8 @@ typedef struct tagMY_CONTEXT
     char 					*base_name;
     int 					enable_sequence;
     int 					enable_save;
+    double                  quality;
+    double                  preset;
     BOOL              exit;
 } MY_CONTEXT, *PMY_CONTEXT;
 
@@ -182,7 +187,6 @@ void *ImageCaptureThread( void *context)
         }
         
 
-        cv::VideoWriter writer;
         int OpenCV_Type = 0;
         OpenCV_Type = CV_8UC1;
         // int codec = CV_FOURCC('H', '2', '6', '4'); // select desired codec (must be available at runtime)
@@ -195,7 +199,7 @@ void *ImageCaptureThread( void *context)
 
         // Let's create our storage workers -- let's have two, to simulate your scenario
         // and to keep it interesting, have each one write a different format
-        std::vector <storage_worker> storage;
+        std::vector <storage_worker_cv> storage;
         std::vector<std::thread> storage_thread;
 
         int32_t const MAX_FRAME_COUNT(10);
@@ -240,8 +244,6 @@ void *ImageCaptureThread( void *context)
                     &pTotalBuffers, &pNumUsed,
                     &pNumFree, &pNumTrashed,
                      pMode);
-
-printf("%llu \n",(unsigned long long)img->timestamp);
 
 if (pNumUsed>0) {
                     printf("%d ",pTotalBuffers);
@@ -293,11 +295,13 @@ if (pNumUsed>0) {
                                 , codec
                                 , fps
                                 , imgSize
-                                , isColor);
+                                , isColor
+                                , captureContext->quality
+                                , captureContext->preset);
 
                             // And start the worker threads for each storage worker
                             for (auto& s : storage) {
-                                storage_thread.emplace_back(&storage_worker::run, &s);
+                                storage_thread.emplace_back(&storage_worker_cv::run, &s);
                             }
 
 
@@ -567,6 +571,12 @@ int main(int argc, char *argv[])
     cv::String configFile = parser.get<cv::String>(0);
     printf("Configuration file %s \n", configFile.c_str());
 
+    context.quality = parser.get<double>("quality");
+    printf("FFMPEG Quality %f \n", context.quality);
+    context.preset = parser.get<double>("preset");
+    printf("FFMPEG preset %f \n", context.preset);
+
+
     // Open the file.
     fp = fopen(configFile.c_str(), "r");
     if (fp == NULL)
@@ -746,7 +756,6 @@ int main(int argc, char *argv[])
                         }
                     }
 
-t_reset_1 = high_resolution_clock::now();
 
 
 char feature_name2[] = "timestampControlReset";
@@ -779,11 +788,9 @@ else
 }
 
 
-t_reset_2 = high_resolution_clock::now();
-double dt_us(static_cast<double>(duration_cast<microseconds>(t_reset_2 - t_reset_1).count()));
+t_reset=  high_resolution_clock::now();
 
-
-std::cout << "time reset in " << (dt_us / 1000.0) << " ms" << t_reset_2.time_since_epoch().count() << std::endl;
+std::cout << "Camera clock reset around " << t_reset.time_since_epoch().count()/1000 <<" \n"  << std::endl;
 
 GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
 
@@ -837,7 +844,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                     // based on the last 3 octets of the MAC address.
                     macLow = pCamera[camIndex].macLow;
                     macLow &= 0x00FFFFFF;
-                    snprintf(uniqueName, sizeof(uniqueName), "%s/img_%06x", output.c_str(), macLow);
+                    snprintf(uniqueName, sizeof(uniqueName), "%s/visss_%06x", output.c_str(), macLow);
 
                     // // If there are multiple pixel formats supported on this camera, get one.
                     // {

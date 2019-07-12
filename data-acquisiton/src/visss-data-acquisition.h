@@ -33,11 +33,11 @@
 using std::chrono::high_resolution_clock;
 using std::chrono::duration_cast;
 using std::chrono::microseconds;
+
 // ============================================================================
 
 
-high_resolution_clock::time_point t_reset_1;
-high_resolution_clock::time_point t_reset_2;
+high_resolution_clock::time_point t_reset;
 char DeviceID[TELEDYNEDALSA_CHUNK_SIZE_DEVICEID];
 
 struct MatMeta {

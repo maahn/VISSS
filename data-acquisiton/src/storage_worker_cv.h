@@ -1,76 +1,21 @@
 
 // ============================================================================
 //https://stackoverflow.com/questions/37140643/how-to-save-two-cameras-data-but-not-influence-their-picture-acquire-speed/37146523
-class frame_queue
-{
-public:
-    struct cancelled {};
 
-public:
-    frame_queue();
-
-    void push(MatMeta const& image);
-    MatMeta pop();
-
-    void cancel();
-
-private:
-    std::queue<MatMeta> queue_;
-    std::mutex mutex_;
-    std::condition_variable cond_;
-    bool cancelled_;
-};
-// ----------------------------------------------------------------------------
-frame_queue::frame_queue()
-    : cancelled_(false)
-{
-}
-// ----------------------------------------------------------------------------
-void frame_queue::cancel()
-{
-    std::unique_lock<std::mutex> mlock(mutex_);
-    cancelled_ = true;
-    cond_.notify_all();
-}
-// ----------------------------------------------------------------------------
-void frame_queue::push(MatMeta const& image)
-{
-    std::unique_lock<std::mutex> mlock(mutex_);
-    queue_.push(image);
-    cond_.notify_one();
-}
-// ----------------------------------------------------------------------------
-MatMeta frame_queue::pop()
-{
-    std::unique_lock<std::mutex> mlock(mutex_);
-
-    while (queue_.empty()) {
-        if (cancelled_) {
-            throw cancelled();
-        }
-        cond_.wait(mlock);
-        if (cancelled_) {
-            throw cancelled();
-        }
-    }
-
-    MatMeta image(queue_.front());
-    queue_.pop();
-    return image;
-}
 // ============================================================================
 
-class storage_worker
+class storage_worker_cv
 {
 public:
-    storage_worker(frame_queue& queue
+    storage_worker_cv(frame_queue& queue
         , int32_t id
         , std::string const& file_name
         , int32_t fourcc
         , double fps
         , cv::Size frame_size
-        , bool is_color = true);
-
+        , bool is_color
+        , double quality
+        , double preset);
     void run();
 
     double total_time_ms() const { return total_time_ / 1000.0; }
@@ -85,18 +30,21 @@ private:
     double fps_;
     cv::Size frame_size_;
     bool is_color_;
-
+    double quality_;
+    double preset_;
     double total_time_;
 };
 // ----------------------------------------------------------------------------
-storage_worker::storage_worker(frame_queue& queue
+storage_worker_cv::storage_worker_cv(frame_queue& queue
     , int32_t id
     , std::string const& file_name
     , int32_t fourcc
     , double fps
     , cv::Size frame_size
-    , bool is_color)
-    : queue_(queue)
+    , bool is_color
+    , double quality
+    , double preset)    :
+      queue_(queue)
     , id_(id)
     , file_name_(file_name)
     , fourcc_(fourcc)
@@ -104,10 +52,12 @@ storage_worker::storage_worker(frame_queue& queue
     , frame_size_(frame_size)
     , is_color_(is_color)
     , total_time_(0.0)
+    , quality_(quality)
+    , preset_(preset)
 {
 }
 // // ----------------------------------------------------------------------------
-void storage_worker::run()
+void storage_worker_cv::run()
 
 
 // TEST cv::CAP_FFMPEG!!
@@ -121,10 +71,18 @@ void storage_worker::run()
 // DEBUG FLAG IN MAKEFILE!! -O3 -O2
 
 {
+
+    int firstImage = -1;
+
     // 6.91 ms
     cv::VideoWriter writer(file_name_, cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
     std::ofstream fMeta;
-    // writer.set(cv::VIDEOWRITER_PROP_QUALITY, 5);
+    writer.set(cv::VIDEOWRITER_PROP_QUALITY, quality_);
+    writer.set(cv::VIDEOWRITER_PROP_PRESET, preset_);
+    double foo = writer.get(cv::VIDEOWRITER_PROP_QUALITY);
+    printf("GET %f \n",foo);
+    double foo2 = writer.get(cv::VIDEOWRITER_PROP_PRESET);
+    printf("GET %f \n",foo2);
 
     // 8.05 ms
     // cv::VideoWriter writer("appsrc ! videoconvert  ! timeoverlay ! x264enc speed-preset=ultrafast  ! mp4mux ! filesink location=video-h264.mp4",
@@ -139,7 +97,7 @@ void storage_worker::run()
     fMeta.open(file_name_+".txt");
 
 
-      std::chrono::milliseconds ms = duration_cast<std::chrono::milliseconds>(t_reset_2.time_since_epoch());
+      std::chrono::milliseconds ms = duration_cast<std::chrono::milliseconds>(t_reset.time_since_epoch());
 
       std::chrono::seconds s = duration_cast<std::chrono::seconds>(ms);
       std::time_t t = s.count();
@@ -149,7 +107,7 @@ void storage_worker::run()
       fMeta << "# Camera start time: " << ctime_no_newline << ' '
             << fractional_seconds  << "\n";
     fMeta << "# ns since epoche: " 
-          << t_reset_2.time_since_epoch().count() << "\n";
+          << t_reset.time_since_epoch().count() << "\n";
     
     fMeta << "# Camera serial number: "
           << DeviceID << "\n";
@@ -161,7 +119,11 @@ void storage_worker::run()
             MatMeta image(queue_.pop());
             if (!image.MatImage.empty()) {
                 high_resolution_clock::time_point t1(high_resolution_clock::now());
-
+                if (frame_count % 100 == 0)
+                {
+                    fMeta  <<image.timestamp 
+                          << ", " << image.id << "\n";
+                }
                 ++frame_count;
                 writer.write(image.MatImage);
 
@@ -170,8 +132,7 @@ void storage_worker::run()
                 total_time_ += dt_us;
 
                 //to do : move to thread? https://stackoverflow.com/questions/21126950/asynchronously-writing-to-a-file-in-c-unix
-                fMeta  <<image.timestamp 
-                      << ", " << image.id << "\n";
+                
 
                 // std::cout << "Worker " << id_ << " stored image.MatImage #" << frame_count
                 //     << " in " << (dt_us / 1000.0) << " ms" << std::endl;
@@ -184,7 +145,7 @@ void storage_worker::run()
     }
 }
 
-// void storage_worker::run()
+// void storage_worker_cv::run()
 // {
 
 // // https://stackoverflow.com/questions/40454019/opencv-to-ffplay-from-named-pipe-fifo
@@ -250,7 +211,5 @@ void storage_worker::run()
 //         std::cout << "Queue " << id_ << " cancelled, worker finished." << std::endl;
 //     }
 // }
-
-
 
 
