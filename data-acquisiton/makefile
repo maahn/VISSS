@@ -23,7 +23,7 @@ else
 endif
 
 INC_PATH = -I. -I$(IROOT)/include -I$(IROOT)/examples/common $(INC_GENICAM) 
-openCV = `export PKG_CONFIG_PATH='/home/mmaahn/opencv_build/lib/pkgconfig' && pkg-config --cflags --libs opencv4`  
+openCV = $(shell pkg-config --cflags --libs opencv4)
 
 print-%  : ; @echo $* = $($*)
 
