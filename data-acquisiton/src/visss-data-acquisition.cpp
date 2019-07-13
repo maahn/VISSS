@@ -4,7 +4,7 @@
 //============================================================================
 #include "frame_queue.h"   
 #include "storage_worker_cv.h"   
-// #include "storage_worker_ffmpeg.h"   
+#include "storage_worker_ffmpeg.h"   
 
 
 // using namespace cv;

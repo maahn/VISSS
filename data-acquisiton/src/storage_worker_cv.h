@@ -146,12 +146,12 @@ void storage_worker_cv::open_files()
     create_filename();
 
     writer_.open(filename_, cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
-    writer_.set(cv::VIDEOWRITER_PROP_QUALITY, quality_);
-    writer_.set(cv::VIDEOWRITER_PROP_PRESET, preset_);
-    double foo = writer_.get(cv::VIDEOWRITER_PROP_QUALITY);
-    printf("GET %f \n",foo);
-    double foo2 = writer_.get(cv::VIDEOWRITER_PROP_PRESET);
-    printf("GET %f \n",foo2);
+    // writer_.set(cv::VIDEOWRITER_PROP_QUALITY, quality_);
+    // writer_.set(cv::VIDEOWRITER_PROP_PRESET, preset_);
+    // double foo = writer_.get(cv::VIDEOWRITER_PROP_QUALITY);
+    // printf("GET %f \n",foo);
+    // double foo2 = writer_.get(cv::VIDEOWRITER_PROP_PRESET);
+    // printf("GET %f \n",foo2);
 
     // Open the text file.
     fMeta_.open(filename_+".txt");
