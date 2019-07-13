@@ -50,11 +50,12 @@ void *m_latestBuffer = NULL;
 typedef struct tagMY_CONTEXT
 {
     GEV_CAMERA_HANDLE camHandle;
-    char 					*base_name;
+    std::string 					base_name;
     int 					enable_sequence;
     int 					enable_save;
     double                  quality;
     double                  preset;
+    std::chrono::time_point<std::chrono::system_clock> t_reset;
     BOOL              exit;
 } MY_CONTEXT, *PMY_CONTEXT;
 
@@ -84,37 +85,6 @@ static void _GetUniqueFilename_sec( char *filename, size_t size, char *basename)
     }
 }
 
-int mkdir_p(const char *path)
-{
-    /* Adapted from http://stackoverflow.com/a/2336245/119527 */
-    const size_t len = strlen(path);
-    char _path[PATH_MAX];
-    char *p; 
-
-    errno = 0;
-
-    /* Copy string so its mutable */
-    if (len > sizeof(_path)-1) {
-        errno = ENAMETOOLONG;
-        return -1; 
-    }   
-    strcpy(_path, path);
-
-    /* Iterate the string */
-    for (p = _path + 1; *p; p++) {
-        if (*p == '/') {
-            /* Temporarily truncate */
-            *p = '\0';
-
-            if (mkdir(_path, S_IRWXU) != 0) {
-                if (errno != EEXIST)
-                    return -1; 
-            }
-
-            *p = '/';
-        }
-    }   
-}
 
 static void ValidateFeatureValues( const GenApi::CNodePtr &ptrFeature )
 {
@@ -178,13 +148,13 @@ void *ImageCaptureThread( void *context)
 
         // FILE *seqFP = NULL;
         size_t len = 0;
-        char filename[FILENAME_MAX] = {0};
+        // char filename[FILENAME_MAX] = {0};
 
-        if ( captureContext->base_name != NULL)
-        {
-            len = strlen(captureContext->base_name);
-            strncpy( filename, captureContext->base_name, len);
-        }
+        // if ( captureContext->base_name != NULL)
+        // {
+        //     len = strlen(captureContext->base_name);
+        //     strncpy( filename, captureContext->base_name, len);
+        // }
         
 
         int OpenCV_Type = 0;
@@ -283,7 +253,7 @@ if (pNumUsed>0) {
 
 
 
-                            snprintf( &filename[len], (FILENAME_MAX - len - 1), "_seq_%06d.avi", sequence_index++);
+                            // snprintf( &filename[len], (FILENAME_MAX - len - 1), "_seq_%06d.avi", sequence_index++);
                             // writer.open(filename, codec, fps, imgSize, isColor);
 
                             // writer.set(cv::VIDEOWRITER_PROP_QUALITY, 75);
@@ -291,13 +261,15 @@ if (pNumUsed>0) {
                             // cout << "QUAL" << qual << "\n";
 
                             storage.emplace_back(std::ref(queue[0]), 0
-                                , filename
+                                , captureContext->base_name
                                 , codec
                                 , fps
                                 , imgSize
                                 , isColor
                                 , captureContext->quality
-                                , captureContext->preset);
+                                , captureContext->preset
+                                , captureContext->t_reset
+                                );
 
                             // And start the worker threads for each storage worker
                             for (auto& s : storage) {
@@ -398,7 +370,7 @@ if (pNumUsed>0) {
                         if ( !captureContext->enable_sequence )
                         {
                             // GEVBUFFILE_Close( seqFP, sequence_count );
-                            printf("Complete sequence 1: %s has %d frames\n", filename, sequence_count);
+                            printf("Complete sequence 1: has %d frames\n", sequence_count);
                             sequence_count = 0;
                             sequence_init = 0;
 
@@ -444,7 +416,7 @@ if (pNumUsed>0) {
             if ((!captureContext->enable_sequence) && (sequence_init == 1))
             {
                 // GEVBUFFILE_Close( seqFP, sequence_count );
-                printf("Complete sequence2 : %s has %d frames\n", filename, sequence_count);
+                printf("Complete sequence2 : has %d frames\n", sequence_count);
                 sequence_count = 0;
                 sequence_init = 0;
             }
@@ -540,7 +512,7 @@ int main(int argc, char *argv[])
     int done = FALSE;
     FILE *fp = NULL;
     int turboDriveAvailable = 0;
-    char uniqueName[FILENAME_MAX];
+    // char uniqueName[FILENAME_MAX];
     char filename[FILENAME_MAX] = {0};
     uint32_t macLow = 0; // Low 32-bits of the mac address (for file naming).
     int error_count = 0;
@@ -562,11 +534,6 @@ int main(int argc, char *argv[])
     printf("Camera index %d \n", camIndex);
     cv::String output = parser.get<cv::String>("output");
     printf("Output path %s \n", output.c_str());
-
-    if (mkdir(output.c_str(), S_IRWXU) != 0) {
-        if (errno != EEXIST)
-            return -1; 
-    } 
 
     cv::String configFile = parser.get<cv::String>(0);
     printf("Configuration file %s \n", configFile.c_str());
@@ -788,9 +755,11 @@ else
 }
 
 
-t_reset = std::chrono::system_clock::now();
 
-std::cout << "Camera clock reset around " << t_reset.time_since_epoch().count()/1000 <<" \n"  << std::endl;
+
+context.t_reset = std::chrono::system_clock::now();
+
+std::cout << "Camera clock reset around " << context.t_reset.time_since_epoch().count()/1000 <<" \n"  << std::endl;
 
 GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
 
@@ -844,7 +813,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                     // based on the last 3 octets of the MAC address.
                     macLow = pCamera[camIndex].macLow;
                     macLow &= 0x00FFFFFF;
-                    snprintf(uniqueName, sizeof(uniqueName), "%s/visss_%06x", output.c_str(), macLow);
+                    // snprintf(uniqueName, sizeof(uniqueName), "%s/visss_%06x", output.c_str(), macLow);
 
                     // // If there are multiple pixel formats supported on this camera, get one.
                     // {
@@ -958,7 +927,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
 
                         // Generate a file name from the unique base name
                         // (leave at least 16 digits for index and extension)
-                        _GetUniqueFilename_sec(filename, (sizeof(filename) - 17), uniqueName);
+                        // _GetUniqueFilename_sec(filename, (sizeof(filename) - 17), uniqueName);
 
                         // Initialize a transfer with synchronous buffer handling.
                         // (To avoid overwriting data buffer while saving to disk).
@@ -971,7 +940,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
     #endif
                         // Create a thread to receive images from the API and save them
                         context.camHandle = handle;
-                        context.base_name = filename;
+                        context.base_name = output;
                         context.exit = FALSE;
                         pthread_create(&tid, NULL, ImageCaptureThread, &context);
 
