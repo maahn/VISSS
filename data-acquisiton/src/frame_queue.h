@@ -1,6 +1,9 @@
 
 // ============================================================================
 //https://stackoverflow.com/questions/37140643/how-to-save-two-cameras-data-but-not-influence-their-picture-acquire-speed/37146523
+
+int const max_queue_size = 200;
+
 class frame_queue
 {
 public:
@@ -35,9 +38,14 @@ void frame_queue::cancel()
 // ----------------------------------------------------------------------------
 void frame_queue::push(MatMeta const& image)
 {
-    std::unique_lock<std::mutex> mlock(mutex_);
-    queue_.push(image);
-    cond_.notify_one();
+    if (queue_.size() <= max_queue_size) 
+    {
+        std::unique_lock<std::mutex> mlock(mutex_);
+        queue_.push(image);
+        cond_.notify_one();
+    } else {
+        printf("Maximum queue size %d reached. Discarding data!\n", max_queue_size);
+    }
 }
 // ----------------------------------------------------------------------------
 MatMeta frame_queue::pop()
