@@ -157,7 +157,7 @@ void storage_worker_ffmpeg::create_filename() {
     std::string full_path = path_ + "/" + hostname_ + "_" + DeviceID + "/" + timestamp1 + "/" ;
     mkdir_p(full_path.c_str());
 
-    filename_ = full_path + hostname_ + "_" + DeviceID  + "_" + timestamp2 +".avi";
+    filename_ = full_path + hostname_ + "_" + DeviceID  + "_" + timestamp2 +".mkv";
     printf("filename_ %s \n",filename_.c_str());
 
 
