@@ -210,7 +210,8 @@ void storage_worker_cv::create_filename() {
 void storage_worker_cv::run() 
 
 {
-
+    long int timestamp = 0;
+    long int frame_count_new_file = 0;
     gethostname(hostname_, HOST_NAME_MAX);
     t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
     
@@ -222,12 +223,24 @@ void storage_worker_cv::run()
             MatMeta image(queue_.pop());
             if (!image.MatImage.empty()) {
                 high_resolution_clock::time_point t1(high_resolution_clock::now());
+                
+
+
                 if (frame_count % 100 == 0)
                 {
                     fMeta_  <<image.timestamp +t_reset_uint_ << ", " << t1.time_since_epoch().count()/1000
                           << ", " << image.id << "\n";
                 }
                 ++frame_count;
+                timestamp = static_cast<long int> (time(NULL));
+                if ((timestamp % 300 == 0) && (frame_count-frame_count_new_file > 300))
+                {
+        close_files();
+        open_files();
+        frame_count_new_file = frame_count;
+
+
+                }
                 writer_.write(image.MatImage);
 
                 high_resolution_clock::time_point t2(high_resolution_clock::now());
