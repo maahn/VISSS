@@ -215,15 +215,15 @@ void *ImageCaptureThread( void *context)
                     &pNumFree, &pNumTrashed,
                      pMode);
 
-if (pNumUsed>0) {
-                    printf("%d ",pTotalBuffers);
-                    printf("%d ",pNumUsed);
-                    printf("%d ",pNumFree);
-                    printf("%d ",pNumTrashed);
-                    printf("%d ",pMode);
-                    printf("%d ",img->id);
-                    printf("%d \n",img->timestamp-last_timestamp);
-}
+// if (pNumUsed>0) {
+//                     printf("%d ",pTotalBuffers);
+//                     printf("%d ",pNumUsed);
+//                     printf("%d ",pNumFree);
+//                     printf("%d ",pNumTrashed);
+//                     printf("%d ",pMode);
+//                     printf("%d ",img->id);
+//                     printf("%d \n",img->timestamp-last_timestamp);
+// }
                     last_id = img->id;
                     last_timestamp = img->timestamp;
                     if ((captureContext->enable_sequence) || (sequence_init == 1))
@@ -338,11 +338,11 @@ if (pNumUsed>0) {
                             // printf("OPENCV Add to Sequence : Frame %llu\n", (unsigned long long)img->id);
                             fflush(stdout);
 
-                            if (frame_count>360000) {
-                                captureContext->enable_sequence = 0;
-                                captureContext->exit = 1;
-                                printf("STOPPING!\n");
-                            }
+                            //if (frame_count>360000) {
+                            //    captureContext->enable_sequence = 0;
+                            //    captureContext->exit = 1;
+                            //    printf("STOPPING!\n");
+                            //}
                             ++frame_count;
 
                             sequence_count++;
