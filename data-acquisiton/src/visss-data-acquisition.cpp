@@ -37,8 +37,8 @@ const char* params
     = "{ help h         |                   | Print usage }"
       "{ output o       | ./                | Output Path }"
       "{ camera n       | 0                 | camera number }"
-      "{ quality q      | 53                | quality 0-100% }"
-      "{ preset p       | 0                 | preset (0 ultrafast - 9 placebo) }"
+      "{ quality q      | 53                | quality 0-51 }"
+      "{ preset p       | medium            | preset (ultrafast - placebo) }"
       "{ @config        | <none>            | camera configuration file }";
 
 // ====================================
@@ -54,8 +54,8 @@ typedef struct tagMY_CONTEXT
     std::string 					base_name;
     int 					enable_sequence;
     int 					enable_save;
-    double                  quality;
-    double                  preset;
+    std::string                  quality;
+    std::string                  preset;
     std::chrono::time_point<std::chrono::system_clock> t_reset;
     BOOL              exit;
 } MY_CONTEXT, *PMY_CONTEXT;
@@ -265,8 +265,8 @@ void *ImageCaptureThread( void *context)
                                 , fps
                                 , imgSize
                                 , isColor
-                                , captureContext->quality
-                                , captureContext->preset
+                                //, captureContext->quality
+                                //, captureContext->preset
                                 , captureContext->t_reset
                                 );
 
@@ -534,18 +534,55 @@ int main(int argc, char *argv[])
     }
 
     int camIndex = parser.get<int>("camera");
-    printf("Camera index %d \n", camIndex);
+    std::cout << "Camera index "<< camIndex << std::endl;
     cv::String output = parser.get<cv::String>("output");
-    printf("Output path %s \n", output.c_str());
+    std::cout << "Output path "<< output << std::endl;
 
     cv::String configFile = parser.get<cv::String>(0);
-    printf("Configuration file %s \n", configFile.c_str());
+    std::cout << "Configuration file "<< configFile << std::endl;
 
-    context.quality = parser.get<double>("quality");
-    printf("FFMPEG Quality %f \n", context.quality);
-    context.preset = parser.get<double>("preset");
-    printf("FFMPEG preset %f \n", context.preset);
+    context.quality = parser.get<cv::String>("quality");
+    std::cout << "FFMPEG Quality "<< context.quality << std::endl;
+    context.preset = parser.get<cv::String>("preset");
+    std::cout << "FFMPEG preset "<< context.preset << std::endl;
 
+
+    std::set<std::string> presets = {
+        "ultrafast",
+        "superfast",
+        "veryfast",
+        "faster",
+        "fast",
+        "medium",
+        "slow",
+        "slower",
+        "placebo",
+    };
+
+    if (presets.find(context.preset) == presets.end()){
+        std::cerr <<"Do not know preset " << context.preset<< std::endl;
+        exit(1);
+    }
+
+
+    char OPENCV_PRESET[100];
+    strcpy(OPENCV_PRESET,"OPENCV_PRESET=");
+    strcat(OPENCV_PRESET,context.preset.c_str());
+    char OPENCV_CRF[100];
+    strcpy(OPENCV_CRF,"OPENCV_CRF=");
+    strcat(OPENCV_CRF,context.quality.c_str());
+
+
+    if(putenv(OPENCV_PRESET)!=0)
+    {
+        std::cerr <<"putenv failed: " << OPENCV_PRESET<< std::endl;
+        exit(1);
+    }
+    if(putenv(OPENCV_CRF)!=0)
+    {
+        std::cerr <<"putenv failed: " << OPENCV_CRF<< std::endl;
+        exit(1);
+    }
 
     // Open the file.
     fp = fopen(configFile.c_str(), "r");

@@ -30,6 +30,7 @@
 #include <queue>
 #include <thread>
 #include <unistd.h>
+#include <set>
 
 // ============================================================================
 using std::chrono::high_resolution_clock;

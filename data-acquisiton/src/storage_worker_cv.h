@@ -50,8 +50,8 @@ public:
         , double fps
         , cv::Size frame_size
         , bool is_color
-        , double quality
-        , double preset
+//        , double quality
+//        , double preset
         , std::chrono::time_point<std::chrono::system_clock> t_reset);
     void run();
 
@@ -69,8 +69,8 @@ private:
     double fps_;
     cv::Size frame_size_;
     bool is_color_;
-    double quality_;
-    double preset_;
+//    double quality_;
+//    double preset_;
     double total_time_;
     std::chrono::time_point<std::chrono::system_clock> t_reset_;
     unsigned long t_reset_uint_;
@@ -92,8 +92,8 @@ storage_worker_cv::storage_worker_cv(frame_queue& queue
     , double fps
     , cv::Size frame_size
     , bool is_color
-    , double quality
-    , double preset
+//    , double quality
+//    , double preset
     , std::chrono::time_point<std::chrono::system_clock> t_reset)    :
       queue_(queue)
     , id_(id)
@@ -103,8 +103,8 @@ storage_worker_cv::storage_worker_cv(frame_queue& queue
     , frame_size_(frame_size)
     , is_color_(is_color)
     , total_time_(0.0)
-    , quality_(quality)
-    , preset_(preset)
+//    , quality_(quality)
+//    , preset_(preset)
     , t_reset_(t_reset)
 {
 }
