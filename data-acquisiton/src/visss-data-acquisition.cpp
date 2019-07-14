@@ -28,7 +28,7 @@
 #define USE_SYNCHRONOUS_BUFFER_CYCLING  1
 
 //every Xth frame will be displayed in the live window
-#define LIVE_WINDOW_FRAME_RATIO 1
+#define LIVE_WINDOW_FRAME_RATIO 100
 
 
 
@@ -144,10 +144,9 @@ void *ImageCaptureThread( void *context)
     {
         int sequence_init = 0;
         unsigned int sequence_count = 0;
-        int sequence_index = 0;
 
         // FILE *seqFP = NULL;
-        size_t len = 0;
+        //size_t len = 0;
         // char filename[FILENAME_MAX] = {0};
 
         // if ( captureContext->base_name != NULL)
@@ -172,12 +171,11 @@ void *ImageCaptureThread( void *context)
         std::vector <storage_worker_cv> storage;
         std::vector<std::thread> storage_thread;
 
-        int32_t const MAX_FRAME_COUNT(10);
         double total_read_time(0.0);
         int32_t frame_count(0);
 
-        int last_id = -1;
-        int last_timestamp = -1;
+        uint last_id = 0;
+        uint last_timestamp = 0;
         // While we are still running.
         while(!captureContext->exit)
         {
@@ -194,7 +192,7 @@ void *ImageCaptureThread( void *context)
                     was_active = TRUE;
                     m_latestBuffer = img->address;
                     if ((last_id>=0) && (img->id != last_id+1) ){
-                        printf("MISSED %06d %06d\n",img->id, last_id);
+                        std::cout<< "MISSED"  <<img->id << " " <<last_id << std::endl;
                     }
 
 
@@ -338,11 +336,11 @@ void *ImageCaptureThread( void *context)
                             // printf("OPENCV Add to Sequence : Frame %llu\n", (unsigned long long)img->id);
                             fflush(stdout);
 
-                            //if (frame_count>360000) {
-                            //    captureContext->enable_sequence = 0;
-                            //    captureContext->exit = 1;
-                            //    printf("STOPPING!\n");
-                            //}
+                            if (frame_count>200) {
+                               captureContext->enable_sequence = 0;
+                               captureContext->exit = 1;
+                               printf("STOPPING!\n");
+                            }
                             ++frame_count;
 
                             sequence_count++;
@@ -511,7 +509,6 @@ int main(int argc, char *argv[])
     char c;
     int done = FALSE;
     FILE *fp = NULL;
-    int turboDriveAvailable = 0;
     // char uniqueName[FILENAME_MAX];
     char filename[FILENAME_MAX] = {0};
     uint32_t macLow = 0; // Low 32-bits of the mac address (for file naming).
@@ -631,7 +628,6 @@ int main(int argc, char *argv[])
             int i;
             int type;
             UINT32 val = 0;
-            UINT32 isLocked = 0;
             UINT32 height = 0;
             UINT32 width = 0;
             UINT32 format = 0;

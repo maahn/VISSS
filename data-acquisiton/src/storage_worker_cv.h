@@ -35,6 +35,7 @@ int mkdir_p(const char *path)
             *p = '/';
         }
     }   
+    return 0;
 }
 
 
