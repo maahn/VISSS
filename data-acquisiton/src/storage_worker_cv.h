@@ -211,11 +211,14 @@ void storage_worker_cv::create_filename() {
 void storage_worker_cv::run() 
 
 {
+    nice(-15);
+
     long int timestamp = 0;
     long int frame_count_new_file = 0;
     gethostname(hostname_, HOST_NAME_MAX);
     t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
-    
+    int fps_int = cvCeil(fps_);
+
     open_files();
 
     try {
@@ -226,11 +229,11 @@ void storage_worker_cv::run()
                 high_resolution_clock::time_point t1(high_resolution_clock::now());
                 
 
-
-                if (frame_count % 100 == 0)
-                {
-                    fMeta_  <<image.timestamp +t_reset_uint_ << ", " << t1.time_since_epoch().count()/1000
+                fMeta_  <<image.timestamp +t_reset_uint_ << ", " << t1.time_since_epoch().count()/1000
                           << ", " << image.id << "\n";
+                if (frame_count % fps_int == 0)
+                {
+                    std::cout << "STATUS | " << get_timestamp() << " | Frame queue size: " <<queue_.size() << "                     \r"<<std::flush;
                 }
                 ++frame_count;
                 timestamp = static_cast<long int> (time(NULL));

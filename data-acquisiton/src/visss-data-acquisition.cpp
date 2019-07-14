@@ -45,6 +45,7 @@ const char* params
 
 
 
+
 void *m_latestBuffer = NULL;
 
 typedef struct tagMY_CONTEXT
@@ -160,7 +161,7 @@ void *ImageCaptureThread( void *context)
         OpenCV_Type = CV_8UC1;
         // int codec = CV_FOURCC('H', '2', '6', '4'); // select desired codec (must be available at runtime)
         int codec = cv:: VideoWriter::fourcc('H', '2', '6', '4'); // select desired codec (must be available at runtime)
-        double fps = 13;                          // framerate of the created video stream
+        double fps = 130;                          // framerate of the created video stream
         bool isColor = FALSE;
 
         // The synchronized queues, one per video source/storage worker pair
@@ -183,7 +184,7 @@ void *ImageCaptureThread( void *context)
             GEV_STATUS status = 0;
 
             // Wait for images to be received
-            status = GevWaitForNextImage(captureContext->camHandle, &img, 1000);
+            status = GevWaitForNextImage(captureContext->camHandle, &img, 2000);
 
             if ((img != NULL) && (status == GEVLIB_OK))
             {
@@ -192,7 +193,7 @@ void *ImageCaptureThread( void *context)
                     was_active = TRUE;
                     m_latestBuffer = img->address;
                     if ((last_id>=0) && (img->id != last_id+1) ){
-                        std::cout<< "MISSED"  <<img->id << " " <<last_id << std::endl;
+                        std::cout<< "ERROR | " << get_timestamp() << " | missed frames between " << last_id << " and " << img->id << std::endl;
                     }
 
 
@@ -336,11 +337,11 @@ void *ImageCaptureThread( void *context)
                             // printf("OPENCV Add to Sequence : Frame %llu\n", (unsigned long long)img->id);
                             fflush(stdout);
 
-                            if (frame_count>200) {
-                               captureContext->enable_sequence = 0;
-                               captureContext->exit = 1;
-                               printf("STOPPING!\n");
-                            }
+                            // if (frame_count>200) {
+                            //    captureContext->enable_sequence = 0;
+                            //    captureContext->exit = 1;
+                            //    printf("STOPPING!\n");
+                            // }
                             ++frame_count;
 
                             sequence_count++;
@@ -402,12 +403,15 @@ void *ImageCaptureThread( void *context)
                 {
                     // Image had an error (incomplete (timeout/overflow/lost)).
                     // Do any handling of this condition necessary.
-                    printf("Frame %llu : Status = %d\n", (unsigned long long)img->id, img->status);
+                    printf("ERROR | %s | Frame %llu : Status = %d\n", get_timestamp().c_str(), (unsigned long long)img->id, img->status);
                 }
             }
-            else
+            else if (status  == GEVLIB_ERROR_TIME_OUT)
             {
-                printf("camera not running...\n");
+                printf("ERROR | %s | Camera time out \n", get_timestamp().c_str());
+            }
+            else {
+                printf("ERROR | %s | Could not get image %d \n", get_timestamp().c_str(), status);
 
             }
             // See if a sequence in progress needs to be stopped here.
@@ -515,6 +519,8 @@ int main(int argc, char *argv[])
     int error_count = 0;
     int feature_count = 0;
 
+    nice(-20);
+
     //============================================================================
     // Greetings
     printf ("\nVISSS data acquisition (%s)\n", __DATE__);
@@ -563,8 +569,9 @@ int main(int argc, char *argv[])
     // SCHED_OTHER (normal default scheduler) is not too bad afer all.
     if (1)
     {
-        // int policy = SCHED_FIFO;
-        int policy = SCHED_OTHER;
+        //int policy = SCHED_FIFO;
+        //int policy = SCHED_OTHER;
+        int policy = SCHED_BATCH;
         pthread_attr_t attrib;
         int inherit_sched = 0;
         struct sched_param param = {0};

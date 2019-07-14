@@ -29,6 +29,8 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+#include <unistd.h>
+
 // ============================================================================
 using std::chrono::high_resolution_clock;
 using std::chrono::duration_cast;
@@ -45,3 +47,17 @@ struct MatMeta {
   unsigned long timestamp;
   unsigned long id;
 }; 
+
+std::string get_timestamp(){
+    char s[100];
+
+    time_t t = time(NULL);
+    struct tm * p = localtime(&t);
+
+    strftime(s, 100, "%y-%m-%d %H:%M:%S", p);
+
+    std::string t_string(s, strlen(s));
+
+    return t_string;
+   
+}
