@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Visss-master        
+Comment=Launch VISSS master process
+Exec=gnome-terminal -e 'sh -c "/home/visss/Desktop/VISSS/data-acquisiton/launch_visss_data_acquisition_master.sh; exec bash"'
+Icon=applets-screenshooter
+Terminal=false
+Type=Application
+Categories=Application;
+
