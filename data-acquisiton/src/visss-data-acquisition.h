@@ -19,6 +19,7 @@
 #include <opencv2/videoio.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/video.hpp>
 #include <opencv2/core/utility.hpp>
 #include <iostream>
 
@@ -47,6 +48,8 @@ struct MatMeta {
   cv::Mat MatImage;
   unsigned long timestamp;
   unsigned long id;
+  bool newFile = FALSE;
+  std::string filename;
 }; 
 
 std::string get_timestamp(){

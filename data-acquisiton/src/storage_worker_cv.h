@@ -47,7 +47,6 @@ private:
     void add_meta_data();
     void close_files();
     void open_files();
-    void create_filename();
 
 };
 // ----------------------------------------------------------------------------
@@ -109,8 +108,6 @@ void storage_worker_cv::add_meta_data()
 
 void storage_worker_cv::open_files() 
 {
-    create_filename();
-
     std::cout << std::flush;
     writer_.open(filename_, cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
     std::cout << "STATUS | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
@@ -134,30 +131,7 @@ void storage_worker_cv::close_files() {
 }
 
 
-void storage_worker_cv::create_filename() {
 
-    time_t t = time(0);   // get time now
-    struct tm * now = localtime( & t );
-    int res = 0;
-    char timestamp1 [80];
-    strftime (timestamp1,80,"%Y/%m/%d",now);
-    char timestamp2 [80];
-    strftime (timestamp2,80,"%Y%m%d-%H%M%S",now);
-
-    std::string full_path = path_ + "/" + hostname_ + "_" + DeviceID + "/" + timestamp1 + "/" ;
-    std::cout << "DEBUGGING | " << get_timestamp() << full_path <<std::endl;
-
-    filename_ = full_path + hostname_ + "_" + DeviceID  + "_" + timestamp2 +".mkv";
-    std::cerr << "STATUS | " << get_timestamp() << "| filename_:" << filename_ << std::endl;
-
-    res = mkdir_p(full_path.c_str());
-    if (res != 0) {
-        std::cerr << "FATAL ERROR | " << get_timestamp() << " | Cannot create path "<< full_path.c_str() <<std::endl;
-        exit(1);
-    }
-
-    return;
-}
 
 // TEST cv::CAP_FFMPEG!!
 //     res["h264"] = VideoWriter::fourcc('H','2','6','4');
@@ -185,12 +159,10 @@ void storage_worker_cv::run()
 
 
     long int timestamp = 0;
-    long int frame_count_new_file = 0;
-    bool firstImage = TRUE;
     gethostname(hostname_, HOST_NAME_MAX);
     t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
     int fps_int = cvCeil(fps_);
-    open_files();
+    //open_files();
     try {
         int32_t frame_count(0);
         for (;;) {
@@ -204,26 +176,21 @@ void storage_worker_cv::run()
 
                 ++frame_count;
                 timestamp = static_cast<long int> (time(NULL));
-                if (firstImage || ((timestamp % 60 == 0) && (frame_count-frame_count_new_file > 300)))
+                if (image.newFile)
                 {
-                    if (not firstImage) {
-                        close_files();
-                        open_files();
-    }
-        cv::imwrite(filename_+".jpg", image.MatImage );
-        frame_count_new_file = frame_count;
-
+                    filename_ = image.filename;
+                    close_files();
+                    open_files();
 
                 }
+
                 writer_.write(image.MatImage);
 
                 high_resolution_clock::time_point t2(high_resolution_clock::now());
                 double dt_us(static_cast<double>(duration_cast<microseconds>(t2 - t1).count()));
                 total_time_ += dt_us;
 
-                
-                firstImage = FALSE;
-                // std::cout << "Worker " << id_ << " stored image.MatImage #" << frame_count
+                                // std::cout << "Worker " << id_ << " stored image.MatImage #" << frame_count
                 //     << " in " << (dt_us / 1000.0) << " ms" << std::endl;
             }
         }

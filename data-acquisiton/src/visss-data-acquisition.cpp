@@ -302,7 +302,18 @@ void *ImageCaptureThread( void *context)
                             // cout << filename << ": FILE OPEN\n";
 
 
-                            // Now the main capture loop
+                            // Add timestamp to frame
+                            if (1) {
+                                std::string textJpg = get_timestamp() + ", ID: " + std::to_string(img->id) + ", time: " + std::to_string(img->timestamp);
+                                cv::putText(exportImg, 
+                                    textJpg,
+                                    cv::Point(10,30), // Coordinates
+                                    cv::FONT_HERSHEY_PLAIN, // Font
+                                    1.0, // Scale. 2.0 = 2x bigger
+                                    cv::Scalar(1), // BGR Color
+                                    1, // Line Thickness (Optional)
+                                    cv::LINE_AA); // Anti-alias (Optional)
+                                }
 
                             exportImgMeta.MatImage = exportImg.clone();
                             exportImgMeta.timestamp = img->timestamp;
