@@ -507,6 +507,7 @@ int IsTurboDriveAvailable(GEV_CAMERA_HANDLE handle)
 
 int main(int argc, char *argv[])
 {
+    bool error = false;
     GEV_DEVICE_INTERFACE  pCamera[MAX_CAMERAS] = {0};
     GEV_STATUS status;
     int numCamera = 0;
@@ -654,8 +655,11 @@ int main(int argc, char *argv[])
     printf ("%d camera(s) on the network\n", numCamera);
 
     // Select the first camera found (unless the command line has a parameter = the camera index)
-    if (numCamera != 0)
+    if (numCamera == 0)
     {
+        error = true;
+    } 
+    else   {
 
         if (camIndex >= (int)numCamera)
         {
@@ -1043,6 +1047,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
             else
             {
                 printf("Error : 0x%0x : opening camera\n", status);
+                error = true;
             }
         }
     }
@@ -1057,6 +1062,10 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
     //printf("Hit any key to exit\n");
     //kbhit();
 
-    return 0;
+    if (error) {
+        return 1;
+    } else {
+        return 0;
+    }
 }
 
