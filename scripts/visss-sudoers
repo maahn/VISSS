@@ -1,0 +1,2 @@
+visss ALL=(ALL) NOPASSWD: /home/visss/DALSA/GigeV/bin/gev_nettweak, /sbin/setcap
+

@@ -57,8 +57,7 @@ export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig'
 
 
 #for visss
-visss ALL=(ALL) NOPASSWD: /home/visss/DALSA/GigeV/bin/gev_nettweak, /sbin/setcap
-
+sudo cp /home/visss/Desktop/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
 
 #### VISSSS #################
 cd Desktop
