@@ -204,7 +204,7 @@ void storage_worker_cv::run()
 
                 ++frame_count;
                 timestamp = static_cast<long int> (time(NULL));
-                if (firstImage || ((timestamp % 60 == 0) && (frame_count-frame_count_new_file > 300)))
+                if (firstImage || ((timestamp % 300 == 0) && (frame_count-frame_count_new_file > 300)))
                 {
                     if (not firstImage) {
                         close_files();
