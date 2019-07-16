@@ -27,8 +27,6 @@
 // Enable/disable buffer FULL/EMPTY handling (cycling)
 #define USE_SYNCHRONOUS_BUFFER_CYCLING  1
 
-//every Xth frame will be displayed in the live window
-#define LIVE_WINDOW_FRAME_RATIO 100
 
 
 
@@ -39,6 +37,8 @@ const char* params
       "{ camera n       | 0                 | camera number }"
       "{ quality q      | 23                | quality 0-51 }"
       "{ preset p       | medium            | preset (ultrafast - placebo) }"
+      "{ liveratio l    | 100               | every Xth frame will be displayed in the live window }"
+      "{ fps f          | 130               | frames per seconds of output }"
       "{ @config        | <none>            | camera configuration file }";
 
 // ====================================
@@ -54,37 +54,14 @@ typedef struct tagMY_CONTEXT
     std::string 					base_name;
     int 					enable_sequence;
     int 					enable_save;
+    int                     live_window_frame_ratio;
+    double                     fps;
     std::string                  quality;
     std::string                  preset;
     std::chrono::time_point<std::chrono::system_clock> t_reset;
     BOOL              exit;
 } MY_CONTEXT, *PMY_CONTEXT;
 
-// Unique name (seconds resolution in filename)
-static void _GetUniqueFilename_sec( char *filename, size_t size, char *basename)
-{
-    // Create a filename based on the current time (to 1 seconds)
-    struct timeval tm;
-    uint32_t years, days, hours, seconds;
-
-    if ((filename != NULL) && (basename != NULL) )
-    {
-        if (size > (16 + sizeof(basename)) )
-        {
-
-            // Get the time and turn it into a 10 msec resolution counter to use as an index.
-            gettimeofday( &tm, NULL);
-            years = ((tm.tv_sec / 86400) / 365);
-            tm.tv_sec = tm.tv_sec - (years * 86400 * 365);
-            days  = (tm.tv_sec / 86400);
-            tm.tv_sec = tm.tv_sec - (days * 86400);
-            hours = (tm.tv_sec / 3600);
-            seconds = tm.tv_sec - (hours * 3600);
-
-            snprintf(filename, size, "%s_%02d%03d%02d%04d", basename, (years - 30), days, hours, (int)seconds);
-        }
-    }
-}
 
 
 static void ValidateFeatureValues( const GenApi::CNodePtr &ptrFeature )
@@ -132,7 +109,9 @@ char GetKey()
 
 void PrintMenu()
 {
-    printf("press [Q] or [ESC] to end\n");
+    std::cout << "**************************************************************************" << std::endl;
+    std::cout << "press [Q] or [ESC] to end" << std::endl;
+    std::cout << "**************************************************************************" << std::endl;
 }
 
 
@@ -156,12 +135,10 @@ void *ImageCaptureThread( void *context)
         //     strncpy( filename, captureContext->base_name, len);
         // }
         
-
         int OpenCV_Type = 0;
         OpenCV_Type = CV_8UC1;
         // int codec = CV_FOURCC('H', '2', '6', '4'); // select desired codec (must be available at runtime)
         int codec = cv:: VideoWriter::fourcc('H', '2', '6', '4'); // select desired codec (must be available at runtime)
-        double fps = 130;                          // framerate of the created video stream
         bool isColor = FALSE;
 
         // The synchronized queues, one per video source/processing worker pair
@@ -241,28 +218,15 @@ void *ImageCaptureThread( void *context)
                         {
                         // init
 
-
-
-                    	printf("IN LOOP STARTING...\n");
-
                             cv::namedWindow( OPENCV_WINDOW_NAME, cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO );
 
                             //--- INITIALIZE VIDEOWRITER
 
 
-
-
-                            // snprintf( &filename[len], (FILENAME_MAX - len - 1), "_seq_%06d.avi", sequence_index++);
-                            // writer.open(filename, codec, fps, imgSize, isColor);
-
-                            // writer.set(cv::VIDEOWRITER_PROP_QUALITY, 75);
-                            // double qual = writer.get(cv::VIDEOWRITER_PROP_QUALITY);
-                            // cout << "QUAL" << qual << "\n";
-
                             processing.emplace_back(std::ref(queue[0]), 0
                                 , captureContext->base_name
                                 , codec
-                                , fps
+                                , captureContext->fps
                                 , imgSize
                                 , isColor
                                 //, captureContext->quality
@@ -277,22 +241,6 @@ void *ImageCaptureThread( void *context)
                             }
 
 
-                            // check if we succeeded
-
-
-            // snprintf(filename, size, "%s_%02d%03d%02d%04d", basename, (years - 30), days, hours, (int)seconds);
-            //         // 	snprintf( &filename[len], (FILENAME_MAX-len-1), "_%09llu.gevbuf", (unsigned long long)img->id);
-
-
-
-
-
-                            // 	// Init the capture sequence
-                            // 	printf("%s\n", filename); //?????
-                            // 	seqFP = GEVBUFFILE_Create( filename );
-                            // 	if (seqFP != NULL)
-                            // 	{
-                            // 		printf("Store sequence to : %s\n", filename);
                             sequence_init = 1;
                             sequence_count = 0;
                             // }
@@ -325,52 +273,38 @@ void *ImageCaptureThread( void *context)
 
                             // writer.write(exportImg);
 
-                            if (frame_count % LIVE_WINDOW_FRAME_RATIO == 0)
+                            if (frame_count % captureContext->live_window_frame_ratio == 0)
                             {
                                 cv::imshow( OPENCV_WINDOW_NAME, exportImg );
                                 cv::waitKey(1);
                             }
-                            // Display OpenCV Image
-                            // // img->ReleaseAddress( &pBuf );
-
-                            // if ( GEVBUFFILE_AddFrame( seqFP, img ) > 0)
-                            // {
-                            // printf("OPENCV Add to Sequence : Frame %llu\n", (unsigned long long)img->id);
+ 
                             fflush(stdout);
 
-                            // if (frame_count>200) {
-                            //    captureContext->enable_sequence = 0;
-                            //    captureContext->exit = 1;
-                            //    printf("STOPPING!\n");
-                            // }
+                            // if (frame_count>200) global_error = true;
+
+                            if (n_timeouts > 100) {
+                                std::cerr << "FATAL ERROR | " << get_timestamp() << " | Too many timeouts." <<std::endl;
+                                global_error = true;
+                            }
+
+                            if (global_error) {
+                                captureContext->enable_sequence = 0;
+                                captureContext->exit = 1;
+                                std::cerr << "FATAL ERROR | " << get_timestamp() << " | Error detected. Exiting capture loop..." <<std::endl;
+
+                            }
+
                             ++frame_count;
 
                             sequence_count++;
 
-                        // } else {
-                        //     cerr << filename << ": FILE NOT OPEN\n";
-                        //     printf("Add to Sequence : Data Not Saved for Frame %llu\n", (unsigned long long)img->id); 
-
-                        //     fflush(stdout);
-
-                        // }
-                        // 	if (sequence_count > FRAME_SEQUENCE_MAX_COUNT)
-                        // 	{
-                        // 		printf("\n Max Sequence Frame Count exceeded - closing sequence file\n");
-                        // 		captureContext->enable_sequence = 0;
-                        // 	}
-                        // }
-                        // else
-                        // {
-                        // 	printf("Add to Sequence : Data Not Saved for Frame %llu\r", (unsigned long long)img->id); 
-                        // }
-                        // }
                         // See if we  are done.
                         }
                         if ( !captureContext->enable_sequence )
                         {
                             // GEVBUFFILE_Close( seqFP, sequence_count );
-                            printf("Complete sequence 1: has %d frames\n", sequence_count);
+                            std::cout << "STATUS | " << get_timestamp() << " | Complete sequence has " << sequence_count << "frames" << std::endl;
                             sequence_count = 0;
                             sequence_init = 0;
 
@@ -379,20 +313,7 @@ void *ImageCaptureThread( void *context)
                         }
 
                     }
-                    // else if (captureContext->enable_save)
-                    // {
-                    // 	// Save image (example only).
-                    // 	// Note : For better performace, some other scheme with multiple
-                    // 	//        images (sequence) in a file using file mapping is needed.
 
-                    // 	snprintf( &filename[len], (FILENAME_MAX-len-1), "_%09llu.gevbuf", (unsigned long long)img->id);
-                    // 	GEVBUFFILE_SaveSingleBufferObject( filename, img );
-
-                    // 	// Turn off file save for next frame
-                    // 	captureContext->enable_save = 0;
-                    // 	printf("Single frame saved as : %s\n", filename);
-                    // 	printf("Frame %llu\r", (unsigned long long)img->id); fflush(stdout);
-                    // }
                     else
                     {
                         //printf("chunk_data = %p  : chunk_size = %d\n", img->chunk_data, img->chunk_size); //???????????
@@ -404,22 +325,25 @@ void *ImageCaptureThread( void *context)
                 {
                     // Image had an error (incomplete (timeout/overflow/lost)).
                     // Do any handling of this condition necessary.
-                    printf("ERROR | %s | Frame %llu : Status = %d\n", get_timestamp().c_str(), (unsigned long long)img->id, img->status);
+                    std::cerr << "ERROR | " << get_timestamp() <<" | Frame " << img->id << "Status = " <<  img->status << std::endl;
                 }
             }
             else if (status  == GEVLIB_ERROR_TIME_OUT)
             {
-                printf("ERROR | %s | Camera time out \n", get_timestamp().c_str());
+                n_timeouts += 1;
+                std::cerr << "ERROR | " << get_timestamp() <<" | Camera time out"
+                << " #" << n_timeouts << std::endl;
             }
             else {
-                printf("ERROR | %s | Could not get image %d \n", get_timestamp().c_str(), status);
-
+                n_timeouts += 1;
+                std::cerr << "ERROR | " << get_timestamp() <<" | Could not get image " << status
+                << " #" << n_timeouts << std::endl;
             }
             // See if a sequence in progress needs to be stopped here.
             if ((!captureContext->enable_sequence) && (sequence_init == 1))
             {
                 // GEVBUFFILE_Close( seqFP, sequence_count );
-                printf("Complete sequence2 : has %d frames\n", sequence_count);
+                std::cout << "STATUS | " << get_timestamp() << " | Complete sequence has " << sequence_count << "frames" << std::endl;
                 sequence_count = 0;
                 sequence_init = 0;
             }
@@ -453,14 +377,11 @@ void *ImageCaptureThread( void *context)
             double total_write_time_a(processing[0].storage[0].total_time_ms());
             // double total_write_time_b(storage[1].total_time_ms());
 
-            std::cout << "Completed processing " << frame_count << " images:\n"
+            std::cout << "STATUS | " << get_timestamp() 
+                << " | Completed processing " << frame_count << " images:\n"
                 << "  average capture time = " << (total_read_time / frame_count) << " ms\n"
                 << "  average processing time = " << (total_processing_time / frame_count) << " ms\n"
                 << "  average write time A = " << (total_write_time_a / frame_count) << " ms\n";
-                // << "  average write time B = " << (total_write_time_b / frame_count) << " ms\n";
-
-
-            printf("RELEASED\n");
         }
     }
     pthread_exit(0);
@@ -507,7 +428,6 @@ int IsTurboDriveAvailable(GEV_CAMERA_HANDLE handle)
 
 int main(int argc, char *argv[])
 {
-    bool error = false;
     GEV_DEVICE_INTERFACE  pCamera[MAX_CAMERAS] = {0};
     GEV_STATUS status;
     int numCamera = 0;
@@ -515,7 +435,9 @@ int main(int argc, char *argv[])
     pthread_t  tid;
     char c;
     int done = FALSE;
+    int res = 0;
     FILE *fp = NULL;
+    FILE *fp2 = NULL;
     // char uniqueName[FILENAME_MAX];
     char filename[FILENAME_MAX] = {0};
     uint32_t macLow = 0; // Low 32-bits of the mac address (for file naming).
@@ -526,7 +448,8 @@ int main(int argc, char *argv[])
 
     //============================================================================
     // Greetings
-    printf ("\nVISSS data acquisition (%s)\n", __DATE__);
+    std::cout << "VISSS data acquisition (" << __DATE__ << ")" << std::endl;
+    std::cout << "**************************************************************************" << std::endl;
 
     cv :: CommandLineParser parser(argc, argv, params);
 
@@ -537,17 +460,23 @@ int main(int argc, char *argv[])
     }
 
     int camIndex = parser.get<int>("camera");
-    std::cout << "Camera index "<< camIndex << std::endl;
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: Camera index "<< camIndex << std::endl;
     cv::String output = parser.get<cv::String>("output");
-    std::cout << "Output path "<< output << std::endl;
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: Output path "<< output << std::endl;
 
     cv::String configFile = parser.get<cv::String>(0);
-    std::cout << "Configuration file "<< configFile << std::endl;
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: Configuration file "<< configFile << std::endl;
 
     context.quality = parser.get<cv::String>("quality");
-    std::cout << "FFMPEG Quality "<< context.quality << std::endl;
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: FFMPEG Quality "<< context.quality << std::endl;
     context.preset = parser.get<cv::String>("preset");
-    std::cout << "FFMPEG preset "<< context.preset << std::endl;
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: FFMPEG preset "<< context.preset << std::endl;
+
+    context.live_window_frame_ratio = parser.get<int>("liveratio");
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: liveratio "<< context.live_window_frame_ratio << std::endl;
+
+    context.fps = parser.get<double>("fps");
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: fps "<< context.fps << std::endl;
 
 
     std::set<std::string> presets = {
@@ -563,8 +492,8 @@ int main(int argc, char *argv[])
     };
 
     if (presets.find(context.preset) == presets.end()){
-        std::cerr <<"Do not know preset " << context.preset<< std::endl;
-        exit(1);
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| Do not know preset " << context.preset<< std::endl;
+        global_error = true;
     }
 
 
@@ -578,24 +507,25 @@ int main(int argc, char *argv[])
 
     if(putenv(OPENCV_PRESET)!=0)
     {
-        std::cerr <<"putenv failed: " << OPENCV_PRESET<< std::endl;
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_PRESET<< std::endl;
         exit(1);
     }
     if(putenv(OPENCV_CRF)!=0)
     {
-        std::cerr <<"putenv failed: " << OPENCV_CRF<< std::endl;
-        exit(1);
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_CRF<< std::endl;
+        global_error = true;
     }
+
+    gethostname(hostname, HOST_NAME_MAX);
+
 
     // Open the file.
     fp = fopen(configFile.c_str(), "r");
     if (fp == NULL)
     {
-        printf("Error opening configuration file %s : errno = %d\n", filename, errno);
-        exit(-1);
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| Error opening configuration file " << configFile << std::endl;
+        global_error= true;
     }   
-
-
 
     if (!parser.check())
     {
@@ -652,20 +582,21 @@ int main(int argc, char *argv[])
 
     status = GevGetCameraList( pCamera, MAX_CAMERAS, &numCamera);
 
-    printf ("%d camera(s) on the network\n", numCamera);
+    std::cout << "STATUS | " << get_timestamp() << " | " << numCamera << " camera(s) on the network"<< std::endl;
 
     // Select the first camera found (unless the command line has a parameter = the camera index)
     if (numCamera == 0)
     {
-        error = true;
+        global_error = true;
     } 
     else   {
 
         if (camIndex >= (int)numCamera)
         {
-            printf("Camera index %d out of range\n", camIndex);
-            printf("only %d camera(s) are present\n", numCamera);
+            std::cerr << "FATAL ERROR | " << get_timestamp() << "| Camera index " << camIndex<< " out of range" << std::endl;
+            std::cerr << "FATAL ERROR | " << get_timestamp() << "| only " << numCamera<< " camera(s) are present" << std::endl;
             camIndex = -1;
+            global_error = true;
         }
 
 
@@ -731,7 +662,13 @@ int main(int argc, char *argv[])
                     // Catch all possible exceptions from a node access.
                     CATCH_GENAPI_ERROR(status);
                 }
-                                
+                      
+
+                std::cout << "STATUS | " << get_timestamp() << " | Loading settings"<< std::endl;
+                std::cout << "**************************************************************************" << std::endl;
+
+
+
                 // Read the file as { feature value } pairs and write them to the camera.
                 if ( status == 0 )
                 {
@@ -773,7 +710,7 @@ int main(int argc, char *argv[])
 
 char feature_name2[] = "timestampControlReset";
 char value_str2[] = "1";
-status = 0;
+// status = 0;
 // Find node and write the feature string (without validation).
 GenApi::CNodePtr pNode = Camera._GetNode(feature_name2);
 if (pNode)
@@ -800,17 +737,17 @@ else
     printf("Error restoring feature %s : with value %s\n", feature_name2, value_str2);
 }
 
+std::cout << "**************************************************************************" << std::endl;
 
 
 
 context.t_reset = std::chrono::system_clock::now();
 
-std::cout << "Camera clock reset around " << context.t_reset.time_since_epoch().count()/1000 <<" \n"  << std::endl;
+std::cout << "STATUS | " << get_timestamp() << "| Camera clock reset around " << context.t_reset.time_since_epoch().count()/1000  << std::endl;
 
 GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
 
                 }
-
                 // End the "streaming feature mode".
                 GenApi ::CCommandPtr end = Camera._GetNode("Std::DeviceRegistersStreamingEnd");
                 if ( end  )
@@ -841,16 +778,86 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
 
                 if (error_count == 0)
                 {
-                    printf("%d Features loaded successfully !\n", feature_count);
+                    std::cout << "STATUS | " << get_timestamp() << "| " << feature_count << " Features loaded successfully" << std::endl;
                 }
                 else
                 {
-                    printf("%d Features loaded successfully : %d Features had errors\n", feature_count, error_count);
-                    printf("Exiting...\n");
+                    std::cerr << "FATAL ERROR | " << get_timestamp() << "| " << feature_count << " Features loaded successfully, " << 
+                    error_count << " Features had errors " << std::endl;
+                    global_error = true;
                 }
 
 
-                if (error_count == 0)
+// get ALL settings
+                time_t t = time(0);   // get time now
+                struct tm * now = localtime( & t );
+                char timestamp3[80];
+                strftime (timestamp3,80,"%Y%m%d-%H%M%S",now);
+                std::string full_path = output + "/" + hostname + "_" + DeviceID + "/applied_config/" ;
+                std::string config_out = full_path + hostname + "_" + DeviceID + "_" + timestamp3 + ".config" ;
+
+                res = mkdir_p(full_path.c_str());
+                if (res != 0) {
+                    std::cerr << "FATAL ERROR | " << get_timestamp() << " | Cannot create path "<< full_path <<std::endl;
+                    global_error = true;
+                }
+                // Open the file.
+                fp2 = fopen(config_out.c_str(), "w");
+                if (fp2 == NULL)
+                {
+                    std::cerr << "FATAL ERROR | " << get_timestamp() << " | Error opening configuration file "<< config_out <<std::endl;
+                    global_error = true;
+                }   
+
+                // Put the camera in "streaming feature mode".
+                GenApi::CCommandPtr start1 = Camera._GetNode("Std::DeviceFeaturePersistenceStart");
+                if ( start1 )
+                {
+                    try {
+                            int done = FALSE;
+                            int timeout = 5;
+                            start1->Execute();
+                            while(!done && (timeout-- > 0))
+                            {
+                                Sleep(10);
+                                done = start1->IsDone();
+                            }
+                    }
+                    // Catch all possible exceptions from a node access.
+                    CATCH_GENAPI_ERROR(status);
+                }
+                                
+                // Traverse the node map and dump all the { feature value } pairs.
+                if ( status == 0 )
+                {
+                    // Find the standard "Root" node and dump the features.
+                    GenApi::CNodePtr pRoot = Camera._GetNode("Root");
+                    OutputFeatureValues( pRoot, fp2);
+                }
+
+                // End the "streaming feature mode".
+                GenApi::CCommandPtr end1 = Camera._GetNode("Std::DeviceFeaturePersistenceEnd");
+                if ( end1  )
+                {
+                    try {
+                            int done = FALSE;
+                            int timeout = 5;
+                            end1->Execute();
+                            while(!done && (timeout-- > 0))
+                            {
+                                Sleep(10);
+                                done = end1->IsDone();
+                            }
+                    }
+                    // Catch all possible exceptions from a node access.
+                    CATCH_GENAPI_ERROR(status);
+                }
+
+                fclose(fp2);
+                std::cout << "STATUS | " << get_timestamp() << "| applied configuration written to: " << config_out << std::endl;
+
+
+                if((not global_error) && (error_count == 0))
                 {
                     GEV_CAMERA_OPTIONS camOptions = {0};
 
@@ -903,46 +910,47 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
 
                     //===========================================================
                     // Set up the frame information.....
-                    printf("Camera ROI set for \n");
-                    GevGetFeatureValue(handle, "Width", &type, sizeof(width), &width);
-                    printf("\tWidth = %d\n", width);
-                    GevGetFeatureValue(handle, "Height", &type, sizeof(height), &height);
-                    printf("\tHeight = %d\n", height);
-                    GevGetFeatureValue(handle, "PixelFormat", &type, sizeof(format), &format);
-                    printf("\tPixelFormat  = 0x%x\n", format);
+                    // printf("Camera ROI set for \n");
+                    // GevGetFeatureValue(handle, "Width", &type, sizeof(width), &width);
+                    // printf("\tWidth = %d\n", width);
+                    // GevGetFeatureValue(handle, "Height", &type, sizeof(height), &height);
+                    // printf("\tHeight = %d\n", height);
+                    // GevGetFeatureValue(handle, "PixelFormat", &type, sizeof(format), &format);
+                    // printf("\tPixelFormat  = 0x%x\n", format);
 
                     if (camOptions.enable_passthru_mode)
                     {
-                        printf("\n\tPASSTHRU Mode is ON\n");
+                        // printf("\n\tPASSTHRU Mode is ON\n");
                     }
 
                     if (IsTurboDriveAvailable(handle))
                     {
-                        printf("\n\tTurboDrive is : \n");
                         val = 1;
                         if ( GevGetFeatureValue(handle, "transferTurboMode", &type, sizeof(UINT32), &val) == 0)
                         {
                             if (val == 1)
                             {
-                                printf("ON\n");
+                                std::cout << "STATUS | " << get_timestamp() << "| Turbodrive on" << std::endl;
                             }
                             else
                             {
-                                printf("OFF\n");
+                                std::cerr << "FATAL ERROR | " << get_timestamp() << "| Turbodrive off" << std::endl;
+                                global_error = false;
                             }
                         }
                     }
                     else
                     {
-                        printf("\t*** TurboDrive is NOT Available ***\n");
+                        std::cerr << "FATAL ERROR | " << get_timestamp() << "| TurboDrive is NOT Available" << std::endl;
+
+                        global_error = false;  
                     }
 
-                    printf("\n");
                     //
                     // End frame info
                     //============================================================
 
-                    if (status == 0)
+                    if ((not global_error) && (status == 0))
                     {
                         //=================================================================
                         // Set up a grab/transfer from this camera based on the settings...
@@ -997,11 +1005,14 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                         {
                             memset(bufAddress[i], 0, size);
                         }
-                        printf("STARING GevStartTransfer\n");
-                        status = GevStartTransfer( handle, -1);
-                        if (status != 0) printf("Error starting grab - 0x%x  or %d\n", status, status);
-                        printf("STARTED GevStartTransfer\n");
+                        std::cout << "STATUS | " << get_timestamp() <<" | STARING GevStartTransfer" <<std::endl;
 
+                        status = GevStartTransfer( handle, -1);
+                        if (status != 0) {
+                            std::cerr << "FATAL STATUS | " << get_timestamp() <<" | Error starting grab" <<std::endl;
+                            printf("0x%x  or %d\n", status, status);
+                            global_error = true;
+                        }
                         context.enable_sequence = 1;
 
 
@@ -1014,31 +1025,18 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                             if ((c == 0x1b) || (c == 'q') || (c == 'Q'))
                             {
                                 context.enable_sequence = 0; // End sequence if active.
-                                printf("1\n");
                                 GevStopTransfer(handle);
-                                printf("2\n");
                                 done = TRUE;
-                                printf("3\n");
                                 context.exit = TRUE;
-                                printf("4\n");
-                                usleep(1000000); 
-                                printf("4a\n");
-
                                 pthread_join( tid, NULL);
-                                printf("5\n");
                             }
                         }
-                                printf("6\n");
-
                         GevAbortTransfer(handle);
                         status = GevFreeTransfer(handle);
-                                printf("7\n");
-
                         for (i = 0; i < numBuffers; i++)
                         {
                             free(bufAddress[i]);
                         }
-                                                        printf("8\n");
 
                     }
                 }
@@ -1046,8 +1044,8 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
             }
             else
             {
-                printf("Error : 0x%0x : opening camera\n", status);
-                error = true;
+                std::cerr << "FATAL ERROR | " << get_timestamp() << " | Error : "<< status <<" : opening camera" << std::endl;
+                global_error = true;
             }
         }
     }
@@ -1062,7 +1060,8 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
     //printf("Hit any key to exit\n");
     //kbhit();
 
-    if (error) {
+    if (global_error) {
+        std::cerr << "FATAL ERROR | " << get_timestamp() << " | EXIT due to fatal error" <<std::endl;
         return 1;
     } else {
         return 0;

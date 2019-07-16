@@ -40,7 +40,6 @@ private:
     double total_time_;
     std::chrono::time_point<std::chrono::system_clock> t_reset_;
     unsigned long t_reset_uint_;
-    char hostname_[HOST_NAME_MAX];
 
     cv::VideoWriter writer_;
 
@@ -99,7 +98,7 @@ void storage_worker_cv::add_meta_data()
           <<  "CONFIG FILE"<< "\n";
 
     fMeta_ << "# Hostname: "
-          <<  hostname_<< "\n";
+          <<  hostname<< "\n";
      
     fMeta_ << "# Capture time, Record time, Frame id \n";
     return;
@@ -112,7 +111,7 @@ void storage_worker_cv::open_files()
     create_filename();
 
     std::cout << std::flush;
-    writer_.open(filename_, cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
+    writer_.open(filename_+".mkv", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
     std::cout << "STATUS | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
 
 
@@ -144,16 +143,14 @@ void storage_worker_cv::create_filename() {
     char timestamp2 [80];
     strftime (timestamp2,80,"%Y%m%d-%H%M%S",now);
 
-    std::string full_path = path_ + "/" + hostname_ + "_" + DeviceID + "/" + timestamp1 + "/" ;
-    std::cout << "DEBUGGING | " << get_timestamp() << full_path <<std::endl;
+    std::string full_path = path_ + "/" + hostname + "_" + DeviceID + "/data/" + timestamp1 + "/" ;
 
-    filename_ = full_path + hostname_ + "_" + DeviceID  + "_" + timestamp2 +".mkv";
-    std::cerr << "STATUS | " << get_timestamp() << "| filename_:" << filename_ << std::endl;
+    filename_ = full_path + hostname + "_" + DeviceID  + "_" + timestamp2;
 
     res = mkdir_p(full_path.c_str());
     if (res != 0) {
         std::cerr << "FATAL ERROR | " << get_timestamp() << " | Cannot create path "<< full_path.c_str() <<std::endl;
-        exit(1);
+        global_error = true;
     }
 
     return;
@@ -187,7 +184,6 @@ void storage_worker_cv::run()
     long int timestamp = 0;
     long int frame_count_new_file = 0;
     bool firstImage = TRUE;
-    gethostname(hostname_, HOST_NAME_MAX);
     t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
     int fps_int = cvCeil(fps_);
     open_files();
@@ -210,8 +206,9 @@ void storage_worker_cv::run()
                         close_files();
                         open_files();
     }
-        cv::imwrite(filename_+".jpg", image.MatImage );
-        frame_count_new_file = frame_count;
+                cv::imwrite(filename_+".jpg", image.MatImage );
+                frame_count_new_file = frame_count;
+                std::cout << "STATUS | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
 
 
                 }

@@ -8,7 +8,7 @@
 #include <sys/stat.h>   /* mkdir(2) */
 #include <errno.h>
 
-// #include "cordef.h"
+#include "cordef.h"
 #include "GenApi/GenApi.h"      //!< GenApi lib definitions.
 #include "gevapi.h"             //!< GEV lib definitions.
 // #include "gevbuffile.h"
@@ -42,6 +42,11 @@ using std::chrono::microseconds;
 
 
 char DeviceID[TELEDYNEDALSA_CHUNK_SIZE_DEVICEID];
+char hostname[HOST_NAME_MAX];
+int n_timeouts = 0;
+int max_n_timeouts = 100;
+bool global_error = false;
+
 
 struct MatMeta {
   cv::Mat MatImage;
@@ -93,6 +98,87 @@ int mkdir_p(const char *path)
             *p = '/';
         }
     }
-    std::cout << "STATUS | " << " Created path " << _path <<std::endl;
+    std::cout << "STATUS | " << get_timestamp() << "| Created path " << _path <<std::endl;
     return 0;
+}
+
+static void OutputFeatureValuePair( const char *feature_name, const char *value_string, FILE *fp )
+{
+    if ( (feature_name != NULL)  && (value_string != NULL) )
+    {
+        // Feature : Value pair output (in one place in to ease changing formats or output method - if desired).
+        fprintf(fp, "%s %s\n", feature_name, value_string);
+    }
+}
+
+
+static void OutputFeatureValues( const GenApi::CNodePtr &ptrFeature, FILE *fp )
+{
+    
+   GenApi::CCategoryPtr ptrCategory(ptrFeature);
+   if( ptrCategory.IsValid() )
+   {
+       GenApi::FeatureList_t Features;
+       ptrCategory->GetFeatures(Features);
+       for( GenApi::FeatureList_t::iterator itFeature=Features.begin(); itFeature!=Features.end(); itFeature++ )
+       {    
+          OutputFeatureValues( (*itFeature), fp );
+       }
+   }
+   else
+   {
+        // Store only "streamable" features (since only they can be restored).
+        if ( ptrFeature->IsStreamable() )
+        {
+            // Create a selector set (in case this feature is selected)
+            bool selectorSettingWasOutput = false;
+            GenApi::CSelectorSet selectorSet(ptrFeature);
+            
+            // Loop through all the selectors that select this feature.
+            // Use the magical CSelectorSet class that handles the 
+            //   "set of selectors that select this feature" and indexes
+            // through all possible combinations so we can save all of them.
+            selectorSet.SetFirst();
+            do
+            {
+                GenApi::CValuePtr valNode(ptrFeature);  
+                if ( valNode.IsValid() && (GenApi::RW == valNode->GetAccessMode()) && (ptrFeature->IsFeature()) )
+                {
+                    // Its a valid streamable feature.
+                    // Get its selectors (if it has any)
+                    GenApi::FeatureList_t selectorList;
+                    selectorSet.GetSelectorList( selectorList, true );
+
+                    for ( GenApi::FeatureList_t ::iterator itSelector=selectorList.begin(); itSelector!=selectorList.end(); itSelector++ )  
+                    {
+                        // Output selector : selectorValue as a feature : value pair.
+                        selectorSettingWasOutput = true;
+                        GenApi::CNodePtr selectedNode( *itSelector);
+                        GenApi::CValuePtr selectedValue( *itSelector);
+                        OutputFeatureValuePair(static_cast<const char *>(selectedNode->GetName()), static_cast<const char *>(selectedValue->ToString()), fp);
+                    }
+                        
+                    // Output feature : value pair for this selector combination 
+                    // It just outputs the feature : value pair if there are no selectors. 
+                    OutputFeatureValuePair(static_cast<const char *>(ptrFeature->GetName()), static_cast<const char *>(valNode->ToString()), fp);                   
+                }
+                
+            } while( selectorSet.SetNext());
+            // Reset to original selector/selected value (if any was used)
+            selectorSet.Restore();
+            
+            // Save the original settings for any selector that was handled (looped over) above.
+            if (selectorSettingWasOutput)
+            {
+                GenApi::FeatureList_t selectingFeatures;
+                selectorSet.GetSelectorList( selectingFeatures, true);
+                for ( GenApi::FeatureList_t ::iterator itSelector = selectingFeatures.begin(); itSelector != selectingFeatures.end(); ++itSelector)
+                {
+                    GenApi::CNodePtr selectedNode( *itSelector);
+                    GenApi::CValuePtr selectedValue( *itSelector);
+                    OutputFeatureValuePair(static_cast<const char *>(selectedNode->GetName()), static_cast<const char *>(selectedValue->ToString()), fp);
+                } 
+            }
+        }
+    }
 }
