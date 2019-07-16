@@ -17,6 +17,7 @@ if $EXE -p=superfast -o=/data/test /home/visss/Desktop/VISSS/camera-configuratio
 			exit
 else
 	echo "Didn't work, trying again in 5s"
+	paplay /usr/share/sounds/ubuntu/stereo/dialog-question.ogg
 	sleep 5
 fi
 done
