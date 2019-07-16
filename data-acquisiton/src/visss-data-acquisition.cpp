@@ -281,19 +281,6 @@ void *ImageCaptureThread( void *context)
  
                             fflush(stdout);
 
-                            // if (frame_count>200) global_error = true;
-
-                            if (n_timeouts > 100) {
-                                std::cerr << "FATAL ERROR | " << get_timestamp() << " | Too many timeouts." <<std::endl;
-                                global_error = true;
-                            }
-
-                            if (global_error) {
-                                captureContext->enable_sequence = 0;
-                                captureContext->exit = 1;
-                                std::cerr << "FATAL ERROR | " << get_timestamp() << " | Error detected. Exiting capture loop..." <<std::endl;
-
-                            }
 
                             ++frame_count;
 
@@ -304,7 +291,7 @@ void *ImageCaptureThread( void *context)
                         if ( !captureContext->enable_sequence )
                         {
                             // GEVBUFFILE_Close( seqFP, sequence_count );
-                            std::cout << "STATUS | " << get_timestamp() << " | Complete sequence has " << sequence_count << "frames" << std::endl;
+                            std::cout << "STATUS | " << get_timestamp() << " | Complete sequence has " << sequence_count << " frames" << std::endl;
                             sequence_count = 0;
                             sequence_init = 0;
 
@@ -339,8 +326,15 @@ void *ImageCaptureThread( void *context)
                 std::cerr << "ERROR | " << get_timestamp() <<" | Could not get image " << status
                 << " #" << n_timeouts << std::endl;
             }
+
+            if (n_timeouts > max_n_timeouts) {
+                std::cerr << "FATAL ERROR | " << get_timestamp() << " | Too many timeouts." <<std::endl;
+                global_error = true;
+            }
+
+
             // See if a sequence in progress needs to be stopped here.
-            if ((!captureContext->enable_sequence) && (sequence_init == 1))
+            if (global_error || ((!captureContext->enable_sequence) && (sequence_init == 1)))
             {
                 // GEVBUFFILE_Close( seqFP, sequence_count );
                 std::cout << "STATUS | " << get_timestamp() << " | Complete sequence has " << sequence_count << "frames" << std::endl;
@@ -357,7 +351,15 @@ void *ImageCaptureThread( void *context)
                 GevReleaseImage( captureContext->camHandle, img);
             }
 #endif
+
+        if (global_error) {
+            captureContext->enable_sequence = 0;
+            captureContext->exit = 1;
+            std::cerr << "FATAL ERROR | " << get_timestamp() << " | Error detected. Exiting capture loop..." <<std::endl;
+
         }
+
+        } //while
 
         if (was_active) {
 
@@ -383,8 +385,12 @@ void *ImageCaptureThread( void *context)
                 << "  average processing time = " << (total_processing_time / frame_count) << " ms\n"
                 << "  average write time A = " << (total_write_time_a / frame_count) << " ms\n";
         }
+
     }
     pthread_exit(0);
+
+
+
 }
 
 
@@ -434,7 +440,6 @@ int main(int argc, char *argv[])
     MY_CONTEXT context = {0};
     pthread_t  tid;
     char c;
-    int done = FALSE;
     int res = 0;
     FILE *fp = NULL;
     FILE *fp2 = NULL;
@@ -935,7 +940,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                             else
                             {
                                 std::cerr << "FATAL ERROR | " << get_timestamp() << "| Turbodrive off" << std::endl;
-                                global_error = false;
+                                global_error = true;
                             }
                         }
                     }
@@ -943,7 +948,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                     {
                         std::cerr << "FATAL ERROR | " << get_timestamp() << "| TurboDrive is NOT Available" << std::endl;
 
-                        global_error = false;  
+                        global_error = true;  
                     }
 
                     //
@@ -1005,7 +1010,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                         {
                             memset(bufAddress[i], 0, size);
                         }
-                        std::cout << "STATUS | " << get_timestamp() <<" | STARING GevStartTransfer" <<std::endl;
+                        std::cout << "STATUS | " << get_timestamp() <<" | STARTING GevStartTransfer" <<std::endl;
 
                         status = GevStartTransfer( handle, -1);
                         if (status != 0) {
@@ -1015,22 +1020,36 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                         }
                         context.enable_sequence = 1;
 
+                       struct sigaction sigIntHandler;
+                       sigIntHandler.sa_handler = signal_handler;
+                       sigemptyset(&sigIntHandler.sa_mask);
+                       sigIntHandler.sa_flags = 0;
+                       sigaction(SIGINT, &sigIntHandler, NULL);
+                       sigaction(SIGTERM, &sigIntHandler, NULL);
 
+                       struct sigaction sigIntHandler_null;
+                       sigIntHandler_null.sa_handler = signal_handler_null;
+                       sigemptyset(&sigIntHandler_null.sa_mask);
+                       sigIntHandler_null.sa_flags = 0;
+                       sigaction(SIGALRM, &sigIntHandler_null, NULL);
 
-                        while(!done)
+                        while(!(global_error) && (!done))
                         {
+                            alarm(1);
                             c = GetKey();
-
 
                             if ((c == 0x1b) || (c == 'q') || (c == 'Q'))
                             {
-                                context.enable_sequence = 0; // End sequence if active.
-                                GevStopTransfer(handle);
                                 done = TRUE;
-                                context.exit = TRUE;
-                                pthread_join( tid, NULL);
-                            }
+                           }
                         }
+
+                        context.enable_sequence = 0; // End sequence if active.
+                        GevStopTransfer(handle);
+                        context.exit = TRUE;
+                        pthread_join( tid, NULL);
+
+                        std::cout << "STATUS | " << get_timestamp() <<" | STOPPING GevStartTransfer" <<std::endl;
                         GevAbortTransfer(handle);
                         status = GevFreeTransfer(handle);
                         for (i = 0; i < numBuffers; i++)
@@ -1064,6 +1083,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
         std::cerr << "FATAL ERROR | " << get_timestamp() << " | EXIT due to fatal error" <<std::endl;
         return 1;
     } else {
+        std::cout << "STATUS | " << get_timestamp() << " | All done" <<std::endl;
         return 0;
     }
 }

@@ -31,6 +31,8 @@
 #include <thread>
 #include <unistd.h>
 #include <set>
+#include <signal.h>
+#include <stdlib.h>
 
 // ============================================================================
 using std::chrono::high_resolution_clock;
@@ -44,8 +46,11 @@ using std::chrono::microseconds;
 char DeviceID[TELEDYNEDALSA_CHUNK_SIZE_DEVICEID];
 char hostname[HOST_NAME_MAX];
 int n_timeouts = 0;
-int max_n_timeouts = 100;
+int max_n_timeouts = 2;
 bool global_error = false;
+int done = FALSE;
+
+
 
 
 struct MatMeta {
@@ -67,6 +72,14 @@ std::string get_timestamp(){
     return t_string;
    
 }
+
+
+void signal_handler(int s){
+   std::cout << "STATUS | " << get_timestamp() << "| Catched signal Ctrl-C" <<std::endl;
+   done = TRUE; 
+
+}
+void signal_handler_null(int s) {}
 
 int mkdir_p(const char *path)
 {
