@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+EXE=/home/visss/Desktop/VISSS/data-acquisiton/visss-data-acquisiton
 
 for (( ; ; ))
 do
