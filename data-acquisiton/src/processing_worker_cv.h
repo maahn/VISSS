@@ -140,8 +140,8 @@ void processing_worker_cv::run()
                 if (frame_count % fps_int == 0)
                 {
                     std::cout << "STATUS | " << get_timestamp() << 
-                    " | Proc. queue: " <<queue_.size() << 
-                    " | Stor.1 queue: " <<queue_writer[0].size() << 
+                    " | Proc. & Stor queues: " <<queue_.size() << 
+                    " & " <<queue_writer[0].size() << 
                     " | Mean img: " << cv::mean(image.MatImage)[0] <<
                     "\r"<<std::flush;
                 }
