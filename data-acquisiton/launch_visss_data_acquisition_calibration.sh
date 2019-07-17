@@ -8,11 +8,11 @@ for (( ; ; ))
 do
 if $EXE -f=10 -q=15 -l=1 -p=medium -o=/data/test $PATH/camera-configuration/visss_calibration.config
 		then
-			echo "worked"
+			/bin/echo "worked"
 			exit
 else
-	echo "Didn't work, trying again in 5s"
-	paplay /usr/share/sounds/ubuntu/stereo/dialog-question.ogg
-	sleep 5
+	/bin/echo "Didn't work, trying again in 5s"
+	/usr/bin/paplay /usr/share/sounds/ubuntu/stereo/dialog-question.ogg
+	/bin/sleep 5
 fi
 done
