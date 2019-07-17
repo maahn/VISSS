@@ -128,21 +128,22 @@ void processing_worker_cv::run()
                 
 
                 ++frame_count;
-                            processedImage.MatImage = image.MatImage.clone();
-                            processedImage.timestamp = image.timestamp;
-                            processedImage.id = image.id;
+                processedImage.MatImage = image.MatImage.clone();
+                processedImage.timestamp = image.timestamp;
+                processedImage.id = image.id;
 
-                            // Insert a copy into all queues
-                            for (auto& q : queue_writer) {
-                                q.push(processedImage);
-                            }    
+                // Insert a copy into all queues
+                for (auto& q : queue_writer) {
+                    q.push(processedImage);
+                }    
 
                 if (frame_count % fps_int == 0)
                 {
                     std::cout << "STATUS | " << get_timestamp() << 
-                    " | Processing queue size: " <<queue_.size() << 
-                    " | Storage1 queue size: " <<queue_writer[0].size() << 
-                    "                     \r"<<std::flush;
+                    " | Proc. queue: " <<queue_.size() << 
+                    " | Stor.1 queue: " <<queue_writer[0].size() << 
+                    " | Mean img: " << cv::mean(image.MatImage)[0] <<
+                    "\r"<<std::flush;
                 }
 
                 high_resolution_clock::time_point t2(high_resolution_clock::now());
