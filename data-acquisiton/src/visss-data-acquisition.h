@@ -49,7 +49,7 @@ int n_timeouts = 0;
 int max_n_timeouts = 2;
 bool global_error = false;
 int done = FALSE;
-
+cv::String configFile;
 
 
 

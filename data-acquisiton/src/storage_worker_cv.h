@@ -143,9 +143,15 @@ void storage_worker_cv::create_filename() {
     char timestamp2 [80];
     strftime (timestamp2,80,"%Y%m%d-%H%M%S",now);
 
-    std::string full_path = path_ + "/" + hostname + "_" + DeviceID + "/data/" + timestamp1 + "/" ;
+    std::string configFileRaw = configFile.substr(0, configFile.find_last_of("."));
+    size_t sep = configFileRaw.find_last_of("\\/");
+    if (sep != std::string::npos)
+        configFileRaw = configFileRaw.substr(sep + 1, configFileRaw.size() - sep - 1);
 
-    filename_ = full_path + hostname + "_" + DeviceID  + "_" + timestamp2;
+
+    std::string full_path = path_ + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "/data/" + timestamp1 + "/" ;
+
+    filename_ = full_path + hostname + "_" + configFileRaw + "_" + DeviceID  + "_" + timestamp2;
 
     res = mkdir_p(full_path.c_str());
     if (res != 0) {

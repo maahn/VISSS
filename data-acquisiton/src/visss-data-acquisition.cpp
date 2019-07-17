@@ -469,7 +469,7 @@ int main(int argc, char *argv[])
     cv::String output = parser.get<cv::String>("output");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: Output path "<< output << std::endl;
 
-    cv::String configFile = parser.get<cv::String>(0);
+    configFile = parser.get<cv::String>(0);
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: Configuration file "<< configFile << std::endl;
 
     context.quality = parser.get<cv::String>("quality");

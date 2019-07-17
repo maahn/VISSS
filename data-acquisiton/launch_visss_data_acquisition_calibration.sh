@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-EXE=/home/visss/Desktop/VISSS/data-acquisiton/visss-data-acquisiton
+PATH=/home/visss/Desktop/VISSS/
+EXE=$PATH/data-acquisiton/visss-data-acquisiton
+cd $PATH/data-acquisiton/
+
 
 for (( ; ; ))
 do
-if $EXE -f=10 -q=15 -l=1 -p=medium -o=/data/test /home/visss/Desktop/VISSS/camera-configuration/visss_calibration.config
+if $EXE -f=10 -q=15 -l=1 -p=medium -o=/data/test $PATH/camera-configuration/visss_calibration.config
 		then
 			echo "worked"
 			exit

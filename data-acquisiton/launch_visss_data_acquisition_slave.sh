@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-
-EXE=/home/visss/Desktop/VISSS/data-acquisiton/visss-data-acquisiton
+PATH=/home/visss/Desktop/VISSS/
+EXE=$PATH/data-acquisiton/visss-data-acquisiton
+cd $PATH/data-acquisiton/
 sudo /home/visss/DALSA/GigeV/bin/gev_nettweak eno1
 sudo /sbin/setcap cap_sys_nice+ep $EXE
 
@@ -11,7 +12,7 @@ sleep 25
 
 for (( ; ; ))
 do
-if $EXE -p=superfast -o=/data/test /home/visss/Desktop/VISSS/camera-configuration/visss_slave.config
+if $EXE -p=superfast -o=/data/test $PATH/camera-configuration/visss_slave.config
 		then
 			echo "worked"
 			exit
