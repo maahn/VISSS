@@ -46,7 +46,7 @@ using std::chrono::microseconds;
 char DeviceID[TELEDYNEDALSA_CHUNK_SIZE_DEVICEID];
 char hostname[HOST_NAME_MAX];
 int n_timeouts = 0;
-int max_n_timeouts = 2;
+int max_n_timeouts = 30;
 bool global_error = false;
 int done = FALSE;
 cv::String configFile;
