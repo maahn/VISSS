@@ -50,7 +50,7 @@ int max_n_timeouts = 30;
 bool global_error = false;
 int done = FALSE;
 cv::String configFile;
-
+std::string configFileRaw;
 
 
 struct MatMeta {

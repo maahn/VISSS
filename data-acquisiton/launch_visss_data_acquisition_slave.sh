@@ -12,7 +12,7 @@ cd $PATH/data-acquisiton/
 
 for (( ; ; ))
 do
-if $EXE -p=superfast -o=/data/test $PATH/camera-configuration/visss_slave.config
+if $EXE -p=superfast -l=20 -o=/data/test $PATH/camera-configuration/visss_slave.config
 		then
 			/bin/echo "worked"
 			exit

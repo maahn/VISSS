@@ -471,6 +471,11 @@ int main(int argc, char *argv[])
 
     configFile = parser.get<cv::String>(0);
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: Configuration file "<< configFile << std::endl;
+    configFileRaw = configFile.substr(0, configFile.find_last_of("."));
+    size_t sep = configFileRaw.find_last_of("\\/");
+    if (sep != std::string::npos)
+        configFileRaw = configFileRaw.substr(sep + 1, configFileRaw.size() - sep - 1);
+
 
     context.quality = parser.get<cv::String>("quality");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: FFMPEG Quality "<< context.quality << std::endl;
@@ -798,7 +803,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                 struct tm * now = localtime( & t );
                 char timestamp3[80];
                 strftime (timestamp3,80,"%Y%m%d-%H%M%S",now);
-                std::string full_path = output + "/" + hostname + "_" + DeviceID + "/applied_config/" ;
+                std::string full_path = output + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "/applied_config/" ;
                 std::string config_out = full_path + hostname + "_" + DeviceID + "_" + timestamp3 + ".config" ;
 
                 res = mkdir_p(full_path.c_str());
