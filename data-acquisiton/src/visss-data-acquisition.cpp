@@ -38,7 +38,7 @@ const char* params
       "{ quality q      | 23                | quality 0-51 }"
       "{ preset p       | medium            | preset (ultrafast - placebo) }"
       "{ liveratio l    | 100               | every Xth frame will be displayed in the live window }"
-      "{ fps f          | 170               | frames per seconds of output }"
+      "{ fps f          | 140               | frames per seconds of output }"
       "{ @config        | <none>            | camera configuration file }";
 
 // ====================================
