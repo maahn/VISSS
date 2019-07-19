@@ -286,6 +286,9 @@ void *ImageCaptureThread( void *context)
 
                             sequence_count++;
 
+                            //rest n_timeout after success
+                            n_timeouts = 0;
+
                         // See if we  are done.
                         }
                         if ( !captureContext->enable_sequence )
