@@ -1,10 +1,10 @@
 [Desktop Entry]
 Version=1.0
-Name=Visss-slavecalibration
+Name=Visss-calibration
 Comment=Launch VISSS calibration process
 Exec=gnome-terminal -e 'sh -c "/home/visss/Desktop/VISSS/data-acquisiton/launch_visss_data_acquisition_calibration.sh; exec bash"'
 Icon=face-glasses
-Terminal=false
+Terminal=true
 Type=Application
 Categories=Application;
 

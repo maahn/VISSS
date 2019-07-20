@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=Visss-calibration-depth-master
+Comment=Launch VISSS depth calibration process for master
+Exec=gnome-terminal -e 'sh -c "/home/visss/Desktop/VISSS/data-acquisiton/launch_visss_data_acquisition_calibration_depth_master.sh; exec bash"'
+Icon=face-cool
+Terminal=true
+Type=Application
+Categories=Application;
+
+Name[en_US]=Visss-calibration-depth-master
