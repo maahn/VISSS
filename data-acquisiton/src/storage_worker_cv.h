@@ -130,29 +130,6 @@ void storage_worker_cv::close_files() {
 }
 
 
-void storage_worker_cv::create_filename() {
-
-    time_t t = time(0);   // get time now
-    struct tm * now = localtime( & t );
-    int res = 0;
-    char timestamp1 [80];
-    strftime (timestamp1,80,"%Y/%m/%d",now);
-    char timestamp2 [80];
-    strftime (timestamp2,80,"%Y%m%d-%H%M%S",now);
-
-
-    std::string full_path = path_ + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "/data/" + timestamp1 + "/" ;
-
-    filename_ = full_path + hostname + "_" + configFileRaw + "_" + DeviceID  + "_" + timestamp2;
-
-    res = mkdir_p(full_path.c_str());
-    if (res != 0) {
-        std::cerr << "FATAL ERROR | " << get_timestamp() << " | Cannot create path "<< full_path.c_str() <<std::endl;
-        global_error = true;
-    }
-
-
-
 // TEST cv::CAP_FFMPEG!!
 //     res["h264"] = VideoWriter::fourcc('H','2','6','4');
 //     res["h265"] = VideoWriter::fourcc('H','E','V','C');
@@ -203,13 +180,11 @@ void storage_worker_cv::run()
                     close_files();
                     open_files();
 
-    }
+                }
                 cv::imwrite(filename_+".jpg", image.MatImage );
                 frame_count_new_file = frame_count;
                 std::cout << "STATUS | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
 
-
-                }
 
                 writer_.write(image.MatImage);
 
