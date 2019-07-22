@@ -241,10 +241,10 @@ void processing_worker_cv::run()
                 if (frame_count % fps_int == 0)
                 {
                     std::cout << "STATUS | " << get_timestamp() << 
-                    " | Processing queue size: " <<queue_.size() << 
-                    " | Storage1 queue size: " <<queue_writer[0].size() << 
-                    " | Moving Pixel: " << movingPixel <<
-                    "                     \r"<<std::flush;
+                    " | Proc. & Stor queues: " <<queue_.size() << 
+                    " & " <<queue_writer[0].size() << 
+                    " | Mean img: " << cv::mean(image.MatImage)[0] <<
+                    "\r"<<std::flush;
                 }
 
                 firstImage = FALSE;
