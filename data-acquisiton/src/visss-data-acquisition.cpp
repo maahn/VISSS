@@ -218,7 +218,7 @@ void *ImageCaptureThread( void *context)
                         {
                         // init
 
-                            cv::namedWindow( OPENCV_WINDOW_NAME, cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO );
+                            cv::namedWindow( OPENCV_WINDOW_NAME, cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
 
                             //--- INITIALIZE VIDEOWRITER
 
@@ -275,7 +275,10 @@ void *ImageCaptureThread( void *context)
 
                             if (frame_count % captureContext->live_window_frame_ratio == 0)
                             {
-                                cv::imshow( OPENCV_WINDOW_NAME, exportImg );
+                                cv::Mat exportImgSmall;
+                                cv::resize(exportImg, exportImgSmall, cv::Size(), 0.5, 0.5);
+
+                                cv::imshow( OPENCV_WINDOW_NAME, exportImgSmall );
                                 cv::waitKey(1);
                             }
  
