@@ -47,6 +47,7 @@ void frame_queue::push(MatMeta const& image)
         cond_.notify_one();
     } else {
         std::cout<< "ERROR | " << get_timestamp() << " | Maximum queue size "  << max_queue_size << " reached. Discarding data!" << std::endl;
+        global_error = true;
     }
 }
 // ----------------------------------------------------------------------------

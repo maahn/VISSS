@@ -180,11 +180,11 @@ void storage_worker_cv::run()
                     close_files();
                     open_files();
 
-                }
-                cv::imwrite(filename_+".jpg", image.MatImage );
-                frame_count_new_file = frame_count;
-                std::cout << "STATUS | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
 
+                    cv::imwrite(filename_+".jpg", image.MatImage );
+                    frame_count_new_file = frame_count;
+                    std::cout << "STATUS | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
+                }
 
                 writer_.write(image.MatImage);
 

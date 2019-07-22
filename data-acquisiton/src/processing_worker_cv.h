@@ -105,23 +105,23 @@ void processing_worker_cv::run()
     double movingPixel = 0;
     cv::Ptr<cv::BackgroundSubtractor> pBackSub;
  
-    // int     history = 500;
-    // double  dist2Threshold = 400;
-    // bool    detectShadows = false;
-    // pBackSub = cv::createBackgroundSubtractorKNN(
-    //     history,
-    //     dist2Threshold,
-    //     detectShadows 
-    // );
-
     int     history = 500;
-    double  varThreshold = 16;
+    double  dist2Threshold = 40;
     bool    detectShadows = false;
-    pBackSub = cv::createBackgroundSubtractorMOG2(
+    pBackSub = cv::createBackgroundSubtractorKNN(
         history,
-        varThreshold,
+        dist2Threshold,
         detectShadows 
     );
+
+    // int     history = 50;
+    // double  varThreshold = 160;
+    // bool    detectShadows = false;
+    // pBackSub = cv::createBackgroundSubtractorMOG2(
+    //     history,
+    //     varThreshold,
+    //     detectShadows 
+    // );
 
 
     cv::Mat element;
@@ -171,17 +171,17 @@ void processing_worker_cv::run()
                 pBackSub->apply(image.MatImage, fgMask);
 
 
-                int morph_size = 2;
-                element = cv::getStructuringElement(
-                    cv::MORPH_RECT, 
-                    cv::Size( 2*morph_size + 1, 2*morph_size+1 ), 
-                    cv::Point( morph_size, morph_size ) 
-                    );
-                cv::morphologyEx( fgMask, fgMask2, cv::MORPH_OPEN, element );
+                // int morph_size = 2;
+                // element = cv::getStructuringElement(
+                //     cv::MORPH_RECT, 
+                //     cv::Size( 2*morph_size + 1, 2*morph_size+1 ), 
+                //     cv::Point( morph_size, morph_size ) 
+                //     );
+                //cv::morphologyEx( fgMask, fgMask2, cv::MORPH_OPEN, element );
                 //movingPixel = cv::sum( fgMask )[0];
 
 
-                image.MatImage.copyTo(processedImage.MatImage, fgMask2);
+                image.MatImage.copyTo(processedImage.MatImage);//, fgMask2);
 
                 timestamp = static_cast<long int> (time(NULL));
                 if (firstImage || ((timestamp % 300 == 0) && (frame_count-frame_count_new_file > 300)))
