@@ -217,10 +217,14 @@ void storage_worker_cv::run()
 
                 if (frame_count % fps_int == 0)
                 {
+                    cv::Scalar meanImg, stdImg;
+                    cv::meanStdDev(image.MatImage, meanImg, stdImg);
+
                     std::cout << "STATUS | " << get_timestamp() << 
-                    " | Storage queue: " <<queue_.size() << 
-                    " | Mean img: " << cv::mean(image.MatImage)[0] <<
-                    "\r"<<std::flush;
+                    " | Storage queue: " << queue_.size() << 
+                    " | Mean+/-std img: " << meanImg[0] <<
+                    "+/-" << stdImg[0] <<
+                    "  \r"<<std::flush;
                 }
 
                 high_resolution_clock::time_point t2(high_resolution_clock::now());
