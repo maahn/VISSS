@@ -221,7 +221,7 @@ void storage_worker_cv::run()
                     cv::meanStdDev(image.MatImage, meanImg, stdImg);
 
                     std::cout << "STATUS | " << get_timestamp() << 
-                    " | Storage queue: " << queue_.size() << 
+                    " | Queue: " << queue_.size() << 
                     " | Mean+/-std img: " << meanImg[0] <<
                     "+/-" << stdImg[0] <<
                     "  \r"<<std::flush;

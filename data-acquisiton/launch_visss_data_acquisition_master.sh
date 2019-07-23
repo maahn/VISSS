@@ -5,8 +5,8 @@ cd $PATH/data-acquisiton/
 /usr/bin/sudo /home/visss/DALSA/GigeV/bin/gev_nettweak eno1
 /usr/bin/sudo /sbin/setcap cap_sys_nice+ep $EXE
 
-/bin/echo "It takes some time for the camera to come online... Sleep 15"
-/bin/sleep 15
+/bin/echo "It takes some time for the camera to come online... Sleep 20"
+/bin/sleep 20
 
 for (( ; ; ))
 do
