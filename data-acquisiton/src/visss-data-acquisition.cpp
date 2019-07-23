@@ -278,6 +278,17 @@ void *ImageCaptureThread( void *context)
                                 cv::Mat exportImgSmall;
                                 cv::resize(exportImg, exportImgSmall, cv::Size(), 0.5, 0.5);
 
+
+                                std::string textImg = get_timestamp() + ", Hostname: " + hostname + ", Config file: " + configFileRaw;
+                                cv::putText(exportImgSmall, 
+                                    textImg,
+                                    cv::Point(10,20), // Coordinates
+                                    cv::FONT_HERSHEY_PLAIN, // Font
+                                    1.0, // Scale. 2.0 = 2x bigger
+                                    cv::Scalar(255), // BGR Color
+                                    1, // Line Thickness (Optional)
+                                    cv::LINE_AA); // Anti-alias (Optional)
+
                                 cv::imshow( OPENCV_WINDOW_NAME, exportImgSmall );
                                 cv::waitKey(1);
                             }
