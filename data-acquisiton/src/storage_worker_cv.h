@@ -187,7 +187,7 @@ void storage_worker_cv::run()
     bool firstImage = TRUE;
     t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
     int fps_int = cvCeil(fps_);
-    open_files();
+
     try {
         int32_t frame_count(0);
         for (;;) {
@@ -203,17 +203,25 @@ void storage_worker_cv::run()
                 timestamp = static_cast<long int> (time(NULL));
                 if (firstImage || ((timestamp % 300 == 0) && (frame_count-frame_count_new_file > 300)))
                 {
-                    if (not firstImage) {
-                        close_files();
-                        open_files();
-    }
-                cv::imwrite(filename_+".jpg", image.MatImage );
-                frame_count_new_file = frame_count;
-                std::cout << "STATUS | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
+
+                    close_files();
+                    open_files();
+
+                    cv::imwrite(filename_+".jpg", image.MatImage );
+                    frame_count_new_file = frame_count;
+                    std::cout << "STATUS | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
 
 
                 }
                 writer_.write(image.MatImage);
+
+                if (frame_count % fps_int == 0)
+                {
+                    std::cout << "STATUS | " << get_timestamp() << 
+                    " | Storage queue: " <<queue_.size() << 
+                    " | Mean img: " << cv::mean(image.MatImage)[0] <<
+                    "\r"<<std::flush;
+                }
 
                 high_resolution_clock::time_point t2(high_resolution_clock::now());
                 double dt_us(static_cast<double>(duration_cast<microseconds>(t2 - t1).count()));
@@ -221,6 +229,9 @@ void storage_worker_cv::run()
 
                 
                 firstImage = FALSE;
+
+
+
                 // std::cout << "Worker " << id_ << " stored image.MatImage #" << frame_count
                 //     << " in " << (dt_us / 1000.0) << " ms" << std::endl;
             }

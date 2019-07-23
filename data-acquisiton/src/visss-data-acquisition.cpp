@@ -4,7 +4,7 @@
 //============================================================================
 #include "frame_queue.h"   
 #include "storage_worker_cv.h"   
-#include "processing_worker_cv.h"   
+//#include "storage_worker_cv.h"   
 
 
 // using namespace cv;
@@ -141,13 +141,13 @@ void *ImageCaptureThread( void *context)
         int codec = cv:: VideoWriter::fourcc('H', '2', '6', '4'); // select desired codec (must be available at runtime)
         bool isColor = FALSE;
 
-        // The synchronized queues, one per video source/processing worker pair
+        // The synchronized queues, one per video source/storage worker pair
         std::vector<frame_queue> queue(1);
 
-        // Let's create our processing workers -- let's have two, to simulate your scenario
+        // Let's create our storage workers -- let's have two, to simulate your scenario
         // and to keep it interesting, have each one write a different format
-        std::vector <processing_worker_cv> processing;
-        std::vector<std::thread> processing_thread;
+        std::vector <storage_worker_cv> storage;
+        std::vector<std::thread> storage_thread;
 
         double total_read_time(0.0);
         int32_t frame_count(0);
@@ -223,7 +223,7 @@ void *ImageCaptureThread( void *context)
                             //--- INITIALIZE VIDEOWRITER
 
 
-                            processing.emplace_back(std::ref(queue[0]), 0
+                            storage.emplace_back(std::ref(queue[0]), 0
                                 , captureContext->base_name
                                 , codec
                                 , captureContext->fps
@@ -233,11 +233,11 @@ void *ImageCaptureThread( void *context)
                                 //, captureContext->preset
                                 , captureContext->t_reset
                                 );
-                            std:: cout << "STATUS | " << get_timestamp() << "| Processing worker started" << std::endl;
+                            std:: cout << "STATUS | " << get_timestamp() << "| storage worker started" << std::endl;
 
-                            // And start the worker threads for each processing worker
-                            for (auto& s : processing) {
-                                processing_thread.emplace_back(&processing_worker_cv::run, &s);
+                            // And start the worker threads for each storage worker
+                            for (auto& s : storage) {
+                                storage_thread.emplace_back(&storage_worker_cv::run, &s);
                             }
 
 
@@ -386,21 +386,22 @@ void *ImageCaptureThread( void *context)
             }
 
             // And join all the worker threads, waiting for them to finish
-            processing_thread[0].join();
-            // for (auto& st2 : processing_thread) {
+            storage_thread[0].join();
+            // for (auto& st2 : storage_thread) {
             //     st2.join();
             // }
             // Report the timings
             total_read_time /= 1000.0;
-            double total_processing_time(processing[0].total_time_ms());
-            double total_write_time_a(processing[0].storage[0].total_time_ms());
+            double total_storage_time(storage[0].total_time_ms());
+            //double total_write_time_a(storage[0].storage[0].total_time_ms());
             // double total_write_time_b(storage[1].total_time_ms());
 
             std::cout << "STATUS | " << get_timestamp() 
-                << " | Completed processing " << frame_count << " images:\n"
+                << " | Completed storage " << frame_count << " images:\n"
                 << "  average capture time = " << (total_read_time / frame_count) << " ms\n"
-                << "  average processing time = " << (total_processing_time / frame_count) << " ms\n"
-                << "  average write time A = " << (total_write_time_a / frame_count) << " ms\n";
+                << "  average storage time = " << (total_storage_time / frame_count) << " ms\n"
+                //<< "  average write time A = " << (total_write_time_a / frame_count) << " ms\n"
+                ;
         }
 
     }
