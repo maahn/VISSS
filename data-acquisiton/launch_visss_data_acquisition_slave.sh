@@ -6,8 +6,8 @@ cd $PATH/data-acquisiton/
 /usr/bin/sudo /sbin/setcap cap_sys_nice+ep $EXE
 
 
-/bin/echo "It takes some time for the camera to come online... Sleep 20"
-/bin/sleep 20
+/bin/echo "It takes some time for the camera to come online... Sleep 25"
+/bin/sleep 25
 
 
 for (( ; ; ))
