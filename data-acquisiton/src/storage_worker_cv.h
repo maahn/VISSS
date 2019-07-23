@@ -111,7 +111,7 @@ void storage_worker_cv::open_files()
     create_filename();
 
     std::cout << std::flush;
-    writer_.open(filename_+".mkv", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
+    writer_.open(filename_+".mov", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
     std::cout << "STATUS | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
 
 
