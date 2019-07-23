@@ -35,9 +35,9 @@ const char* params
     = "{ help h         |                   | Print usage }"
       "{ output o       | ./                | Output Path }"
       "{ camera n       | 0                 | camera number }"
-      "{ quality q      | 23                | quality 0-51 }"
-      "{ preset p       | medium            | preset (ultrafast - placebo) }"
-      "{ liveratio l    | 100               | every Xth frame will be displayed in the live window }"
+      "{ quality q      | 16                | quality 0-51 }"
+      "{ preset p       | veryfast          | preset (ultrafast - placebo) }"
+      "{ liveratio l    | 35                | every Xth frame will be displayed in the live window }"
       "{ fps f          | 140               | frames per seconds of output }"
       "{ @config        | <none>            | camera configuration file }";
 
