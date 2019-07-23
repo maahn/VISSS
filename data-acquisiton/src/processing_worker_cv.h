@@ -5,6 +5,7 @@
 // ============================================================================
 
 
+#define OPENCV_WINDOW_NAME  "VISSS Live Image"
 
 
 
@@ -105,8 +106,8 @@ void processing_worker_cv::run()
     double movingPixel = 0;
     cv::Ptr<cv::BackgroundSubtractor> pBackSub;
  
-    int     history = 500;
-    double  dist2Threshold = 40;
+    int     history = 5000;
+    double  dist2Threshold = 400;
     bool    detectShadows = false;
     pBackSub = cv::createBackgroundSubtractorKNN(
         history,
@@ -127,6 +128,8 @@ void processing_worker_cv::run()
     cv::Mat element;
     cv::Mat imageJpg;
     cv::Mat fgMask, fgMask2;
+    
+    cv::namedWindow( OPENCV_WINDOW_NAME, cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO );
 
     storage.emplace_back(std::ref(queue_writer[0]), 100
         , path_
@@ -221,14 +224,14 @@ void processing_worker_cv::run()
                         cv::Scalar(255), // BGR Color
                         1, // Line Thickness (Optional)
                         cv::LINE_AA); // Anti-alias (Optional)
-                    std::cerr << "STATUS | " << get_timestamp() << "| Writing JPG" << processedImage.filename+".jpg" << std::endl;
+                    std::cout << "STATUS | " << get_timestamp() << "| Writing JPG" << processedImage.filename+".jpg" << std::endl;
                     cv::imwrite(processedImage.filename+".jpg", imageJpg );
                     
                 }
 
                 //if (frame_count % LIVE_WINDOW_FRAME_RATIO == 0)
                 //{
-                //    cv::imshow( OPENCV_WINDOW_NAME, exportImg );
+                 //   cv::imshow( '123', fgMask );
                 //    cv::waitKey(1);
                 //}
 
@@ -239,14 +242,27 @@ void processing_worker_cv::run()
                 }    
 
                 if (frame_count % fps_int == 0)
-                {
+{
+uint nMasked;
+nMasked = cv::countNonZero(  fgMask );
+
                     std::cout << "STATUS | " << get_timestamp() << 
                     " | Proc. & Stor queues: " <<queue_.size() << 
                     " & " <<queue_writer[0].size() << 
+                    " | " <<nMasked <<
                     " | Mean img: " << cv::mean(image.MatImage)[0] <<
                     "\r"<<std::flush;
                 }
 
+                if (frame_count % live_window_frame_ratio == 0)
+                {
+
+//cv::cvtColor(gray_img,color_img,CV_GRAY2BGR)
+
+
+                    cv::imshow( OPENCV_WINDOW_NAME, fgMask );
+                    cv::waitKey(1);
+                }
                 firstImage = FALSE;
 
                 high_resolution_clock::time_point t2(high_resolution_clock::now());

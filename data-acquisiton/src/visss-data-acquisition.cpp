@@ -10,7 +10,6 @@
 // using namespace cv;
 // using namespace std;
 
-#define OPENCV_WINDOW_NAME	"VISSS Live Image"
 
 #define MAX_CAMERAS     2
 
@@ -54,7 +53,6 @@ typedef struct tagMY_CONTEXT
     std::string 					base_name;
     int 					enable_sequence;
     int 					enable_save;
-    int                     live_window_frame_ratio;
     double                     fps;
     std::string                  quality;
     std::string                  preset;
@@ -218,7 +216,6 @@ void *ImageCaptureThread( void *context)
                         {
                         // init
 
-                            cv::namedWindow( OPENCV_WINDOW_NAME, cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO );
 
                             //--- INITIALIZE VIDEOWRITER
 
@@ -251,7 +248,7 @@ void *ImageCaptureThread( void *context)
 
 
                             // Add timestamp to frame
-                            if (1) {
+                            if (0) {
                                 std::string textJpg = get_timestamp() + ", ID: " + std::to_string(img->id) + ", time: " + std::to_string(img->timestamp);
                                 cv::putText(exportImg, 
                                     textJpg,
@@ -284,11 +281,6 @@ void *ImageCaptureThread( void *context)
 
                             // writer.write(exportImg);
 
-                            if (frame_count % captureContext->live_window_frame_ratio == 0)
-                            {
-                                cv::imshow( OPENCV_WINDOW_NAME, exportImg );
-                                cv::waitKey(1);
-                            }
  
                             fflush(stdout);
 
@@ -496,8 +488,8 @@ int main(int argc, char *argv[])
     context.preset = parser.get<cv::String>("preset");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: FFMPEG preset "<< context.preset << std::endl;
 
-    context.live_window_frame_ratio = parser.get<int>("liveratio");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: liveratio "<< context.live_window_frame_ratio << std::endl;
+    live_window_frame_ratio = parser.get<int>("liveratio");
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: liveratio "<< live_window_frame_ratio << std::endl;
 
     context.fps = parser.get<double>("fps");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: fps "<< context.fps << std::endl;
