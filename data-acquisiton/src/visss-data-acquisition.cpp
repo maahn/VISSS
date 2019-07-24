@@ -137,8 +137,8 @@ void *ImageCaptureThread( void *context)
         
         int OpenCV_Type = 0;
         OpenCV_Type = CV_8UC1;
-        // int codec = CV_FOURCC('H', '2', '6', '4'); // select desired codec (must be available at runtime)
-        int codec = cv:: VideoWriter::fourcc('H', '2', '6', '4'); // select desired codec (must be available at runtime)
+        //int codec = cv:: VideoWriter::fourcc('H', '2', '6', '4'); // select desired codec (must be available at runtime)
+        int codec = cv:: VideoWriter::fourcc('a', 'v', 'c', '1'); // select desired codec (must be available at runtime)
         bool isColor = FALSE;
 
         // The synchronized queues, one per video source/storage worker pair
@@ -920,7 +920,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                     camOptions.streamMemoryLimitMax = 64 * 1024 * 1024;		// Adjust packet memory buffering limit.
                     camOptions.streamMemoryLimitMax =  2 * 20 * 8 * 1280 * 1024;     // Adjust packet memory buffering limit.
                     camOptions.streamPktSize = 8960;                            // Adjust the GVSP packet size.
-                    camOptions.streamPktSize = 8928-1;                            // Adjust the GVSP packet size.
+                    camOptions.streamPktSize = 8960-1;                            // Adjust the GVSP packet size.
                     camOptions.streamPktDelay = 10;                         // Add usecs between packets to pace arrival at NIC.
                     camOptions.streamPktDelay = 0;                         // Add usecs between packets to pace arrival at NIC.
                     // Assign specific CPUs to threads (affinity) - if required for better performance.
