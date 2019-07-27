@@ -63,6 +63,7 @@ install:
 
 $(EXE): $(OBJ)
 	$(CC) -g  $^ $(LCLLIBS) $(openCV)  $(GENICAM_LIBS) -L$(ARCHLIBDIR) -lstdc++ -o $@
+	/usr/bin/sudo /sbin/setcap cap_sys_nice,cap_net_raw+ep $(EXE)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CC) -I. $(INC_PATH) $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -I/home/mmaahn/ffmpeg_build/include/ -L/home/mmaahn/ffmpeg_build/lib/ -lavcodec -lavutil -c $< -o $@

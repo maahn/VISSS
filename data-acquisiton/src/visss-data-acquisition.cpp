@@ -233,7 +233,7 @@ void *ImageCaptureThread( void *context)
                                 //, captureContext->preset
                                 , captureContext->t_reset
                                 );
-                            std:: cout << "STATUS | " << get_timestamp() << "| storage worker started" << std::endl;
+                            //std:: cout << "STATUS | " << get_timestamp() << "| storage worker started" << std::endl;
 
                             // And start the worker threads for each storage worker
                             for (auto& s : storage) {
@@ -568,8 +568,9 @@ int main(int argc, char *argv[])
     if (1)
     {
         //int policy = SCHED_FIFO;
-        //int policy = SCHED_OTHER;
-        int policy = SCHED_BATCH;
+        //int policy = SCHED_RR;
+        int policy = SCHED_OTHER;
+        //int policy = SCHED_BATCH;
         pthread_attr_t attrib;
         int inherit_sched = 0;
         struct sched_param param = {0};
@@ -610,7 +611,7 @@ int main(int argc, char *argv[])
 
     status = GevGetCameraList( pCamera, MAX_CAMERAS, &numCamera);
 
-    std::cout << "STATUS | " << get_timestamp() << " | " << numCamera << " camera(s) on the network"<< std::endl;
+    //std::cout << "STATUS | " << get_timestamp() << " | " << numCamera << " camera(s) on the network"<< std::endl;
 
     // Select the first camera found (unless the command line has a parameter = the camera index)
     if (numCamera == 0)
@@ -956,15 +957,15 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                         val = 1;
                         if ( GevGetFeatureValue(handle, "transferTurboMode", &type, sizeof(UINT32), &val) == 0)
                         {
-                            if (val == 1)
-                            {
-                                std::cout << "STATUS | " << get_timestamp() << "| Turbodrive on" << std::endl;
-                            }
-                            else
+                            if (val != 1)
                             {
                                 std::cerr << "FATAL ERROR | " << get_timestamp() << "| Turbodrive off" << std::endl;
                                 global_error = true;
                             }
+                            //else
+                            //{
+                            //    std::cout << "STATUS | " << get_timestamp() << "| Turbodrive on" << std::endl;
+                            //}
                         }
                     }
                     else
@@ -1033,11 +1034,11 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                         {
                             memset(bufAddress[i], 0, size);
                         }
-                        std::cout << "STATUS | " << get_timestamp() <<" | STARTING GevStartTransfer" <<std::endl;
+                        //std::cout << "STATUS | " << get_timestamp() <<" | STARTING GevStartTransfer" <<std::endl;
 
                         status = GevStartTransfer( handle, -1);
                         if (status != 0) {
-                            std::cerr << "FATAL STATUS | " << get_timestamp() <<" | Error starting grab" <<std::endl;
+                            std::cerr << "FATAL ERROR | " << get_timestamp() <<" | Error starting grab" <<std::endl;
                             printf("0x%x  or %d\n", status, status);
                             global_error = true;
                         }
@@ -1072,7 +1073,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                         context.exit = TRUE;
                         pthread_join( tid, NULL);
 
-                        std::cout << "STATUS | " << get_timestamp() <<" | STOPPING GevStartTransfer" <<std::endl;
+                        //std::cout << "STATUS | " << get_timestamp() <<" | STOPPING GevStartTransfer" <<std::endl;
                         GevAbortTransfer(handle);
                         status = GevFreeTransfer(handle);
                         for (i = 0; i < numBuffers; i++)

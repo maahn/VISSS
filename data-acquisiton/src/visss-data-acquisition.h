@@ -111,7 +111,7 @@ int mkdir_p(const char *path)
             *p = '/';
         }
     }
-    std::cout << "STATUS | " << get_timestamp() << "| Created path " << _path <<std::endl;
+    //std::cout << "STATUS | " << get_timestamp() << "| Created path " << _path <<std::endl;
     return 0;
 }
 
