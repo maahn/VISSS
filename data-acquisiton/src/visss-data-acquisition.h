@@ -51,7 +51,7 @@ bool global_error = false;
 int done = FALSE;
 cv::String configFile;
 std::string configFileRaw;
-
+int maxframes = -1;
 
 struct MatMeta {
   cv::Mat MatImage;

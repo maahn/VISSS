@@ -39,6 +39,7 @@ const char* params
       "{ preset p       | veryfast          | preset (ultrafast - placebo) }"
       "{ liveratio l    | 35                | every Xth frame will be displayed in the live window }"
       "{ fps f          | 140               | frames per seconds of output }"
+      "{ maxframes m    | -1                | stop after this many frames (for debugging) }"
       "{ @config        | <none>            | camera configuration file }";
 
 // ====================================
@@ -303,6 +304,11 @@ void *ImageCaptureThread( void *context)
                             //rest n_timeout after success
                             n_timeouts = 0;
 
+                            if ((maxframes>0) && (frame_count >=maxframes)) {
+                                std::cout << "FATAL ERROR | " << get_timestamp() << " | Reached maximum number of frames" << std::endl;
+                                global_error = true;
+                            }
+
                         // See if we  are done.
                         }
                         if ( !captureContext->enable_sequence )
@@ -506,6 +512,9 @@ int main(int argc, char *argv[])
     context.fps = parser.get<double>("fps");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: fps "<< context.fps << std::endl;
 
+    maxframes = parser.get<int>("maxframes");
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: maxframes "<< maxframes << std::endl;
+
 
     std::set<std::string> presets = {
         "ultrafast",
@@ -570,7 +579,6 @@ int main(int argc, char *argv[])
         //int policy = SCHED_FIFO;
         //int policy = SCHED_RR;
         int policy = SCHED_OTHER;
-        //int policy = SCHED_BATCH;
         pthread_attr_t attrib;
         int inherit_sched = 0;
         struct sched_param param = {0};
