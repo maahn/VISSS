@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 PATH=/home/visss/Desktop/VISSS/
 EXE=$PATH/data-acquisiton/visss-data-acquisiton
-cd $PATH/data-acquisiton/
+OUTDIR=/data/test
+/bin/mkdir -p $OUTDIR/logs
 
+set -o pipefail
+
+cd $PATH/data-acquisiton/
 
 for (( ; ; ))
 do
