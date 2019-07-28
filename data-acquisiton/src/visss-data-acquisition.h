@@ -53,7 +53,7 @@ cv::String configFile;
 std::string configFileRaw;
 int maxframes = -1;
 int frameborder = 64;
-int new_file_interval = 60;
+int new_file_interval = 300;
 
 struct MatMeta {
   cv::Mat MatImage;
