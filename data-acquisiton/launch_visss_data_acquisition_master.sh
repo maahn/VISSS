@@ -62,4 +62,5 @@ done
 
 
 #190 MB per 5min
+#38 MB per min
 # 4mb per 1000 images!
