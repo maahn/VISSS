@@ -11,7 +11,7 @@ cd $PATH/data-acquisiton/
 
 for (( ; ; ))
 do
-if $EXE -f=10 -q=15 -l=1 -p=medium -o=/data/test $PATH/camera-configuration/visss_calibration.config
+if $EXE -f=10 -q=15 -l=1 -p=medium -o=/data/mosaic_calibration $PATH/camera-configuration/visss_calibration.config
 		then
 			/bin/echo "worked"
 			exit

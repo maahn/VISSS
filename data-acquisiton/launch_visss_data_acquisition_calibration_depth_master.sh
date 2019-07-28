@@ -11,7 +11,7 @@ cd $PATH/data-acquisiton/
 
 for (( ; ; ))
 do
-if $EXE -p=superfast -l=20  -o=/data/mosaic_calibration $PATH/camera-configuration/visss_slave.config
+if $EXE -p=veryfast -l=20  -o=/data/mosaic_calibration $PATH/camera-configuration/visss_master.config
 		then
 			/bin/echo "worked"
 			exit
