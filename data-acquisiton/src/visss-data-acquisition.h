@@ -52,6 +52,7 @@ int done = FALSE;
 cv::String configFile;
 std::string configFileRaw;
 int maxframes = -1;
+int frameborder = 64;
 
 struct MatMeta {
   cv::Mat MatImage;

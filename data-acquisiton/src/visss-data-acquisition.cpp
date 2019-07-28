@@ -210,8 +210,11 @@ void *ImageCaptureThread( void *context)
 
                         // Export to OpenCV Mat object using SapBuffer data directly
                         cv::Mat exportImg(	img->h, img->w, OpenCV_Type, m_latestBuffer );
-                        cv::Size imgSize = exportImg.size();
-                          // cout << imgSize << 'SIZE\n';
+                        cv::Size imgSize( img->w, img->h + frameborder);
+
+                        //cv::Size imgSize = exportImg.size();
+                        //std:: cout << "STATUS | " << get_timestamp() << "| " << imgSize  << std::endl;
+
                         MatMeta exportImgMeta;
 
 
@@ -222,7 +225,6 @@ void *ImageCaptureThread( void *context)
                             cv::namedWindow( OPENCV_WINDOW_NAME, cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
 
                             //--- INITIALIZE VIDEOWRITER
-
 
                             storage.emplace_back(std::ref(queue[0]), 0
                                 , captureContext->base_name
@@ -252,8 +254,22 @@ void *ImageCaptureThread( void *context)
 
 
                             // Now the main capture loop
+                            cv::copyMakeBorder( exportImg, exportImgMeta.MatImage, frameborder, 0, 0, 0, cv::BORDER_CONSTANT, 0 );
+                            //exportImgMeta.MatImage = exportImg.clone();
+                            std::string textImg = get_timestamp() + ", " + hostname + ", " + configFileRaw;
+                            cv::putText(exportImgMeta.MatImage, 
+                                    textImg,
+                                    cv::Point(20,50), // Coordinates
+                                    cv::FONT_HERSHEY_PLAIN, // Font
+                                    2, // Scale. 2.0 = 2x bigger
+                                    cv::Scalar(255), // BGR Color
+                                    2, // Line Thickness (Optional)
+                                    cv::LINE_AA); // Anti-alias (Optional)
 
-                            exportImgMeta.MatImage = exportImg.clone();
+
+
+
+
                             exportImgMeta.timestamp = img->timestamp;
                             exportImgMeta.id = img->id;
 
@@ -277,18 +293,18 @@ void *ImageCaptureThread( void *context)
                             if (frame_count % captureContext->live_window_frame_ratio == 0)
                             {
                                 cv::Mat exportImgSmall;
-                                cv::resize(exportImg, exportImgSmall, cv::Size(), 0.5, 0.5);
+                                cv::resize(exportImgMeta.MatImage, exportImgSmall, cv::Size(), 0.5, 0.5);
 
 
-                                std::string textImg = get_timestamp() + ", Hostname: " + hostname + ", Config file: " + configFileRaw;
-                                cv::putText(exportImgSmall, 
-                                    textImg,
-                                    cv::Point(10,20), // Coordinates
-                                    cv::FONT_HERSHEY_PLAIN, // Font
-                                    1.0, // Scale. 2.0 = 2x bigger
-                                    cv::Scalar(255), // BGR Color
-                                    1, // Line Thickness (Optional)
-                                    cv::LINE_AA); // Anti-alias (Optional)
+                                // std::string textImg = get_timestamp() + ", Hostname: " + hostname + ", Config file: " + configFileRaw;
+                                // cv::putText(exportImgSmall, 
+                                //     textImg,
+                                //     cv::Point(10,20), // Coordinates
+                                //     cv::FONT_HERSHEY_PLAIN, // Font
+                                //     1.0, // Scale. 2.0 = 2x bigger
+                                //     cv::Scalar(255), // BGR Color
+                                //     1, // Line Thickness (Optional)
+                                //     cv::LINE_AA); // Anti-alias (Optional)
 
                                 cv::imshow( OPENCV_WINDOW_NAME, exportImgSmall );
                                 cv::waitKey(1);
