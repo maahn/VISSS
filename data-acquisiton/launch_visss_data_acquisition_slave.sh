@@ -9,7 +9,7 @@ HOST=`hostname`
 
 set -o pipefail
 
-cd $ROOTPATH/data-aquisiton/
+cd $ROOTPATH/data-acquisiton/
 
 MTU=$(/bin/cat /sys/class/net/eno1/mtu)
 if [[ "$MTU" != "8960" ]]
