@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 PATH=/home/visss/Desktop/VISSS/
 EXE=$PATH/data-acquisiton/visss-data-acquisiton
-OUTDIR=/data/test
+OUTDIR=/data/mosaic_calibration
 /bin/mkdir -p $OUTDIR/logs
 
 set -o pipefail
@@ -11,7 +11,7 @@ cd $PATH/data-acquisiton/
 
 for (( ; ; ))
 do
-if $EXE -f=10 -q=15 -l=1 -p=medium -o=/data/mosaic_calibration $PATH/camera-configuration/visss_calibration.config
+if $EXE -f=10 -q=15 -l=1 -p=medium -o=$OUTDIR $PATH/camera-configuration/visss_calibration.config
 		then
 			/bin/echo "worked"
 			exit

@@ -3,7 +3,7 @@ df -H | grep /data | awk '{ print "STORAGE USED " $5 " " $6 }'
 
 ROOTPATH=/home/visss/Desktop/VISSS/
 EXE=$ROOTPATH/data-acquisiton/visss-data-acquisiton
-OUTDIR=/data/test
+OUTDIR=/data/mosaic
 HOST=`hostname`
 /bin/mkdir -p $OUTDIR/logs
 
