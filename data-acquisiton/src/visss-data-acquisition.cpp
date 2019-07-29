@@ -295,7 +295,6 @@ void *ImageCaptureThread( void *context)
                                 cv::Mat exportImgSmall;
                                 cv::resize(exportImgMeta.MatImage, exportImgSmall, cv::Size(), 0.5, 0.5);
 
-
                                 // std::string textImg = get_timestamp() + ", Hostname: " + hostname + ", Config file: " + configFileRaw;
                                 // cv::putText(exportImgSmall, 
                                 //     textImg,

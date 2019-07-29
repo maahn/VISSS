@@ -223,7 +223,8 @@ void storage_worker_cv::run()
                 if (frame_count % fps_int == 0)
                 {
                     cv::Scalar meanImg, stdImg;
-                    cv::meanStdDev(image.MatImage, meanImg, stdImg);
+                    cv::Mat imgCropped = image.MatImage(cv::Rect(0,frameborder,frame_size_.width, frame_size_.height-frameborder));
+                    cv::meanStdDev(imgCropped, meanImg, stdImg);
 
                     std::cout << "STATUS | " << get_timestamp() << 
                     " | Queue: " << queue_.size() << 
