@@ -212,7 +212,7 @@ void storage_worker_cv::run()
                     close_files();
                     open_files();
 
-                    cv::imwrite(filename_+".tiff", image.MatImage );
+                    cv::imwrite(filename_+".jpg", image.MatImage );
                     frame_count_new_file = frame_count;
                     std::cout << "STATUS | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
 
