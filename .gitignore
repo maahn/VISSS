@@ -39,3 +39,13 @@ data-acquisiton/visss-data-acquisiton
 *.avi
 *.mp4
 
+# images
+*.png
+
+# output
+*.nc
+
+# misc
+.DS_Store
+.ipynb_checkpoints
+
