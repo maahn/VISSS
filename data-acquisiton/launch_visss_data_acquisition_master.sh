@@ -3,18 +3,18 @@ df -H | grep /data | awk '{ print "STORAGE USED " $5 " " $6 }'
 
 ROOTPATH=/home/visss/Desktop/VISSS/
 EXE=$ROOTPATH/data-acquisiton/visss-data-acquisiton
-OUTDIR=/data/mosaic
+OUTDIR=/data/lim
 HOST=`hostname`
 /bin/mkdir -p $OUTDIR/logs
 
 set -o pipefail
 
-cd $ROOTPATH/data-aquisiton/
+cd $ROOTPATH/data-acquisiton/
 
-MTU=$(/bin/cat /sys/class/net/eno1/mtu)
+MTU=$(/bin/cat /sys/class/net/enp35s0f1/mtu)
 if [[ "$MTU" != "8960" ]]
 then
-	/usr/bin/sudo /home/visss/DALSA/GigeV/bin/gev_nettweak eno1
+	/usr/bin/sudo /home/visss/DALSA/GigeV/bin/gev_nettweak enp35s0f1
 	/bin/echo "It takes some time for the camera to come online... Sleep 25"
 	/bin/sleep 25
 fi
@@ -26,8 +26,8 @@ for (( ; ; ))
 do
 
 timestamp=$(/bin/date +%FT%T)
-if $EXE -p=superfast -q=21 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_master.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
-# if $EXE -p=veryfast -q=17 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_master.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
+#if $EXE -p=superfast -q=21 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_master.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
+if $EXE -p=veryfast -q=17 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_master.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
 		then
 			/bin/echo "worked"
 			exit

@@ -35,7 +35,7 @@ DEBUGFLAGS = -O2
 #
 include src/commondefs.mk
 
-CXX_COMPILE_OPTIONS = -c $(DEBUGFLAGS) -DPOSIX_HOSTPC -D_REENTRANT -fno-for-scope \
+CXX_COMPILE_OPTIONS = -c $(DEBUGFLAGS) -std=c++11 -DPOSIX_HOSTPC -D_REENTRANT -fno-for-scope \
 			-Wall -Wno-parentheses -Wno-missing-braces -Wno-unused-but-set-variable \
 			-Wno-unknown-pragmas -Wno-cast-qual -Wno-unused-function -Wno-unused-label
 
