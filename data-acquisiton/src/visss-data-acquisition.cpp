@@ -2,6 +2,7 @@
 
 #include "visss-data-acquisition.h"   
 //============================================================================
+
 #include "frame_queue.h"   
 #include "storage_worker_cv.h"   
 //#include "storage_worker_cv.h"   
@@ -26,8 +27,6 @@
 
 // Enable/disable buffer FULL/EMPTY handling (cycling)
 #define USE_SYNCHRONOUS_BUFFER_CYCLING  1
-
-
 
 
 
@@ -171,7 +170,7 @@ void *ImageCaptureThread( void *context)
                     was_active = TRUE;
                     m_latestBuffer = img->address;
                     if ((last_id>=0) && (img->id != last_id+1) ){
-                        std::cout<< "ERROR | " << get_timestamp() << " | missed frames between " << last_id << " and " << img->id << std::endl;
+                        std::cout << std::endl << "ERROR | " << get_timestamp() << " | missed frames between " << last_id << " and " << img->id << std::endl;
                     }
 
 
@@ -484,7 +483,7 @@ int main(int argc, char *argv[])
     FILE *fp2 = NULL;
     // char uniqueName[FILENAME_MAX];
     char filename[FILENAME_MAX] = {0};
-    uint32_t macLow = 0; // Low 32-bits of the mac address (for file naming).
+    // uint32_t macLow = 0; // Low 32-bits of the mac address (for file naming).
     int error_count = 0;
     int feature_count = 0;
 
@@ -549,22 +548,31 @@ int main(int argc, char *argv[])
     }
 
 
-    char OPENCV_PRESET[100];
-    strcpy(OPENCV_PRESET,"OPENCV_PRESET=");
-    strcat(OPENCV_PRESET,context.preset.c_str());
-    char OPENCV_CRF[100];
-    strcpy(OPENCV_CRF,"OPENCV_CRF=");
-    strcat(OPENCV_CRF,context.quality.c_str());
+    char OPENCV_FFMPEG_PRESET[100];
+    strcpy(OPENCV_FFMPEG_PRESET,"OPENCV_FFMPEG_PRESET=");
+    strcat(OPENCV_FFMPEG_PRESET,context.preset.c_str());
+    char OPENCV_FFMPEG_CRF[100];
+    strcpy(OPENCV_FFMPEG_CRF,"OPENCV_FFMPEG_CRF=");
+    strcat(OPENCV_FFMPEG_CRF,context.quality.c_str());
+    char OPENCV_FFMPEG_THREADCOUNT[100];
+    strcpy(OPENCV_FFMPEG_THREADCOUNT,"OPENCV_FFMPEG_THREADCOUNT=4");
+    //strcat(OPENCV_FFMPEG_THREADCOUNT,context.quality.c_str());
 
 
-    if(putenv(OPENCV_PRESET)!=0)
+    if(putenv(OPENCV_FFMPEG_PRESET)!=0)
     {
-        std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_PRESET<< std::endl;
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_FFMPEG_PRESET<< std::endl;
         exit(1);
     }
-    if(putenv(OPENCV_CRF)!=0)
+    if(putenv(OPENCV_FFMPEG_CRF)!=0)
     {
-        std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_CRF<< std::endl;
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_FFMPEG_CRF<< std::endl;
+        global_error = true;
+    }
+
+    if(putenv(OPENCV_FFMPEG_THREADCOUNT)!=0)
+    {
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_FFMPEG_THREADCOUNT<< std::endl;
         global_error = true;
     }
 
@@ -840,7 +848,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                 }
 
 
-// get ALL settings
+// get ALL settings to dump the to file
                 time_t t = time(0);   // get time now
                 struct tm * now = localtime( & t );
                 char timestamp3[80];
@@ -853,7 +861,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                     std::cerr << "FATAL ERROR | " << get_timestamp() << " | Cannot create path "<< full_path <<std::endl;
                     global_error = true;
                 }
-                // Open the file.
+                // Open the file to dump the configuration
                 fp2 = fopen(config_out.c_str(), "w");
                 if (fp2 == NULL)
                 {
@@ -916,8 +924,8 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                     // Get the low part of the MAC address (use it as part of a unique file name for saving images).
                     // Generate a unique base name to be used for saving image files
                     // based on the last 3 octets of the MAC address.
-                    macLow = pCamera[camIndex].macLow;
-                    macLow &= 0x00FFFFFF;
+                    // macLow = pCamera[camIndex].macLow;
+                    // macLow &= 0x00FFFFFF;
                     // snprintf(uniqueName, sizeof(uniqueName), "%s/visss_%06x", output.c_str(), macLow);
 
                     // // If there are multiple pixel formats supported on this camera, get one.
@@ -952,8 +960,8 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                         int numCpus = _GetNumCpus();
                         if (numCpus > 1)
                         {
-                            camOptions.streamThreadAffinity = numCpus - 1;
-                            camOptions.serverThreadAffinity = numCpus - 2;
+                            //camOptions.streamThreadAffinity = numCpus - 1;
+                            camOptions.serverThreadAffinity = 4;
                         }
                     }
     #endif

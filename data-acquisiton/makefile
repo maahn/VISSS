@@ -11,6 +11,8 @@ EXE = visss-data-acquisiton
 SRC = $(wildcard $(SRC_DIR)/*.cpp)
 OBJ = $(SRC:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
+gitTag    := \"$(shell git describe  --always)\"
+gitBranch := \"$(shell git rev-parse --abbrev-ref HEAD)\"
 
 #
 # Get the configured include defs file.
@@ -37,7 +39,8 @@ include src/commondefs.mk
 
 CXX_COMPILE_OPTIONS = -c $(DEBUGFLAGS) -std=c++11 -DPOSIX_HOSTPC -D_REENTRANT -fno-for-scope \
 			-Wall -Wno-parentheses -Wno-missing-braces -Wno-unused-but-set-variable \
-			-Wno-unknown-pragmas -Wno-cast-qual -Wno-unused-function -Wno-unused-label
+			-Wno-unknown-pragmas -Wno-cast-qual -Wno-unused-function -Wno-unused-label -DGIT_BRANCH=$(gitBranch) \
+			-DGIT_TAG=$(gitTag)
 
 C_COMPILE_OPTIONS= $(DEBUGFLAGS) -fhosted -Wall -Wno-parentheses -Wno-missing-braces \
 		   	-Wno-unknown-pragmas -Wno-cast-qual -Wno-unused-function -Wno-unused-label -Wno-unused-but-set-variable
@@ -53,6 +56,7 @@ LCLLIBS=  $(COMMONLIBS) -lpthread -L/usr/local/lib -lGevApi -lCorW32
 
 # OBJS1= src/visss-data-acquisiton.o \
 # 	src/opencv_writer.o
+
 
 .PHONY: all clean
 

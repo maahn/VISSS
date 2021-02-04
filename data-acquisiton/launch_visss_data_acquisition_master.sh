@@ -31,7 +31,7 @@ do
 
 timestamp=$(/bin/date +%FT%T)
 #if $EXE -p=veryfast -q=17 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_master.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
-if $EXE -p=medium -q=17 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_master.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
+if $EXE -p=fast -q=17 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_master.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
 		then
 			/bin/echo "worked"
 			exit

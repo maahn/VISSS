@@ -3,7 +3,7 @@ df -H | grep /data | awk '{ print "STORAGE USED " $5 " " $6 }'
 
 ROOTPATH=/home/visss/Desktop/VISSS/
 EXE=$ROOTPATH/data-acquisiton/visss-data-acquisiton
-OUTDIR=/data/mosaic
+OUTDIR=/data/lim
 HOST=`hostname`
 /bin/mkdir -p $OUTDIR/logs
 
@@ -19,10 +19,8 @@ then
 	/bin/sleep 25
 fi
 
-
 /bin/echo "Set camera IP address (just to be sure)"
 /usr/local/bin/gevipconfig -p 00:01:0D:C3:04:9F 192.168.200.2 255.255.255.0
-
 
 
 /usr/bin/sudo /sbin/setcap cap_sys_nice+ep $EXE
@@ -33,7 +31,7 @@ do
 
 timestamp=$(/bin/date +%FT%T)
 #if $EXE -n=1 -p=superfast -q=21 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_slave.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
-if $EXE -n=1 -p=medium -q=17 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_slave.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
+if $EXE -n=1 -p=fast -q=17 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_slave.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
 		then
 			/bin/echo "worked"
 			exit

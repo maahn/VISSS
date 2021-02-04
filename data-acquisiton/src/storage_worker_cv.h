@@ -1,4 +1,5 @@
 
+
 // ============================================================================
 //https://stackoverflow.com/questions/37140643/how-to-save-two-cameras-data-but-not-influence-their-picture-acquire-speed/37146523
 
@@ -40,6 +41,12 @@ private:
     double total_time_;
     std::chrono::time_point<std::chrono::system_clock> t_reset_;
     unsigned long t_reset_uint_;
+    bool firstImage;
+
+    cv::Mat imageFloat;
+    cv::Mat imageSum;
+    cv::Mat imageSumSquared;
+    unsigned long frame_count_loop;
 
     cv::VideoWriter writer_;
 
@@ -86,6 +93,12 @@ void storage_worker_cv::add_meta_data()
     std::size_t fractional_seconds = ms.count() % 1000;
     char *ctime_no_newline;
     ctime_no_newline = strtok(ctime(&t), "\n");
+    fMeta_ << "# VISSS file format version: 0.2"<< "\n";
+    fMeta_ << "# VISSS git tag: " << GIT_TAG
+          <<  "\n";
+    fMeta_ << "# VISSS git branch: " << GIT_BRANCH
+          <<  "\n";
+
     fMeta_ << "# Camera start time: " << ctime_no_newline << ' '
             << fractional_seconds  << "\n";
     fMeta_ << "# us since epoche: " 
@@ -95,12 +108,12 @@ void storage_worker_cv::add_meta_data()
           << DeviceID << "\n";
      
     fMeta_ << "# Camera configuration: "
-          <<  "CONFIG FILE"<< "\n";
+          <<  configFileRaw<< "\n";
 
     fMeta_ << "# Hostname: "
           <<  hostname<< "\n";
      
-    fMeta_ << "# Capture time, Record time, Frame id \n";
+    fMeta_ << "# Capture time, Record time, Frame id, mean, std \n";
     return;
 
 }
@@ -125,13 +138,35 @@ void storage_worker_cv::open_files()
     add_meta_data();
     std::cout << "STATUS | " << get_timestamp() << " | Opened "<< filename_+".txt"<< std::endl;
 
+    imageSum = imageFloat.clone();
+    imageSumSquared = imageFloat.mul(imageFloat);
+
     return;
 }
 
 void storage_worker_cv::close_files() {
+
+
+    if (!firstImage) {
+        cv::Mat imageSumInt;
+        cv::Mat imageSumSquaredInt;
+
+        imageSum = imageSum / frame_count_loop;
+        imageSumSquared = imageSumSquared / frame_count_loop;
+        imageSumSquared = imageSumSquared - (imageSum.mul(imageSum));
+        cv::sqrt(imageSumSquared, imageSumSquared);
+
+        imageSum.convertTo(imageSumInt, CV_8UC1, 255.0);
+        imageSumSquared.convertTo(imageSumSquaredInt, CV_8UC1, 255.0);
+
+
+        cv::imwrite(filename_+"_mean.jpg", imageSumInt );
+        cv::imwrite(filename_+"_std.jpg", imageSumSquaredInt );
+    }
+
     fMeta_.close();
     writer_.release();
-    std::cout << "STATUS | " << get_timestamp() << " | All files closed. "<<std::endl;
+    std::cout << std::endl << "STATUS | " << get_timestamp() << " | All files closed. "<<std::endl;
 
     return;
 
@@ -189,7 +224,8 @@ void storage_worker_cv::run()
 
     long int timestamp = 0;
     long int frame_count_new_file = 0;
-    bool firstImage = TRUE;
+    frame_count_loop = 0;
+    firstImage = TRUE;
     t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
     int fps_int = cvCeil(fps_);
 
@@ -200,12 +236,20 @@ void storage_worker_cv::run()
             if (!image.MatImage.empty()) {
                 high_resolution_clock::time_point t1(high_resolution_clock::now());
                 
+                cv::Scalar meanImg, stdImg;
+                cv::Mat imgCropped = image.MatImage(cv::Rect(0,frameborder,frame_size_.width, frame_size_.height-frameborder));
+                cv::meanStdDev(imgCropped, meanImg, stdImg);
 
                 fMeta_  <<image.timestamp +t_reset_uint_ << ", " << t1.time_since_epoch().count()/1000
-                          << ", " << image.id << "\n";
+                          << ", " << image.id << ", " << meanImg[0] << ", " << stdImg[0] << "\n";
 
                 ++frame_count;
+                ++frame_count_loop;
                 timestamp = static_cast<long int> (time(NULL));
+
+                image.MatImage.convertTo(imageFloat, CV_32FC1, 1/255.0);
+
+
                 if (firstImage || ((timestamp % new_file_interval == 0) && (frame_count-frame_count_new_file > 300)))
                 {
 
@@ -213,18 +257,22 @@ void storage_worker_cv::run()
                     open_files();
 
                     cv::imwrite(filename_+".jpg", image.MatImage );
+
                     frame_count_new_file = frame_count;
+                    frame_count_loop = 0;
+
+                    std::cout ;
                     std::cout << "STATUS | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
 
-
+                }
+                else { 
+                    imageSum = imageSum + imageFloat;
+                    imageSumSquared = imageSumSquared +imageFloat.mul(imageFloat);
                 }
                 writer_.write(image.MatImage);
 
                 if (frame_count % fps_int == 0)
                 {
-                    cv::Scalar meanImg, stdImg;
-                    cv::Mat imgCropped = image.MatImage(cv::Rect(0,frameborder,frame_size_.width, frame_size_.height-frameborder));
-                    cv::meanStdDev(imgCropped, meanImg, stdImg);
 
                     std::cout << "STATUS | " << get_timestamp() << 
                     " | Queue: " << queue_.size() << 
