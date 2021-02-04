@@ -46,7 +46,7 @@ C_COMPILE_OPTIONS= $(DEBUGFLAGS) -fhosted -Wall -Wno-parentheses -Wno-missing-br
 		   	-Wno-unknown-pragmas -Wno-cast-qual -Wno-unused-function -Wno-unused-label -Wno-unused-but-set-variable
 
 
-LCLLIBS=  $(COMMONLIBS) -lpthread -L/usr/local/lib -lGevApi -lCorW32
+LCLLIBS=  $(COMMONLIBS) -lpthread -L/usr/local/lib -lGevApi -lCorW32 -lm
 
 # %.o : %.cpp
 # 	$(CC) -I. $(INC_PATH) $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -I/home/mmaahn/ffmpeg_build/include/ -L/home/mmaahn/ffmpeg_build/lib/ -lavcodec -lavutil -c $< -o $@

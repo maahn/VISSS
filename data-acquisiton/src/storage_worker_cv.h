@@ -275,8 +275,8 @@ void storage_worker_cv::run()
                 {
 
                     std::cout << "STATUS | " << get_timestamp() << 
-                    " | Queue: " << queue_.size() << 
-                    " | Mean+/-std img: " << meanImg[0] <<
+                    " | Queue:" << queue_.size() << 
+                    " | Mean+/-std:" << meanImg[0] <<
                     "+/-" << stdImg[0] <<
                     "  \r"<<std::flush;
                 }

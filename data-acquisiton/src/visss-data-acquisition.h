@@ -3,6 +3,10 @@
 
 
 #include "stdio.h"
+#include <sys/time.h>
+#include <time.h>
+#include <math.h>
+
 #include <fstream>
 #include <limits.h>     /* PATH_MAX */
 #include <sys/stat.h>   /* mkdir(2) */
@@ -62,14 +66,28 @@ struct MatMeta {
 }; 
 
 std::string get_timestamp(){
-    char s[100];
+  char buffer[26];
+  int millisec;
+  struct tm* tm_info;
+  struct timeval tv;
 
-    time_t t = time(NULL);
-    struct tm * p = localtime(&t);
+  gettimeofday(&tv, NULL);
 
-    strftime(s, 100, "%y-%m-%d %H:%M:%S", p);
+  millisec = lrint(tv.tv_usec/100000.0); // Round to nearest tenth sec
+  if (millisec>=10) { // Allow for rounding up to nearest second
+    millisec -=10;
+    tv.tv_sec++;
+  }
 
-    std::string t_string(s, strlen(s));
+  tm_info = localtime(&tv.tv_sec);
+
+  strftime(buffer, 26, "%Y:%m:%d %H:%M:%S", tm_info);
+  //int n_zero = 3;
+
+  std::string millisec_str = std::to_string(millisec);
+  std::string t_string(buffer, strlen(buffer));
+  //t_string = t_string + '.' + std::string(n_zero - millisec_str.length(), '0') + millisec_str;
+  t_string = t_string + '.' + millisec_str;
 
     return t_string;
    
