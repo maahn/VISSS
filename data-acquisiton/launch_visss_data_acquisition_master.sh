@@ -11,13 +11,17 @@ set -o pipefail
 
 cd $ROOTPATH/data-acquisiton/
 
-MTU=$(/bin/cat /sys/class/net/enp35s0f1/mtu)
-if [[ "$MTU" != "8960" ]]
+MTU=$(/bin/cat /sys/class/net/enp35s0f0/mtu)
+if [[ "$MTU" != "9216" ]]
 then
-	/usr/bin/sudo /home/visss/DALSA/GigeV/bin/gev_nettweak enp35s0f1
+	/usr/bin/sudo /home/visss/DALSA/GigeV/bin/gev_nettweak enp35s0f0
 	/bin/echo "It takes some time for the camera to come online... Sleep 25"
 	/bin/sleep 25
 fi
+
+/bin/echo "Set camera IP address (just to be sure)"
+/usr/local/bin/gevipconfig -p 00:01:0D:C3:0F:34 192.168.100.2 255.255.255.0
+
 
 /usr/bin/sudo /sbin/setcap cap_sys_nice+ep $EXE
 
@@ -26,8 +30,8 @@ for (( ; ; ))
 do
 
 timestamp=$(/bin/date +%FT%T)
-#if $EXE -p=superfast -q=21 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_master.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
-if $EXE -p=veryfast -q=17 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_master.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
+#if $EXE -p=veryfast -q=17 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_master.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
+if $EXE -p=medium -q=17 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_master.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
 		then
 			/bin/echo "worked"
 			exit
