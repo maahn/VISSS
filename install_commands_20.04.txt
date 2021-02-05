@@ -1,0 +1,256 @@
+sudo apt-get update
+sudo apt-get upgrade
+sudo apt install make  gcc  libx11-dev libxext-dev libgtk-3-dev libglade2-0 libglade2-dev libpcap0.8 libcap2 ethtool  net-tools  git gitk libcanberra-gtk-module libcanberra-gtk3-module libtiff-dev libboost-all-dev ffmpeg vlc apt-transport-https intltool  libges-1.0-dev libges-1.0-dev gstreamer1.0-plugins-bad libnotify-bin libnotify-dev ipython3 cmake-data librhash0 libuv1 python-numpy cmake-qt-gui  libgstreamer-plugins-{base,good}1.0-dev libavcodec-dev libavformat-dev libswscale-dev libdc1394-22-dev libxine2-dev libv4l-dev qt5-default libgtk2.0-dev libtbb-dev libatlas-base-dev libfaac-dev libmp3lame-dev libtheora-dev libvorbis-dev libxvidcore-dev libopencore-amrnb-dev libopencore-amrwb-dev x264 v4l-utils  python3-numpy python3-dev python3-pip ubuntu-restricted-extras htop openssh-server mdm mdadm  samba cifs-utils  chrome-gnome-shell apache2 certbot python-certbot-apache 
+
+
+
+
+
+
+
+wget -qO - https://download.sublimetext.com/sublimehq-pub.gpg | sudo apt-key add -
+echo "deb https://download.sublimetext.com/ apt/stable/" | sudo tee /etc/apt/sources.list.d/sublime-text.list 
+sudo apt-get update
+sudo apt-get install sublime-text
+
+
+*********************
+download gig e v framework
+https://www.teledynedalsa.com/en/support/downloads-center/software-development-kits/132/
+
+cd DALSA/
+sudo ./corinstall 
+
+set ethernet interface to link local
+
+*****************REBOOT
+sudo ~/DALSA/GigeV/bin/gev_nettweak eno1
+
+
+
+*****************OPENCV
+mkdir opencv_source
+cd opencv_source
+git clone --depth=100 --single-branch --branch envrionment_variables https://github.com/maahn/opencv.git
+
+git clone --depth=100 https://github.com/opencv/opencv_contrib.git
+cd ~/opencv_source/opencv_contrib
+git checkout 4.1.1
+
+cd
+
+cd opencv_source/opencv
+mkdir build
+cd build
+
+
+
+
+
+cmake -DCMAKE_BUILD_TYPE=RELEASE \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DINSTALL_C_EXAMPLES=ON \
+      -DINSTALL_PYTHON_EXAMPLES=ON \
+      -DWITH_TBB=ON \
+      -DWITH_V4L=ON \
+      -DENABLE_CXX11=ON\
+      -DWITH_OPENGL=ON \
+      -DBUILD_opencv_python3=ON \
+      -DWITH_GSTREAMER=ON \
+      -DWITH_FFMPEG=ON \
+      -DOPENCV_GENERATE_PKGCONFIG=YES \
+      -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules \
+      -DBUILD_EXAMPLES=ON .. 
+make -j6
+sudo make install -j6
+sudo sh -c 'echo "/usr/local/lib" >> /etc/ld.so.conf.d/opencv.conf'
+sudo ldconfig
+
+
+
+export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig'
+#### OTHER #################
+
+# sudo mdadm --create --verbose /dev/md0 --level=5 --raid-devices=3 /dev/sdb /dev/sdc /dev/sdd
+ sudo timedatectl set-timezone UTC
+
+
+
+#for visss
+
+#### VISSSS #################
+cd
+cd Desktop
+git clone https://github.com/maahn/VISSS
+ln -s /home/visss/Desktop/VISSS/scripts/visss_master.desktop /home/visss/.local/share/applications/
+ln -s /home/visss/Desktop/VISSS/scripts/visss_slave.desktop /home/visss/.local/share/applications/
+
+sudo cp /home/visss/Desktop/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
+
+
+#launch apps to sign them
+
+mkdir -p ~/.config/autostart
+ln -s /home/visss/Desktop/VISSS/scripts/visss_master.desktop /home/visss/.config/autostart/
+
+
+
+### add to /etc/samba/smb.conf
+
+
+[visss1_share]
+    comment = VISSS1 data
+    path = /data
+    read only = no
+    browsable = yes
+
+
+### add to crontab -e
+  0 5  *   *   * /home/visss/Desktop/VISSS/sync/rsync.py /data/test/ /data/test_sync/ > /home/visss/Desktop/cronlog.txt 2>&1
+
+
+## add to /etc/fstab
+//10.173.84.16/visss2_share  /media/visss2_share  cifs  username=visssUser,password=visssPassword,iocharset=utf8,uid=visss,file_mode=0777,dir_mode=0777,noperm  0  0
+#//10.173.84.1/visss  /media/polarstern_share  cifs  username=visssUser,password=visssPassword,iocharset=utf8,uid=visss,file_mode=0777,dir_mode=0777,noperm  0  0
+
+
+###################
+
+patch gev_nettweak because ethernet device name is too long for ifconfig
+    available_netif="enp35s0f0 enp35s0f1 enp39s0"
+
+
+
+configure ethernet! fist do link local, then configure persistent ips
+
+gevipconfig -p 00:01:0D:C3:0F:34 192.168.100.2 255.255.255.0
+gevipconfig -p 00:01:0D:C3:04:9F 192.168.200.2 255.255.255.0
+
+
+###########################
+apache2
+
+sudo nano /etc/apache2/sites-enabled/000-default.conf
+DocumentRoot /data
+###########
+sudo nano /etc/apache2/apache2.conf 
+<Directory /data/>
+        Options Indexes FollowSymLinks
+        AllowOverride None
+        Require all granted
+</Directory>
+###########
+chmod -R 755 /data
+
+
+########################### stop
+
+
+
+libopencv-dev    gstreamer1.0-opencv python3-opencv 
+
+
+
+ffmpeg build https://trac.ffmpeg.org/wiki/CompilationGuide/Ubuntu
+sudo apt-get -y install \
+  autoconf \
+  automake \
+  build-essential \
+  cmake \
+  git-core \
+  libass-dev \
+  libfreetype6-dev \
+  libsdl2-dev \
+  libtool \
+  libva-dev \
+  libvdpau-dev \
+  libvorbis-dev \
+  libxcb1-dev \
+  libxcb-shm0-dev \
+  libxcb-xfixes0-dev \
+  pkg-config \
+  texinfo \
+  wget \
+  zlib1g-dev nasm  x264 x265 libx264-dev libx265-dev  libvpx-dev
+cd ffmpeg && \
+PATH="$HOME/bin:$PATH" PKG_CONFIG_PATH="$HOME/ffmpeg_build/lib/pkgconfig" ./configure \
+  --prefix="$HOME/ffmpeg_build" \
+  --pkg-config-flags="--static" \
+  --extra-cflags="-I$HOME/ffmpeg_build/include" \
+  --extra-ldflags="-L$HOME/ffmpeg_build/lib" \
+  --extra-libs="-lpthread -lm" \
+  --bindir="$HOME/bin" \
+  --enable-gpl \
+  --enable-libass \
+  --enable-libfreetype \
+  --enable-libvorbis \
+  --enable-libvpx \
+  --enable-libx264 \
+  --enable-libx265 \
+  --enable-nonfree && \
+PATH="$HOME/bin:$PATH" make && \
+make install && \
+hash -z
+========================================
+gcc -I. -I./ -D_ISOC99_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_POSIX_C_SOURCE=200112 -D_XOPEN_SOURCE=600 -DPIC -DZLIB_CONST -I/home/mmaahn/ffmpeg_build/include -std=c11 -fomit-frame-pointer -fPIC -pthread  -I/usr/include/harfbuzz -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include -I/usr/include/freetype2 -I/usr/include/libpng16 -I/usr/include/fribidi -I/usr/include/freetype2 -I/usr/include/libpng16 -I/usr/include/freetype2 -I/usr/include/libpng16         -I/usr/include/alsa        -g -Wdeclaration-after-statement -Wall -Wdisabled-optimization -Wpointer-arith -Wredundant-decls -Wwrite-strings -Wtype-limits -Wundef -Wmissing-prototypes -Wno-pointer-to-int-cast -Wstrict-prototypes -Wempty-body -Wno-parentheses -Wno-switch -Wno-format-zero-length -Wno-pointer-sign -Wno-unused-const-variable -Wno-bool-operation -O3 -fno-math-errno -fno-signed-zeros -fno-tree-vectorize -Werror=format-security -Werror=implicit-function-declaration -Werror=missing-prototypes -Werror=return-type -Werror=vla -Wformat -fdiagnostics-color=auto -Wno-maybe-uninitialized -D_REENTRANT -I/usr/include/SDL2  -MMD -MF doc/examples/encode_video_test.d -MT doc/examples/encode_video_test.o -c -o doc/examples/encode_video_test.o doc/examples/encode_video_test.c && \
+gcc -Llibavcodec -Llibavdevice -Llibavfilter -Llibavformat -Llibavresample -Llibavutil -Llibpostproc -Llibswscale -Llibswresample -L/home/mmaahn/ffmpeg_build/lib  -Wl,--as-needed -Wl,-z,noexecstack -Wl,--warn-common -Wl,-rpath-link=libpostproc:libswresample:libswscale:libavfilter:libavdevice:libavformat:libavcodec:libavutil:libavresample  -o doc/examples/encode_video_test_g doc/examples/encode_video_test.o -lavdevice -lavfilter -lavformat -lavcodec -lpostproc -lswresample -lswscale -lavutil  -lm -lxcb -lXau -lXdmcp -lxcb-shm -lxcb -lXau -lXdmcp -lxcb-shape -lxcb -lXau -lXdmcp -lxcb-xfixes -lxcb-render -lxcb-shape -lxcb -lXau -lXdmcp -lasound -lm -ldl -lpthread -lrt -lSDL2 -Wl,--no-undefined -lm -ldl -lasound -lm -ldl -lpthread -lpulse-simple -lpulse -lsndio -lX11 -lXext -lXcursor -lXinerama -lXi -lXrandr -lXss -lXxf86vm -lwayland-egl -lwayland-client -lwayland-cursor -lxkbcommon -lpthread -lrt -lsndio -lXv -lX11 -lXext -pthread -lm -lva -lass -lm -lharfbuzz -lm -lglib-2.0 -pthread -lpcre -pthread -lgraphite2 -lfontconfig -lexpat -lfreetype -lexpat -lfribidi -lfreetype -lpng16 -lm -lz -lm -lz -lfreetype -lpng16 -lm -lz -lm -lz -lm -lz -lvpx -lm -lpthread -lvpx -lm -lpthread -lvpx -lm -lpthread -lvpx -lm -lpthread -pthread -lm -llzma -lz -lvorbis -lm -logg -lvorbisenc -lvorbis -lm -logg -lx264 -lpthread -lm -ldl -lx265 -lstdc++ -lm -lgcc_s -lgcc -lgcc_s -lgcc -lrt -ldl -lnuma -lva -lm -lm -lm -pthread -lva-drm -lva -lva-x11 -lva -lvdpau -lX11 -lm -lva -lXv -lX11 -lXext -lpthread -lm  && \
+doc/examples/encode_video_test; strip -o doc/examples/encode_video_test doc/examples/encode_video_test_g
+
+
+=========================================
+
+
+wget -qO - https://download.sublimetext.com/sublimehq-pub.gpg | sudo apt-key add -
+echo "deb https://download.sublimetext.com/ apt/stable/" | sudo tee /etc/apt/sources.list.d/sublime-text.list 
+sudo apt-get update
+sudo apt-get install sublime-text
+
+=============================================
+
+
+
+aravis 0.6.4!
+
+./configure  --enable-viewer   --enable-gst-plugin
+make
+sudo make install
+sudo ldconfig
+
+
+
+
+
+opencv examples
+
+g++ -ggdb facedetect.cpp -o facedetect `pkg-config --cflags --libs opencv`
+
+==========================
+opencv
+https://www.learnopencv.com/install-opencv3-on-ubuntu/
+
+
+sudo apt-get remove ffmpeg libopencv*
+
+
+mkdir build
+cmake -DCMAKE_BUILD_TYPE=RELEASE \
+      -DCMAKE_INSTALL_PREFIX=/home/mmaahn/opencv_build \
+      -DINSTALL_C_EXAMPLES=ON \
+      -DINSTALL_PYTHON_EXAMPLES=ON \
+      -DWITH_TBB=ON \
+      -DWITH_V4L=ON \
+      -DWITH_OPENGL=ON \
+      -DBUILD_opencv_python3=ON \
+      -DWITH_GSTREAMER=ON \
+      -DWITH_FFMPEG=ON \
+      -DOPENCV_GENERATE_PKGCONFIG=YES \
+      -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules \
+      -DBUILD_EXAMPLES=ON .. 
+make -j4
+make install
+sudo sh -c 'echo "/home/mmaahn/opencv_build/lib" >> /etc/ld.so.conf.d/opencv.conf'
+sudo ldconfig
+
+
+
+export PKG_CONFIG_PATH='/home/mmaahn/opencv_build/lib/pkgconfig'

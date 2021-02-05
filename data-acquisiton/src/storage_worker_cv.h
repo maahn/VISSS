@@ -32,6 +32,7 @@ private:
 
     std::string path_;
     std::string filename_;
+    std::string filename_latest_ ;
     int32_t fourcc_;
     double fps_;
     cv::Size frame_size_;
@@ -161,11 +162,17 @@ void storage_worker_cv::close_files() {
 
 
         cv::imwrite(filename_+"_mean.jpg", imageSumInt );
+        create_symlink(filename_+"_mean.jpg",  filename_latest_+"_mean.jpg");
         cv::imwrite(filename_+"_std.jpg", imageSumSquaredInt );
-    }
+        create_symlink(filename_+"_std.jpg",  filename_latest_+"_std.jpg");
+
+   }
 
     fMeta_.close();
     writer_.release();
+    create_symlink(filename_+".mov",  filename_latest_+".mov");
+
+
     std::cout << std::endl << "STATUS | " << get_timestamp() << " | All files closed. "<<std::endl;
 
     return;
@@ -187,6 +194,7 @@ void storage_worker_cv::create_filename() {
     std::string full_path = path_ + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "/data/" + timestamp1 + "/" ;
 
     filename_ = full_path + hostname + "_" + configFileRaw + "_" + DeviceID  + "_" + timestamp2;
+    filename_latest_ = path_ + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "_latest" ;
 
     res = mkdir_p(full_path.c_str());
     if (res != 0) {
@@ -257,6 +265,7 @@ void storage_worker_cv::run()
                     open_files();
 
                     cv::imwrite(filename_+".jpg", image.MatImage );
+                    create_symlink(filename_+".jpg",  filename_latest_+".jpg");
 
                     frame_count_new_file = frame_count;
                     frame_count_loop = 0;

@@ -94,6 +94,19 @@ std::string get_timestamp(){
 }
 
 
+void create_symlink(std::string target, std::string link) 
+{
+
+    char tmp[200];
+    strcpy(tmp, link.c_str());
+    strcat(tmp, ".tmp");
+
+    symlink(target.c_str(), tmp);
+    rename(tmp, link.c_str());
+
+}
+
+
 void signal_handler(int s){
    std::cout << "STATUS | " << get_timestamp() << "| Catched signal Ctrl-C" <<std::endl;
    done = TRUE; 
