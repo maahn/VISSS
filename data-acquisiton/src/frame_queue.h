@@ -2,7 +2,7 @@
 // ============================================================================
 //https://stackoverflow.com/questions/37140643/how-to-save-two-cameras-data-but-not-influence-their-picture-acquire-speed/37146523
 
-int const max_queue_size = 1000;
+int const max_queue_size = 3000;
 
 class frame_queue
 {

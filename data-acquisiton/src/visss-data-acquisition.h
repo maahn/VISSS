@@ -81,7 +81,7 @@ std::string get_timestamp(){
 
   tm_info = localtime(&tv.tv_sec);
 
-  strftime(buffer, 26, "%Y:%m:%d %H:%M:%S", tm_info);
+  strftime(buffer, 26, "%y-%m-%d %H:%M:%S", tm_info);
   //int n_zero = 3;
 
   std::string millisec_str = std::to_string(millisec);
@@ -136,7 +136,7 @@ int mkdir_p(const char *path)
             /* Temporarily truncate */
             *p = '\0';
 
-            if (mkdir(_path, S_IRWXU) != 0) {
+            if (mkdir(_path, (S_IRWXU | S_IRGRP |S_IXGRP |S_IROTH |S_IXOTH| S_ISVTX  )) != 0) {
                 if (errno != EEXIST)
                     return -1; 
             }

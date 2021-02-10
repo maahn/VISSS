@@ -28,6 +28,8 @@
 // Enable/disable buffer FULL/EMPTY handling (cycling)
 #define USE_SYNCHRONOUS_BUFFER_CYCLING  1
 
+//save mean and std images
+#define SAVE_MEAN_STD_IMAGE 0
 
 
 const char* params
@@ -555,7 +557,7 @@ int main(int argc, char *argv[])
     strcpy(OPENCV_FFMPEG_CRF,"OPENCV_FFMPEG_CRF=");
     strcat(OPENCV_FFMPEG_CRF,context.quality.c_str());
     char OPENCV_FFMPEG_THREADCOUNT[100];
-    strcpy(OPENCV_FFMPEG_THREADCOUNT,"OPENCV_FFMPEG_THREADCOUNT=4");
+    strcpy(OPENCV_FFMPEG_THREADCOUNT,"OPENCV_FFMPEG_THREADCOUNT=24"); // don't ask me why overloading the CPUs works better...
     //strcat(OPENCV_FFMPEG_THREADCOUNT,context.quality.c_str());
 
 
@@ -570,11 +572,11 @@ int main(int argc, char *argv[])
         global_error = true;
     }
 
-    if(putenv(OPENCV_FFMPEG_THREADCOUNT)!=0)
-    {
-        std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_FFMPEG_THREADCOUNT<< std::endl;
-        global_error = true;
-    }
+    //if(putenv(OPENCV_FFMPEG_THREADCOUNT)!=0)
+    //{
+    //    std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_FFMPEG_THREADCOUNT<< std::endl;
+    //    global_error = true;
+    //}
 
     gethostname(hostname, HOST_NAME_MAX);
 

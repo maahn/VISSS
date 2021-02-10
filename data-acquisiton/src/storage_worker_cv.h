@@ -44,9 +44,11 @@ private:
     unsigned long t_reset_uint_;
     bool firstImage;
 
+#if SAVE_MEAN_STD_IMAGE
     cv::Mat imageFloat;
     cv::Mat imageSum;
     cv::Mat imageSumSquared;
+#endif SAVE_MEAN_STD_IMAGE
     unsigned long frame_count_loop;
 
     cv::VideoWriter writer_;
@@ -139,8 +141,10 @@ void storage_worker_cv::open_files()
     add_meta_data();
     std::cout << "STATUS | " << get_timestamp() << " | Opened "<< filename_+".txt"<< std::endl;
 
+#if SAVE_MEAN_STD_IMAGE
     imageSum = imageFloat.clone();
     imageSumSquared = imageFloat.mul(imageFloat);
+#endif SAVE_MEAN_STD_IMAGE
 
     return;
 }
@@ -148,6 +152,7 @@ void storage_worker_cv::open_files()
 void storage_worker_cv::close_files() {
 
 
+#if SAVE_MEAN_STD_IMAGE
     if (!firstImage) {
         cv::Mat imageSumInt;
         cv::Mat imageSumSquaredInt;
@@ -165,8 +170,8 @@ void storage_worker_cv::close_files() {
         create_symlink(filename_+"_mean.jpg",  filename_latest_+"_mean.jpg");
         cv::imwrite(filename_+"_std.jpg", imageSumSquaredInt );
         create_symlink(filename_+"_std.jpg",  filename_latest_+"_std.jpg");
-
    }
+#endif SAVE_MEAN_STD_IMAGE
 
     fMeta_.close();
     writer_.release();
@@ -252,11 +257,11 @@ void storage_worker_cv::run()
                           << ", " << image.id << ", " << meanImg[0] << ", " << stdImg[0] << "\n";
 
                 ++frame_count;
-                ++frame_count_loop;
                 timestamp = static_cast<long int> (time(NULL));
-
+#if SAVE_MEAN_STD_IMAGE
+                ++frame_count_loop;
                 image.MatImage.convertTo(imageFloat, CV_32FC1, 1/255.0);
-
+#endif SAVE_MEAN_STD_IMAGE
 
                 if (firstImage || ((timestamp % new_file_interval == 0) && (frame_count-frame_count_new_file > 300)))
                 {
@@ -274,10 +279,13 @@ void storage_worker_cv::run()
                     std::cout << "STATUS | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
 
                 }
+#if SAVE_MEAN_STD_IMAGE
                 else { 
                     imageSum = imageSum + imageFloat;
-                    imageSumSquared = imageSumSquared +imageFloat.mul(imageFloat);
+                    imageSumSquared = imageSumSquared + imageFloat.mul(imageFloat);
                 }
+#endif SAVE_MEAN_STD_IMAGE
+
                 writer_.write(image.MatImage);
 
                 if (frame_count % fps_int == 0)
