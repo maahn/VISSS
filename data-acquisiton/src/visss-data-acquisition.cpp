@@ -171,7 +171,7 @@ void *ImageCaptureThread( void *context)
                 {
                     was_active = TRUE;
                     m_latestBuffer = img->address;
-                    
+
                     // img->id max number is 65535
                     if ((last_id>=0) && (img->id != last_id+1)  && (last_id != 65535) ){
                         std::cout << std::endl << "ERROR | " << get_timestamp() << " | missed frames between " << last_id << " and " << img->id << std::endl;
@@ -225,8 +225,6 @@ void *ImageCaptureThread( void *context)
                         {
                         // init
 
-                            cv::namedWindow( OPENCV_WINDOW_NAME, cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
-
                             //--- INITIALIZE VIDEOWRITER
 
                             storage.emplace_back(std::ref(queue[0]), 0
@@ -238,6 +236,7 @@ void *ImageCaptureThread( void *context)
                                 //, captureContext->quality
                                 //, captureContext->preset
                                 , captureContext->t_reset
+                                , captureContext->live_window_frame_ratio
                                 );
                             //std:: cout << "STATUS | " << get_timestamp() << "| storage worker started" << std::endl;
 
@@ -288,29 +287,6 @@ void *ImageCaptureThread( void *context)
                             // std::cout << "Captured image #" << frame_count << " in "
                             //     << (dt_us / 1000.0) << " ms" << std::endl;
                         
-
-
-
-                            // writer.write(exportImg);
-
-                            if (frame_count % captureContext->live_window_frame_ratio == 0)
-                            {
-                                cv::Mat exportImgSmall;
-                                cv::resize(exportImgMeta.MatImage, exportImgSmall, cv::Size(), 0.5, 0.5);
-
-                                // std::string textImg = get_timestamp() + ", Hostname: " + hostname + ", Config file: " + configFileRaw;
-                                // cv::putText(exportImgSmall, 
-                                //     textImg,
-                                //     cv::Point(10,20), // Coordinates
-                                //     cv::FONT_HERSHEY_PLAIN, // Font
-                                //     1.0, // Scale. 2.0 = 2x bigger
-                                //     cv::Scalar(255), // BGR Color
-                                //     1, // Line Thickness (Optional)
-                                //     cv::LINE_AA); // Anti-alias (Optional)
-
-                                cv::imshow( OPENCV_WINDOW_NAME, exportImgSmall );
-                                cv::waitKey(1);
-                            }
  
                             fflush(stdout);
 

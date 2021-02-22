@@ -19,7 +19,8 @@ public:
         , bool is_color
 //        , double qualityƒ√
 //        , double preset
-        , std::chrono::time_point<std::chrono::system_clock> t_reset);
+        , std::chrono::time_point<std::chrono::system_clock> t_reset
+        , int live_window_frame_ratio);
     void run();
 
     double total_time_ms() const { return total_time_ / 1000.0; }
@@ -41,6 +42,7 @@ private:
 //    double preset_;
     double total_time_;
     std::chrono::time_point<std::chrono::system_clock> t_reset_;
+    int live_window_frame_ratio_;
     unsigned long t_reset_uint_;
     bool firstImage;
 
@@ -69,7 +71,8 @@ storage_worker_cv::storage_worker_cv(frame_queue& queue
     , bool is_color
 //    , double quality
 //    , double preset
-    , std::chrono::time_point<std::chrono::system_clock> t_reset)    :
+    , std::chrono::time_point<std::chrono::system_clock> t_reset
+    , int live_window_frame_ratio)    :
       queue_(queue)
     , id_(id)
     , path_(path)
@@ -81,6 +84,7 @@ storage_worker_cv::storage_worker_cv(frame_queue& queue
 //    , quality_(quality)
 //    , preset_(preset)
     , t_reset_(t_reset)
+    , live_window_frame_ratio_(live_window_frame_ratio)
 {
 }
 // // ----------------------------------------------------------------------------
@@ -241,6 +245,10 @@ void storage_worker_cv::run()
     firstImage = TRUE;
     t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
     int fps_int = cvCeil(fps_);
+    cv::Mat exportImgSmall;
+
+    cv::namedWindow( "VISSS Live Image", cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
+
 
     try {
         int32_t frame_count(0);
@@ -297,6 +305,19 @@ void storage_worker_cv::run()
                     "+/-" << stdImg[0] <<
                     "  \r"<<std::flush;
                 }
+
+
+                if (frame_count % live_window_frame_ratio_ == 0)
+                {
+                    
+                    cv::resize(image.MatImage, exportImgSmall, cv::Size(), 0.5, 0.5);
+
+
+                    cv::imshow( "VISSS Live Image", exportImgSmall );
+                    cv::waitKey(1);
+                }
+ 
+
 
                 high_resolution_clock::time_point t2(high_resolution_clock::now());
                 double dt_us(static_cast<double>(duration_cast<microseconds>(t2 - t1).count()));
