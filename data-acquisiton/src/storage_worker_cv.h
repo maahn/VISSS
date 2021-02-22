@@ -46,12 +46,6 @@ private:
     unsigned long t_reset_uint_;
     bool firstImage;
 
-#if SAVE_MEAN_STD_IMAGE
-    cv::Mat imageFloat;
-    cv::Mat imageSum;
-    cv::Mat imageSumSquared;
-#endif SAVE_MEAN_STD_IMAGE
-    unsigned long frame_count_loop;
 
     cv::VideoWriter writer_;
 
@@ -100,7 +94,7 @@ void storage_worker_cv::add_meta_data()
     std::size_t fractional_seconds = ms.count() % 1000;
     char *ctime_no_newline;
     ctime_no_newline = strtok(ctime(&t), "\n");
-    fMeta_ << "# VISSS file format version: 0.2"<< "\n";
+    fMeta_ << "# VISSS file format version: 0.3a"<< "\n";
     fMeta_ << "# VISSS git tag: " << GIT_TAG
           <<  "\n";
     fMeta_ << "# VISSS git branch: " << GIT_BRANCH
@@ -120,7 +114,7 @@ void storage_worker_cv::add_meta_data()
     fMeta_ << "# Hostname: "
           <<  hostname<< "\n";
      
-    fMeta_ << "# Capture time, Record time, Frame id, mean, std \n";
+    fMeta_ << "# Capture time, Record time, Frame id, x, x \n";
     return;
 
 }
@@ -145,37 +139,12 @@ void storage_worker_cv::open_files()
     add_meta_data();
     std::cout << "STATUS | " << get_timestamp() << " | Opened "<< filename_+".txt"<< std::endl;
 
-#if SAVE_MEAN_STD_IMAGE
-    imageSum = imageFloat.clone();
-    imageSumSquared = imageFloat.mul(imageFloat);
-#endif SAVE_MEAN_STD_IMAGE
 
     return;
 }
 
 void storage_worker_cv::close_files() {
 
-
-#if SAVE_MEAN_STD_IMAGE
-    if (!firstImage) {
-        cv::Mat imageSumInt;
-        cv::Mat imageSumSquaredInt;
-
-        imageSum = imageSum / frame_count_loop;
-        imageSumSquared = imageSumSquared / frame_count_loop;
-        imageSumSquared = imageSumSquared - (imageSum.mul(imageSum));
-        cv::sqrt(imageSumSquared, imageSumSquared);
-
-        imageSum.convertTo(imageSumInt, CV_8UC1, 255.0);
-        imageSumSquared.convertTo(imageSumSquaredInt, CV_8UC1, 255.0);
-
-
-        cv::imwrite(filename_+"_mean.jpg", imageSumInt );
-        create_symlink(filename_+"_mean.jpg",  filename_latest_+"_mean.jpg");
-        cv::imwrite(filename_+"_std.jpg", imageSumSquaredInt );
-        create_symlink(filename_+"_std.jpg",  filename_latest_+"_std.jpg");
-   }
-#endif SAVE_MEAN_STD_IMAGE
 
     fMeta_.close();
     writer_.release();
@@ -241,7 +210,6 @@ void storage_worker_cv::run()
 
     long int timestamp = 0;
     long int frame_count_new_file = 0;
-    frame_count_loop = 0;
     firstImage = TRUE;
     t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
     int fps_int = cvCeil(fps_);
@@ -271,21 +239,12 @@ void storage_worker_cv::run()
                         cv::LINE_AA); // Anti-alias (Optional)
 
 
-
-
-                cv::Scalar meanImg, stdImg;
-                cv::Mat imgCropped = imgBorder(cv::Rect(0,frameborder,frame_size_.width, frame_size_.height-frameborder));
-                cv::meanStdDev(imgCropped, meanImg, stdImg);
-
                 fMeta_  <<image.timestamp +t_reset_uint_ << ", " << t1.time_since_epoch().count()/1000
-                          << ", " << image.id << ", " << meanImg[0] << ", " << stdImg[0] << "\n";
+                          << ", " << image.id << ", " << 0 << ", " << 0 << "\n";
 
                 ++frame_count;
                 timestamp = static_cast<long int> (time(NULL));
-#if SAVE_MEAN_STD_IMAGE
-                ++frame_count_loop;
-                imgBorder.convertTo(imageFloat, CV_32FC1, 1/255.0);
-#endif SAVE_MEAN_STD_IMAGE
+
 
                 if (firstImage || ((timestamp % new_file_interval == 0) && (frame_count-frame_count_new_file > 300)))
                 {
@@ -297,30 +256,23 @@ void storage_worker_cv::run()
                     create_symlink(filename_+".jpg",  filename_latest_+".jpg");
 
                     frame_count_new_file = frame_count;
-                    frame_count_loop = 0;
 
                     std::cout ;
                     std::cout << "STATUS | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
 
                 }
-#if SAVE_MEAN_STD_IMAGE
-                else { 
-                    imageSum = imageSum + imageFloat;
-                    imageSumSquared = imageSumSquared + imageFloat.mul(imageFloat);
-                }
-#endif SAVE_MEAN_STD_IMAGE
 
                 writer_.write(imgBorder);
 
-                if (frame_count % fps_int == 0)
-                {
+                // if (frame_count % fps_int == 0)
+                // {
 
-                    std::cout << "STATUS | " << get_timestamp() << 
-                    " | Queue:" << queue_.size() << 
-                    " | Mean+/-std:" << meanImg[0] <<
-                    "+/-" << stdImg[0] <<
-                    "  \r"<<std::flush;
-                }
+                //     std::cout << "STATUS | " << get_timestamp() << 
+                //     " | Queue:" << queue_.size() << 
+                //     " | Mean+/-std:" << meanImg[0] <<
+                //     "+/-" << stdImg[0] <<
+                //     "  \r"<<std::flush;
+                // }
 
 
                 if (frame_count % live_window_frame_ratio_ == 0)
