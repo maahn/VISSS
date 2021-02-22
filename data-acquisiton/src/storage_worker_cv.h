@@ -245,7 +245,8 @@ void storage_worker_cv::run()
     firstImage = TRUE;
     t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
     int fps_int = cvCeil(fps_);
-    cv::Mat exportImgSmall;
+    cv::Mat imgSmall;
+    cv::Mat imgBorder;
 
     cv::namedWindow( "VISSS Live Image", cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
 
@@ -257,8 +258,23 @@ void storage_worker_cv::run()
             if (!image.MatImage.empty()) {
                 high_resolution_clock::time_point t1(high_resolution_clock::now());
                 
+
+                cv::copyMakeBorder(image.MatImage, imgBorder, frameborder, 0, 0, 0, cv::BORDER_CONSTANT, 0 );
+                std::string textImg = get_timestamp() + " | " + configFileRaw + " | Queue:" + std::to_string(queue_.size());
+                cv::putText(imgBorder, 
+                        textImg,
+                        cv::Point(20,50), // Coordinates
+                        cv::FONT_HERSHEY_PLAIN, // Font
+                        2, // Scale. 2.0 = 2x bigger
+                        cv::Scalar(255), // BGR Color
+                        2, // Line Thickness (Optional)
+                        cv::LINE_AA); // Anti-alias (Optional)
+
+
+
+
                 cv::Scalar meanImg, stdImg;
-                cv::Mat imgCropped = image.MatImage(cv::Rect(0,frameborder,frame_size_.width, frame_size_.height-frameborder));
+                cv::Mat imgCropped = imgBorder(cv::Rect(0,frameborder,frame_size_.width, frame_size_.height-frameborder));
                 cv::meanStdDev(imgCropped, meanImg, stdImg);
 
                 fMeta_  <<image.timestamp +t_reset_uint_ << ", " << t1.time_since_epoch().count()/1000
@@ -268,7 +284,7 @@ void storage_worker_cv::run()
                 timestamp = static_cast<long int> (time(NULL));
 #if SAVE_MEAN_STD_IMAGE
                 ++frame_count_loop;
-                image.MatImage.convertTo(imageFloat, CV_32FC1, 1/255.0);
+                imgBorder.convertTo(imageFloat, CV_32FC1, 1/255.0);
 #endif SAVE_MEAN_STD_IMAGE
 
                 if (firstImage || ((timestamp % new_file_interval == 0) && (frame_count-frame_count_new_file > 300)))
@@ -277,7 +293,7 @@ void storage_worker_cv::run()
                     close_files();
                     open_files();
 
-                    cv::imwrite(filename_+".jpg", image.MatImage );
+                    cv::imwrite(filename_+".jpg", imgBorder );
                     create_symlink(filename_+".jpg",  filename_latest_+".jpg");
 
                     frame_count_new_file = frame_count;
@@ -294,7 +310,7 @@ void storage_worker_cv::run()
                 }
 #endif SAVE_MEAN_STD_IMAGE
 
-                writer_.write(image.MatImage);
+                writer_.write(imgBorder);
 
                 if (frame_count % fps_int == 0)
                 {
@@ -310,10 +326,10 @@ void storage_worker_cv::run()
                 if (frame_count % live_window_frame_ratio_ == 0)
                 {
                     
-                    cv::resize(image.MatImage, exportImgSmall, cv::Size(), 0.5, 0.5);
+                    cv::resize(imgBorder, imgSmall, cv::Size(), 0.5, 0.5);
 
 
-                    cv::imshow( "VISSS Live Image", exportImgSmall );
+                    cv::imshow( "VISSS Live Image", imgSmall );
                     cv::waitKey(1);
                 }
  
@@ -328,7 +344,7 @@ void storage_worker_cv::run()
 
 
 
-                // std::cout << "Worker " << id_ << " stored image.MatImage #" << frame_count
+                // std::cout << "Worker " << id_ << " stored imgBorder #" << frame_count
                 //     << " in " << (dt_us / 1000.0) << " ms" << std::endl;
             }
         }

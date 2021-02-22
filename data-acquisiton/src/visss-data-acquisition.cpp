@@ -256,22 +256,7 @@ void *ImageCaptureThread( void *context)
 
 
                             // Now the main capture loop
-                            cv::copyMakeBorder( exportImg, exportImgMeta.MatImage, frameborder, 0, 0, 0, cv::BORDER_CONSTANT, 0 );
-                            //exportImgMeta.MatImage = exportImg.clone();
-                            std::string textImg = get_timestamp() + ", " + hostname + ", " + configFileRaw;
-                            cv::putText(exportImgMeta.MatImage, 
-                                    textImg,
-                                    cv::Point(20,50), // Coordinates
-                                    cv::FONT_HERSHEY_PLAIN, // Font
-                                    2, // Scale. 2.0 = 2x bigger
-                                    cv::Scalar(255), // BGR Color
-                                    2, // Line Thickness (Optional)
-                                    cv::LINE_AA); // Anti-alias (Optional)
-
-
-
-
-
+                            exportImgMeta.MatImage = exportImg.clone();
                             exportImgMeta.timestamp = img->timestamp;
                             exportImgMeta.id = img->id;
 
