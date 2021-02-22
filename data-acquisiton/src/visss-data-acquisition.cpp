@@ -171,7 +171,9 @@ void *ImageCaptureThread( void *context)
                 {
                     was_active = TRUE;
                     m_latestBuffer = img->address;
-                    if ((last_id>=0) && (img->id != last_id+1) ){
+                    
+                    // img->id max number is 65535
+                    if ((last_id>=0) && (img->id != last_id+1)  && (last_id != 65535) ){
                         std::cout << std::endl << "ERROR | " << get_timestamp() << " | missed frames between " << last_id << " and " << img->id << std::endl;
                     }
 
