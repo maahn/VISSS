@@ -5,6 +5,9 @@ ROOTPATH=/home/visss/Desktop/VISSS/
 EXE=$ROOTPATH/data-acquisiton/visss-data-acquisiton
 OUTDIR=/data/lim
 HOST=`hostname`
+IP='192.168.100.2'
+MAC='00:01:0D:C3:0F:34'
+
 /bin/mkdir -p $OUTDIR/logs
 
 set -o pipefail
@@ -19,9 +22,13 @@ then
 	/bin/sleep 25
 fi
 
-/bin/echo "Set camera IP address (just to be sure)"
-/usr/local/bin/gevipconfig -p 00:01:0D:C3:0F:34 192.168.100.2 255.255.255.0
-
+if ping -c 1 $IP > /dev/null
+	then
+	echo 'camera repsonding'
+else
+	/bin/echo "Set camera IP address (just to be sure)"
+	/usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0
+fi
 
 /usr/bin/sudo /sbin/setcap cap_sys_nice+ep $EXE
 
@@ -31,7 +38,7 @@ do
 
 timestamp=$(/bin/date +%FT%T)
 #if $EXE -p=veryfast -q=17 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_master.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
-if $EXE -p=fast -q=17 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_master.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
+if $EXE -p=ultrafast -q=17 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_master.config | /usr/bin/tee $OUTDIR/logs/master-$timestamp.txt
 		then
 			/bin/echo "worked"
 			exit
