@@ -99,7 +99,6 @@ void processing_worker_cv::run()
     std::vector<frame_queue> queue_writer((int) 1);
     int fps_int = cvCeil(fps_);
 
-
     storage.emplace_back(std::ref(queue_writer[0]), 100
         , path_
         , fourcc_

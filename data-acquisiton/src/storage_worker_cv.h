@@ -94,7 +94,7 @@ void storage_worker_cv::add_meta_data()
     std::size_t fractional_seconds = ms.count() % 1000;
     char *ctime_no_newline;
     ctime_no_newline = strtok(ctime(&t), "\n");
-    fMeta_ << "# VISSS file format version: 0.3a"<< "\n";
+    fMeta_ << "# VISSS file format version: 0.2"<< "\n";
     fMeta_ << "# VISSS git tag: " << GIT_TAG
           <<  "\n";
     fMeta_ << "# VISSS git branch: " << GIT_BRANCH
@@ -214,8 +214,15 @@ void storage_worker_cv::run()
     t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
     int fps_int = cvCeil(fps_);
     cv::Mat imgSmall;
-    cv::Mat imgBorder;
+    cv::Mat imgWithMeta;
+    cv::Mat imgOld;
+    cv::Mat imgDiff;
+    cv::Mat img1Chan;
+    int threshold;
+    //int [sizeof(thresholds)]= { 0 };
+    cv::Mat nPixel;
 
+    
     cv::namedWindow( "VISSS Live Image", cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
 
 
@@ -227,9 +234,55 @@ void storage_worker_cv::run()
                 high_resolution_clock::time_point t1(high_resolution_clock::now());
                 
 
-                cv::copyMakeBorder(image.MatImage, imgBorder, frameborder, 0, 0, 0, cv::BORDER_CONSTANT, 0 );
-                std::string textImg = get_timestamp() + " | " + configFileRaw + " | Queue:" + std::to_string(queue_.size());
-                cv::putText(imgBorder, 
+                cv::extractChannel(image.MatImage, img1Chan, 0);
+
+                if (firstImage)  { 
+                    imgOld = img1Chan * 0;
+                }   
+
+                cv::absdiff(img1Chan, imgOld, imgDiff);
+
+
+                // get histogramm
+                float range[] = {2,4,6,8,10,20,30,40,60,80,100,256  }; //the upper boundary is exclusive
+                int histSize = 7;
+                const float* histRange = { range };
+                bool uniform = false;
+                bool accumulate = false;
+                cv::calcHist( &imgDiff, 1, 0, cv::Mat(), nPixel, 1,&histSize, &histRange, uniform, accumulate );
+
+                // Mat to array
+                std::vector<float> nPixelA;
+                nPixelA.assign((float*)nPixel.data, (float*)nPixel.data + nPixel.total()*nPixel.channels());
+
+                //std::cout <<  "M1 = " << std::endl << " "  << nPixelA[0]<< " "<< nPixelA[1]<< " "<< nPixelA[2]<< " "<< nPixelA[3]<< " "<< nPixelA[4]<< " "<< nPixelA[5] << " "<< nPixelA[6]<< std::endl << std::endl;
+                    //cumsum
+                for (int ii = histSize-1; ii --> 0; )
+                {
+                     nPixelA[ii] = nPixelA[ii] + nPixelA[ii+1];
+                }
+
+                //std::cout <<  "M2 = " << std::endl << " "  << nPixelA[0]<< " "<< nPixelA[1]<< " "<< nPixelA[2]<< " "<< nPixelA[3]<< " "<< nPixelA[4]<< " "<< nPixelA[5] << " "<< nPixelA[6]<< std::endl << std::endl;
+
+
+
+
+                //for (int tt : thresholds) {
+                //    nPixel[tt] = cv::sum(imgDiff > thresholds[tt])[0];
+                //} https://webcache.googleusercontent.com/search?q=cache:iUCC_CSnaLwJ:https://answers.opencv.org/question/60753/counting-black-white-pixels-with-a-threshold/+&cd=1&hl=de&ct=clnk&gl=de
+
+                cv::copyMakeBorder(image.MatImage, imgWithMeta, frameborder, 0, 0, 0, cv::BORDER_CONSTANT, 0 );
+                std::string textImg = get_timestamp() + " | " + configFileRaw + " | Q:" + std::to_string(queue_.size()) + " | M: ";
+                for (int jj = histSize; jj --> 0; )
+                {
+                     if (nPixelA[jj]>0) 
+                     {
+                        textImg = textImg + std::to_string((int)range[jj]);
+                        break;
+                     }
+                }
+
+                cv::putText(imgWithMeta, 
                         textImg,
                         cv::Point(20,50), // Coordinates
                         cv::FONT_HERSHEY_PLAIN, // Font
@@ -252,7 +305,7 @@ void storage_worker_cv::run()
                     close_files();
                     open_files();
 
-                    cv::imwrite(filename_+".jpg", imgBorder );
+                    cv::imwrite(filename_+".jpg", imgWithMeta );
                     create_symlink(filename_+".jpg",  filename_latest_+".jpg");
 
                     frame_count_new_file = frame_count;
@@ -262,23 +315,30 @@ void storage_worker_cv::run()
 
                 }
 
-                writer_.write(imgBorder);
+                writer_.write(imgWithMeta);
 
-                // if (frame_count % fps_int == 0)
-                // {
+                if (frame_count % fps_int == 0)
+                {
 
-                //     std::cout << "STATUS | " << get_timestamp() << 
-                //     " | Queue:" << queue_.size() << 
-                //     " | Mean+/-std:" << meanImg[0] <<
-                //     "+/-" << stdImg[0] <<
-                //     "  \r"<<std::flush;
-                // }
+                    double min, max;
+                    minMaxIdx(imgDiff, &min, &max);
 
+                    std::cout << "STATUS | " << get_timestamp() << 
+                    " | Queue:" << queue_.size() << 
+                    //" | " << nPixelA <<
+                    "  \r"<<std::flush;
+                    // "  \r"<<std::endl;
+
+
+               }
+
+
+                cv::extractChannel(image.MatImage.clone(), imgOld, 0);
 
                 if (frame_count % live_window_frame_ratio_ == 0)
                 {
                     
-                    cv::resize(imgBorder, imgSmall, cv::Size(), 0.5, 0.5);
+                    cv::resize(imgWithMeta, imgSmall, cv::Size(), 0.5, 0.5);
 
 
                     cv::imshow( "VISSS Live Image", imgSmall );
@@ -296,7 +356,7 @@ void storage_worker_cv::run()
 
 
 
-                // std::cout << "Worker " << id_ << " stored imgBorder #" << frame_count
+                // std::cout << "Worker " << id_ << " stored imgWithMeta #" << frame_count
                 //     << " in " << (dt_us / 1000.0) << " ms" << std::endl;
             }
         }

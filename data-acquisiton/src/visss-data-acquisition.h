@@ -24,6 +24,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/core/utility.hpp>
+
 #include <iostream>
 
 // #include <opencv2/opencv.hpp>
@@ -58,6 +59,7 @@ std::string configFileRaw;
 int maxframes = -1;
 int frameborder = 64;
 int new_file_interval = 300;
+
 
 struct MatMeta {
   cv::Mat MatImage;
@@ -228,3 +230,29 @@ static void OutputFeatureValues( const GenApi::CNodePtr &ptrFeature, FILE *fp )
         }
     }
 }
+
+//https://stackoverflow.com/questions/10167534/how-to-find-out-what-type-of-a-mat-object-is-with-mattype-in-opencv
+std::string type2str(int type) {
+  std::string r;
+
+  uchar depth = type & CV_MAT_DEPTH_MASK;
+  uchar chans = 1 + (type >> CV_CN_SHIFT);
+
+  switch ( depth ) {
+    case CV_8U:  r = "8U"; break;
+    case CV_8S:  r = "8S"; break;
+    case CV_16U: r = "16U"; break;
+    case CV_16S: r = "16S"; break;
+    case CV_32S: r = "32S"; break;
+    case CV_32F: r = "32F"; break;
+    case CV_64F: r = "64F"; break;
+    default:     r = "User"; break;
+  }
+
+  r += "C";
+  r += (chans+'0');
+
+  return r;
+}
+//std::string ty =  type2str( nPixel.type() );
+//printf("nPixel: %s %dx%d \n", ty.c_str(), nPixel.cols, nPixel.rows );
