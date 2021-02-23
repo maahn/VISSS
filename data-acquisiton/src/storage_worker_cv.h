@@ -44,7 +44,9 @@ private:
     std::chrono::time_point<std::chrono::system_clock> t_reset_;
     int live_window_frame_ratio_;
     unsigned long t_reset_uint_;
+    unsigned long t_record;
     bool firstImage;
+    bool fileUsed;
 
 
     cv::VideoWriter writer_;
@@ -94,7 +96,12 @@ void storage_worker_cv::add_meta_data()
     std::size_t fractional_seconds = ms.count() % 1000;
     char *ctime_no_newline;
     ctime_no_newline = strtok(ctime(&t), "\n");
-    fMeta_ << "# VISSS file format version: 0.2"<< "\n";
+
+    //0.2 with mean and standard deviation
+    //0.3 with number of changing pixels
+
+
+    fMeta_ << "# VISSS file format version: 0.3"<< "\n";
     fMeta_ << "# VISSS git tag: " << GIT_TAG
           <<  "\n";
     fMeta_ << "# VISSS git branch: " << GIT_BRANCH
@@ -114,7 +121,16 @@ void storage_worker_cv::add_meta_data()
     fMeta_ << "# Hostname: "
           <<  hostname<< "\n";
      
-    fMeta_ << "# Capture time, Record time, Frame id, x, x \n";
+    fMeta_ << "# Capture time, Record time, Frame id";
+
+
+    for(int ll = 0; ll < histSize; ll++) 
+    {
+        fMeta_ << ", " << std::to_string((int)range[ll]);
+    }
+    fMeta_ << "\n";
+ 
+
     return;
 
 }
@@ -130,7 +146,7 @@ void storage_worker_cv::open_files()
     //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=superfast rc-lookahead=80 subme=2 ! queue ! qtmux !  filesink location=video-h264_lookahead80a_subme2.mov",
     //                            cv::CAP_GSTREAMER, 0, fps_, frame_size_, is_color_);
 // 
-
+   fileUsed = false;
    std::cout << "STATUS | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
 
 
@@ -145,13 +161,17 @@ void storage_worker_cv::open_files()
 
 void storage_worker_cv::close_files() {
 
-
-    fMeta_.close();
-    writer_.release();
-    create_symlink(filename_+".mov",  filename_latest_+".mov");
-
-
-    std::cout << std::endl << "STATUS | " << get_timestamp() << " | All files closed. "<<std::endl;
+    if (!firstImage) {
+        fMeta_.close();
+        writer_.release();
+        if (fileUsed) {
+            create_symlink(filename_+".mov",  filename_latest_+".mov");
+        } else {
+            std::remove((filename_+".mov").c_str());
+            std::cout << std::endl << "STATUS | " << get_timestamp() << " | Empty file removed: " << filename_<<".mov" <<std::endl;
+        }
+    }
+    //std::cout << std::endl << "STATUS | " << get_timestamp() << " | All files closed. "<<std::endl;
 
     return;
 
@@ -221,7 +241,8 @@ void storage_worker_cv::run()
     int threshold;
     //int [sizeof(thresholds)]= { 0 };
     cv::Mat nPixel;
-
+    bool movingPixel;
+    cv::Scalar borderColor;
     
     cv::namedWindow( "VISSS Live Image", cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
 
@@ -233,6 +254,11 @@ void storage_worker_cv::run()
             if (!image.MatImage.empty()) {
                 high_resolution_clock::time_point t1(high_resolution_clock::now());
                 
+                t_record = t1.time_since_epoch().count()/1000;
+
+
+                timestamp = static_cast<long int> (time(NULL));
+                bool newFile = ((timestamp % new_file_interval == 0) && (frame_count-frame_count_new_file > 300));
 
                 cv::extractChannel(image.MatImage, img1Chan, 0);
 
@@ -244,9 +270,6 @@ void storage_worker_cv::run()
 
 
                 // get histogramm
-                float range[] = {2,4,6,8,10,20,30,40,60,80,100,256  }; //the upper boundary is exclusive
-                int histSize = 7;
-                const float* histRange = { range };
                 bool uniform = false;
                 bool accumulate = false;
                 cv::calcHist( &imgDiff, 1, 0, cv::Mat(), nPixel, 1,&histSize, &histRange, uniform, accumulate );
@@ -262,6 +285,16 @@ void storage_worker_cv::run()
                      nPixelA[ii] = nPixelA[ii] + nPixelA[ii+1];
                 }
 
+
+                if (nPixelA[1] > minMovingPixel) 
+                 {
+                     movingPixel = true;
+                }      
+                else       
+                 {
+                     movingPixel = false;
+                }  
+
                 //std::cout <<  "M2 = " << std::endl << " "  << nPixelA[0]<< " "<< nPixelA[1]<< " "<< nPixelA[2]<< " "<< nPixelA[3]<< " "<< nPixelA[4]<< " "<< nPixelA[5] << " "<< nPixelA[6]<< std::endl << std::endl;
 
 
@@ -271,16 +304,31 @@ void storage_worker_cv::run()
                 //    nPixel[tt] = cv::sum(imgDiff > thresholds[tt])[0];
                 //} https://webcache.googleusercontent.com/search?q=cache:iUCC_CSnaLwJ:https://answers.opencv.org/question/60753/counting-black-white-pixels-with-a-threshold/+&cd=1&hl=de&ct=clnk&gl=de
 
-                cv::copyMakeBorder(image.MatImage, imgWithMeta, frameborder, 0, 0, 0, cv::BORDER_CONSTANT, 0 );
                 std::string textImg = get_timestamp() + " | " + configFileRaw + " | Q:" + std::to_string(queue_.size()) + " | M: ";
                 for (int jj = histSize; jj --> 0; )
                 {
-                     if (nPixelA[jj]>0) 
+                     if (nPixelA[jj]> minMovingPixel) 
                      {
                         textImg = textImg + std::to_string((int)range[jj]);
                         break;
                      }
                 }
+
+
+                if (movingPixel  || firstImage)
+                     {
+                        borderColor = ( 0 );
+                        
+                     }
+                 else
+                     {
+                        borderColor = ( 100 );
+                        textImg = textImg + " | NOT RECORDING";
+                     }
+
+                cv::copyMakeBorder(image.MatImage, imgWithMeta, frameborder, 0, 0, 0, cv::BORDER_CONSTANT, borderColor );
+                
+
 
                 cv::putText(imgWithMeta, 
                         textImg,
@@ -292,14 +340,8 @@ void storage_worker_cv::run()
                         cv::LINE_AA); // Anti-alias (Optional)
 
 
-                fMeta_  <<image.timestamp +t_reset_uint_ << ", " << t1.time_since_epoch().count()/1000
-                          << ", " << image.id << ", " << 0 << ", " << 0 << "\n";
 
-                ++frame_count;
-                timestamp = static_cast<long int> (time(NULL));
-
-
-                if (firstImage || ((timestamp % new_file_interval == 0) && (frame_count-frame_count_new_file > 300)))
+                if (firstImage || newFile)
                 {
 
                     close_files();
@@ -314,23 +356,36 @@ void storage_worker_cv::run()
                     std::cout << "STATUS | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
 
                 }
+                
+                if (movingPixel  || firstImage)
+                     {
+                        writer_.write(imgWithMeta);
+                        fileUsed = true;
 
-                writer_.write(imgWithMeta);
+                        fMeta_  <<image.timestamp +t_reset_uint_ << ", " << t_record
+                          << ", " << image.id ;
 
-                if (frame_count % fps_int == 0)
-                {
+                        for(int kk = 0; kk < histSize; kk++) 
+                        {
+                            fMeta_ << ", " << std::to_string((int)nPixelA[kk]);
+                        }
+                        fMeta_ << "\n";
 
-                    double min, max;
-                    minMaxIdx(imgDiff, &min, &max);
-
-                    std::cout << "STATUS | " << get_timestamp() << 
-                    " | Queue:" << queue_.size() << 
+                    std::cout << "WRITTEN | " << get_timestamp() << 
+                    " | Queue:" << queue_.size() <<" | ID:" << image.id <<
                     //" | " << nPixelA <<
-                    "  \r"<<std::flush;
-                    // "  \r"<<std::endl;
+                    //"  \r"<<std::flush;
+                     "  \r"<<std::endl;
+
+                     }
+
+               //  if (frame_count % fps_int == 0)
+               //  {
 
 
-               }
+
+
+               // }
 
 
                 cv::extractChannel(image.MatImage.clone(), imgOld, 0);
@@ -345,6 +400,9 @@ void storage_worker_cv::run()
                     cv::waitKey(1);
                 }
  
+                firstImage = FALSE;
+                ++frame_count;
+
 
 
                 high_resolution_clock::time_point t2(high_resolution_clock::now());
@@ -352,8 +410,6 @@ void storage_worker_cv::run()
                 total_time_ += dt_us;
 
                 
-                firstImage = FALSE;
-
 
 
                 // std::cout << "Worker " << id_ << " stored imgWithMeta #" << frame_count

@@ -61,6 +61,13 @@ int frameborder = 64;
 int new_file_interval = 300;
 
 
+//histogram
+float range[] = {10,20,30,40,60,80,100,256  }; //the upper boundary is exclusive
+int histSize = 7;
+const float* histRange = { range };
+int minMovingPixel = 20;
+
+
 struct MatMeta {
   cv::Mat MatImage;
   unsigned long timestamp;
