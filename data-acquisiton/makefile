@@ -7,6 +7,7 @@ SRC_DIR = src
 OBJ_DIR = obj
 
 EXE = visss-data-acquisiton
+EXE2 = visss-data-acquisition-dryrun
 
 SRC = $(wildcard $(SRC_DIR)/*.cpp)
 OBJ = $(SRC:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
@@ -60,21 +61,36 @@ LCLLIBS=  $(COMMONLIBS) -lpthread -L/usr/local/lib -lGevApi -lCorW32 -lm
 
 .PHONY: all clean
 
-all: $(EXE)
+all: $(EXE) $(EXE2)
 
 install:
 	mv $(EXE) ../bin
 
-$(EXE): $(OBJ)
+
+# $(EXE): $(OBJ)
+# 	$(CC) -g  $^ $(LCLLIBS) $(openCV)  $(GENICAM_LIBS) -L$(ARCHLIBDIR) -lstdc++ -o $@
+# 	/usr/bin/sudo /sbin/setcap cap_sys_nice,cap_net_raw+ep $(EXE)
+
+# $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+# 	$(CC) -I. $(INC_PATH) $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -I/home/mmaahn/ffmpeg_build/include/ -L/home/mmaahn/ffmpeg_build/lib/ -lavcodec -lavutil -c $< -o $@
+
+
+$(EXE): $(OBJ_DIR)/visss-data-acquisition.o
 	$(CC) -g  $^ $(LCLLIBS) $(openCV)  $(GENICAM_LIBS) -L$(ARCHLIBDIR) -lstdc++ -o $@
 	/usr/bin/sudo /sbin/setcap cap_sys_nice,cap_net_raw+ep $(EXE)
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
-	$(CC) -I. $(INC_PATH) $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -I/home/mmaahn/ffmpeg_build/include/ -L/home/mmaahn/ffmpeg_build/lib/ -lavcodec -lavutil -c $< -o $@
+$(OBJ_DIR)/visss-data-acquisition.o: $(SRC_DIR)/visss-data-acquisition.cpp
+	$(CC) -I. $(INC_PATH) $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -lavcodec -lavutil -c $< -o $@
+
+$(EXE2): $(OBJ_DIR)/visss-data-acquisition-dryrun.o
+	$(CC) -g  $^ $(LCLLIBS) $(openCV)  $(GENICAM_LIBS)  -lstdc++ -o $@
+
+$(OBJ_DIR)/visss-data-acquisition-dryrun.o: $(SRC_DIR)/visss-data-acquisition-dryrun.cpp
+	$(CC) -I. $(INC_PATH) $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -lavcodec -lavutil -c $< -o $@
 
 clean:
-	$(RM) $(OBJ)
-
+# 	$(RM) $(OBJ)
+	$(RM) $(OBJ_DIR)/*
 # all: src/visss-data-acquisiton
 
 

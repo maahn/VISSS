@@ -225,21 +225,21 @@ void storage_worker_cv::create_filename() {
 void storage_worker_cv::run() 
 
 {
-    nice(-25);
+    
+
+    int result;
+    result = nice(-25);
 
 
     long int timestamp = 0;
     long int frame_count_new_file = 0;
     firstImage = TRUE;
     t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
-    int fps_int = cvCeil(fps_);
     cv::Mat imgSmall;
     cv::Mat imgWithMeta;
     cv::Mat imgOld;
     cv::Mat imgDiff;
     cv::Mat img1Chan;
-    int threshold;
-    //int [sizeof(thresholds)]= { 0 };
     cv::Mat nPixel;
     bool movingPixel;
     cv::Scalar borderColor;
@@ -255,6 +255,10 @@ void storage_worker_cv::run()
                 high_resolution_clock::time_point t1(high_resolution_clock::now());
                 
                 t_record = t1.time_since_epoch().count()/1000;
+
+
+                // std::string ty =  type2str( image.MatImage.type() );
+                // printf("image.MatImage: %s %dx%d \n", ty.c_str(), image.MatImage.cols, image.MatImage.rows );
 
 
                 timestamp = static_cast<long int> (time(NULL));
@@ -374,8 +378,8 @@ void storage_worker_cv::run()
                     std::cout << "WRITTEN | " << get_timestamp() << 
                     " | Queue:" << queue_.size() <<" | ID:" << image.id <<
                     //" | " << nPixelA <<
-                    //"  \r"<<std::flush;
-                     "  \r"<<std::endl;
+                    "  \r"<<std::flush;
+                    // "  \r"<<std::endl;
 
                      }
 
@@ -398,7 +402,7 @@ void storage_worker_cv::run()
 
                     cv::imshow( "VISSS Live Image", imgSmall );
                     cv::waitKey(1);
-                }
+                    }
  
                 firstImage = FALSE;
                 ++frame_count;
@@ -415,6 +419,9 @@ void storage_worker_cv::run()
                 // std::cout << "Worker " << id_ << " stored imgWithMeta #" << frame_count
                 //     << " in " << (dt_us / 1000.0) << " ms" << std::endl;
             }
+
+
+
         }
     } catch (frame_queue::cancelled& /*e*/) {
         // Nothing more to process, we're done

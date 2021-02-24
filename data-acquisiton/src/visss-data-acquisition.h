@@ -105,12 +105,13 @@ std::string get_timestamp(){
 
 void create_symlink(std::string target, std::string link) 
 {
+    int result;
 
     char tmp[200];
     strcpy(tmp, link.c_str());
     strcat(tmp, ".tmp");
 
-    symlink(target.c_str(), tmp);
+    result = symlink(target.c_str(), tmp);
     rename(tmp, link.c_str());
 
 }
