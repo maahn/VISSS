@@ -47,7 +47,7 @@ C_COMPILE_OPTIONS= $(DEBUGFLAGS) -fhosted -Wall -Wno-parentheses -Wno-missing-br
 		   	-Wno-unknown-pragmas -Wno-cast-qual -Wno-unused-function -Wno-unused-label -Wno-unused-but-set-variable
 
 
-LCLLIBS=  $(COMMONLIBS) -lpthread -L/usr/local/lib -lGevApi -lCorW32 -lm
+LCLLIBS=  $(COMMONLIBS) -lpthread  -lCorW32 -lm
 
 # %.o : %.cpp
 # 	$(CC) -I. $(INC_PATH) $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -I/home/mmaahn/ffmpeg_build/include/ -L/home/mmaahn/ffmpeg_build/lib/ -lavcodec -lavutil -c $< -o $@
@@ -76,17 +76,17 @@ install:
 
 
 $(EXE): $(OBJ_DIR)/visss-data-acquisition.o
-	$(CC) -g  $^ $(LCLLIBS) $(openCV)  $(GENICAM_LIBS) -L$(ARCHLIBDIR) -lstdc++ -o $@
+	$(CC) -g  $^ $(LCLLIBS) -L/usr/local/lib -lGevApi $(openCV)  $(GENICAM_LIBS) -L$(ARCHLIBDIR) -lstdc++ -o $@
 	/usr/bin/sudo /sbin/setcap cap_sys_nice,cap_net_raw+ep $(EXE)
 
 $(OBJ_DIR)/visss-data-acquisition.o: $(SRC_DIR)/visss-data-acquisition.cpp
 	$(CC) -I. $(INC_PATH) $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -lavcodec -lavutil -c $< -o $@
 
 $(EXE2): $(OBJ_DIR)/visss-data-acquisition-dryrun.o
-	$(CC) -g  $^ $(LCLLIBS) $(openCV)  $(GENICAM_LIBS)  -lstdc++ -o $@
+	$(CC) -g  $^ $(LCLLIBS) $(openCV)   -lstdc++ -o $@
 
 $(OBJ_DIR)/visss-data-acquisition-dryrun.o: $(SRC_DIR)/visss-data-acquisition-dryrun.cpp
-	$(CC) -I. $(INC_PATH) $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -lavcodec -lavutil -c $< -o $@
+	$(CC) -I. $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -lavcodec -lavutil -c $< -o $@
 
 clean:
 # 	$(RM) $(OBJ)

@@ -147,7 +147,7 @@ void storage_worker_cv::open_files()
         writer_.open(filename_+".mov", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
         std::cout << "STATUS | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
     }
-    //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=veryfast mb-tree=TRUE me=dia analyse=i8x8 rc-lookahead=20 subme=1 ! queue ! qtmux !  filesink location=video-h264_lookahead20.mov",
+    //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=veryfast mb-tree=true me=dia analyse=i8x8 rc-lookahead=20 subme=1 ! queue ! qtmux !  filesink location=video-h264_lookahead20.mov",
     //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=superfast rc-lookahead=80 subme=2 ! queue ! qtmux !  filesink location=video-h264_lookahead80a_subme2.mov",
     //                            cv::CAP_GSTREAMER, 0, fps_, frame_size_, is_color_);
 // 
@@ -199,7 +199,7 @@ void storage_worker_cv::create_filename() {
         full_path = path_ + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "/data/" + timestamp1 + "/" ;
         filename_ = full_path + hostname + "_" + configFileRaw + "_" + DeviceID  + "_" + timestamp2;
     } else {
-        full_path = path_ + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "/data/"  ;
+        full_path = path_  + "/" ;
         filename_ = full_path + DeviceIDMeta+ "_DRYRUN";
     }
     filename_latest_ = path_ + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "_latest" ;
@@ -243,7 +243,7 @@ void storage_worker_cv::run()
 
     long int timestamp = 0;
     long int frame_count_new_file = 0;
-    firstImage = TRUE;
+    firstImage = true;
     std::string message;
     cv::Mat imgSmall;
     cv::Mat imgWithMeta;
@@ -430,7 +430,7 @@ void storage_worker_cv::run()
 
 
                 imgOld = image.MatImage.clone();
-                firstImage = FALSE;
+                firstImage = false;
                 ++frame_count;
 
 

@@ -1,6 +1,10 @@
 //============================================================================
 
 #include "visss-data-acquisition.h"   
+#include "cordef.h"
+#include "GenApi/GenApi.h"      //!< GenApi lib definitions.
+#include "gevapi.h"             //!< GEV lib definitions.
+// #include "gevbuffile.h"
 //============================================================================
 
 #include "frame_queue.h"   
@@ -11,7 +15,7 @@
 // using namespace cv;
 // using namespace std;
 
-#define OPENCV_WINDOW_NAME	"VISSS Live Image"
+#define OPENCV_WINDOW_NAME  "VISSS Live Image"
 
 #define MAX_CAMERAS     2
 
@@ -33,18 +37,20 @@
 
 
 const char* params
-    = "{ help h           |                   | Print usage }"
-      "{ output o         | ./                | Output Path }"
-      "{ camera n         | 0                 | camera number }"
-      "{ quality q        | 16                | quality 0-51 }"
-      "{ preset p         | veryfast          | preset (ultrafast - placebo) }"
-      "{ liveratio l      | 70                | every Xth frame will be displayed in the live window }"
-      "{ fps f            | 140               | frames per seconds of output }"
-      "{ maxframes m      | -1                | stop after this many frames (for debugging) }"
-      "{ writeallframes w |                   | write all frames whether sth is moving or not (for debugging) }"
-      "{ nopreview        |                   | no preview window }"
-      "{ nooutput         |                   | do not store video data }"
-      "{ @config          | <none>            | camera configuration file }";
+    = "{ help h            |                   | Print usage }"
+      "{ output o          | ./                | Output Path }"
+      "{ camera n          | 0                 | camera number }"
+      "{ quality q         | 16                | quality  0-51 }"
+      "{ preset p          | veryfast          | preset (ultrafast - placebo) }"
+      "{ liveratio l       | 70                | every Xth frame will be displayed in the live window }"
+      "{ fps f             | 140               | frames per seconds of output }"
+      "{ newfileinterval i | 300               | write new file very ?s. Set to 0 to deactivate}"
+      "{ maxframes m       | -1                | stop after this many frames (for debugging) }"
+      "{ writeallframes w  |                   | write all frames whether sth is moving or not (for debugging) }"
+      "{ nopreview         |                   | no preview window }"
+      "{ novideo           |                   | do not store video data }"
+      "{ nometadata        |                   | do not store meta data }"
+      "{ @config           | <none>            | camera configuration file }";
 
 // ====================================
 
@@ -56,17 +62,97 @@ void *m_latestBuffer = NULL;
 typedef struct tagMY_CONTEXT
 {
     GEV_CAMERA_HANDLE camHandle;
-    std::string 					base_name;
-    int 					enable_sequence;
-    int 					enable_save;
+    std::string                     base_name;
+    int                     enable_sequence;
+    int                     enable_save;
     int                     live_window_frame_ratio;
     double                     fps;
     std::string                  quality;
     std::string                  preset;
     std::chrono::time_point<std::chrono::system_clock> t_reset;
-    BOOL              exit;
+    bool              exit;
 } MY_CONTEXT, *PMY_CONTEXT;
 
+static void OutputFeatureValuePair( const char *feature_name, const char *value_string, FILE *fp )
+{
+    if ( (feature_name != NULL)  && (value_string != NULL) )
+    {
+        // Feature : Value pair output (in one place in to ease changing formats or output method - if desired).
+        fprintf(fp, "%s %s\n", feature_name, value_string);
+    }
+}
+
+
+static void OutputFeatureValues( const GenApi::CNodePtr &ptrFeature, FILE *fp )
+{
+    
+   GenApi::CCategoryPtr ptrCategory(ptrFeature);
+   if( ptrCategory.IsValid() )
+   {
+       GenApi::FeatureList_t Features;
+       ptrCategory->GetFeatures(Features);
+       for( GenApi::FeatureList_t::iterator itFeature=Features.begin(); itFeature!=Features.end(); itFeature++ )
+       {    
+          OutputFeatureValues( (*itFeature), fp );
+       }
+   }
+   else
+   {
+        // Store only "streamable" features (since only they can be restored).
+        if ( ptrFeature->IsStreamable() )
+        {
+            // Create a selector set (in case this feature is selected)
+            bool selectorSettingWasOutput = false;
+            GenApi::CSelectorSet selectorSet(ptrFeature);
+            
+            // Loop through all the selectors that select this feature.
+            // Use the magical CSelectorSet class that handles the 
+            //   "set of selectors that select this feature" and indexes
+            // through all possible combinations so we can save all of them.
+            selectorSet.SetFirst();
+            do
+            {
+                GenApi::CValuePtr valNode(ptrFeature);  
+                if ( valNode.IsValid() && (GenApi::RW == valNode->GetAccessMode()) && (ptrFeature->IsFeature()) )
+                {
+                    // Its a valid streamable feature.
+                    // Get its selectors (if it has any)
+                    GenApi::FeatureList_t selectorList;
+                    selectorSet.GetSelectorList( selectorList, true );
+
+                    for ( GenApi::FeatureList_t ::iterator itSelector=selectorList.begin(); itSelector!=selectorList.end(); itSelector++ )  
+                    {
+                        // Output selector : selectorValue as a feature : value pair.
+                        selectorSettingWasOutput = true;
+                        GenApi::CNodePtr selectedNode( *itSelector);
+                        GenApi::CValuePtr selectedValue( *itSelector);
+                        OutputFeatureValuePair(static_cast<const char *>(selectedNode->GetName()), static_cast<const char *>(selectedValue->ToString()), fp);
+                    }
+                        
+                    // Output feature : value pair for this selector combination 
+                    // It just outputs the feature : value pair if there are no selectors. 
+                    OutputFeatureValuePair(static_cast<const char *>(ptrFeature->GetName()), static_cast<const char *>(valNode->ToString()), fp);                   
+                }
+                
+            } while( selectorSet.SetNext());
+            // Reset to original selector/selected value (if any was used)
+            selectorSet.Restore();
+            
+            // Save the original settings for any selector that was handled (looped over) above.
+            if (selectorSettingWasOutput)
+            {
+                GenApi::FeatureList_t selectingFeatures;
+                selectorSet.GetSelectorList( selectingFeatures, true);
+                for ( GenApi::FeatureList_t ::iterator itSelector = selectingFeatures.begin(); itSelector != selectingFeatures.end(); ++itSelector)
+                {
+                    GenApi::CNodePtr selectedNode( *itSelector);
+                    GenApi::CValuePtr selectedValue( *itSelector);
+                    OutputFeatureValuePair(static_cast<const char *>(selectedNode->GetName()), static_cast<const char *>(selectedValue->ToString()), fp);
+                } 
+            }
+        }
+    }
+}
 
 
 static void ValidateFeatureValues( const GenApi::CNodePtr &ptrFeature )
@@ -123,7 +209,7 @@ void PrintMenu()
 void *ImageCaptureThread( void *context)
 {
     MY_CONTEXT *captureContext = (MY_CONTEXT *)context;
-    bool was_active = FALSE;
+    bool was_active = false;
 
     if (captureContext != NULL)
     {
@@ -144,7 +230,7 @@ void *ImageCaptureThread( void *context)
         OpenCV_Type = CV_8UC1;
         //int codec = cv:: VideoWriter::fourcc('H', '2', '6', '4'); // select desired codec (must be available at runtime)
         int codec = cv:: VideoWriter::fourcc('a', 'v', 'c', '1'); // select desired codec (must be available at runtime)
-        bool isColor = FALSE;
+        bool isColor = false;
 
         // The synchronized queues, one per video source/storage worker pair
         std::vector<frame_queue> queue(1);
@@ -158,7 +244,6 @@ void *ImageCaptureThread( void *context)
         int32_t frame_count(0);
 
         uint last_id = 0;
-        uint last_timestamp = 0;
         // While we are still running.
         while(!captureContext->exit)
         {
@@ -172,7 +257,7 @@ void *ImageCaptureThread( void *context)
             {
                 if (img->status == 0)
                 {
-                    was_active = TRUE;
+                    was_active = true;
                     m_latestBuffer = img->address;
 
                     // img->id max number is 65535
@@ -205,17 +290,16 @@ void *ImageCaptureThread( void *context)
 //                     printf("%d ",pNumTrashed);
 //                     printf("%d ",pMode);
 //                     printf("%d ",img->id);
-//                     printf("%d \n",img->timestamp-last_timestamp);
 // }
                     last_id = img->id;
-                    last_timestamp = img->timestamp;
+
                     if ((captureContext->enable_sequence) || (sequence_init == 1))
                     {
 
                             high_resolution_clock::time_point t1(high_resolution_clock::now());
 
                         // Export to OpenCV Mat object using SapBuffer data directly
-                        cv::Mat exportImg(	img->h, img->w, OpenCV_Type, m_latestBuffer );
+                        cv::Mat exportImg(  img->h, img->w, OpenCV_Type, m_latestBuffer );
                         cv::Size imgSize( img->w, img->h + frameborder);
 
                         //cv::Size imgSize = exportImg.size();
@@ -491,19 +575,19 @@ int main(int argc, char *argv[])
     context.live_window_frame_ratio = parser.get<int>("liveratio");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: liveratio "<< context.live_window_frame_ratio << std::endl;
 
+    new_file_interval = parser.get<int>("newfileinterval");
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: newfileinterval "<< new_file_interval << std::endl;
+
     context.fps = parser.get<double>("fps");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: fps "<< context.fps << std::endl;
 
     maxframes = parser.get<int>("maxframes");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: maxframes "<< maxframes << std::endl;
 
-    if (parser.has("writeallframes"))
-    {
-        writeallframes = true;
-    }
-    else {
-        writeallframes = false;
-    }
+    writeallframes = parser.has("writeallframes");
+    showPreview = !parser.has("nopreview");
+    storeVideo = !parser.has("novideo");
+    storeMeta = !parser.has("nometadata");
 
     std::set<std::string> presets = {
         "ultrafast",
@@ -666,7 +750,7 @@ int main(int argc, char *argv[])
                 // Get the XML file onto disk and use it to make the CNodeMap object.
                 char xmlFileName[MAX_PATH] = {0};
                 
-                status = Gev_RetrieveXMLFile( handle, xmlFileName, sizeof(xmlFileName), FALSE );
+                status = Gev_RetrieveXMLFile( handle, xmlFileName, sizeof(xmlFileName), false );
                 if ( status == GEVLIB_OK)
                 {
                     // printf("XML stored as %s\n", xmlFileName);
@@ -685,7 +769,7 @@ int main(int argc, char *argv[])
                 if ( start )
                 {
                     try {
-                            int done = FALSE;
+                            int done = false;
                             int timeout = 5;
                             start->Execute();
                             while(!done && (timeout-- > 0))
@@ -781,6 +865,7 @@ context.t_reset = std::chrono::system_clock::now();
 std::cout << "STATUS | " << get_timestamp() << "| Camera clock reset around " << context.t_reset.time_since_epoch().count()/1000  << std::endl;
 
 GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
+DeviceIDMeta += DeviceID;
 
                 }
                 // End the "streaming feature mode".
@@ -788,7 +873,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                 if ( end  )
                 {
                     try {
-                            int done = FALSE;
+                            int done = false;
                             int timeout = 5;
                             end->Execute();
                             while(!done && (timeout-- > 0))
@@ -849,7 +934,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                 if ( start1 )
                 {
                     try {
-                            int done = FALSE;
+                            int done = false;
                             int timeout = 5;
                             start1->Execute();
                             while(!done && (timeout-- > 0))
@@ -875,7 +960,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                 if ( end1  )
                 {
                     try {
-                            int done = FALSE;
+                            int done = false;
                             int timeout = 5;
                             end1->Execute();
                             while(!done && (timeout-- > 0))
@@ -916,15 +1001,15 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                     // Go on to adjust some API related settings (for tuning / diagnostics / etc....).
                     // Adjust the camera interface options if desired (see the manual)
                     GevGetCameraInterfaceOptions( handle, &camOptions);
-                    //camOptions.heartbeat_timeout_ms = 60000;		// For debugging (delay camera timeout while in debugger)
-                    camOptions.heartbeat_timeout_ms = 5000;		// Disconnect detection (5 seconds)
-                    camOptions.enable_passthru_mode = FALSE;
+                    //camOptions.heartbeat_timeout_ms = 60000;      // For debugging (delay camera timeout while in debugger)
+                    camOptions.heartbeat_timeout_ms = 5000;     // Disconnect detection (5 seconds)
+                    camOptions.enable_passthru_mode = false;
     #if TUNE_STREAMING_THREADS
                     // Some tuning can be done here. (see the manual)
-                    camOptions.streamFrame_timeout_ms = 2001;				// Internal timeout for frame reception.
-                    camOptions.streamNumFramesBuffered = 4;				// Buffer frames internally.
+                    camOptions.streamFrame_timeout_ms = 2001;               // Internal timeout for frame reception.
+                    camOptions.streamNumFramesBuffered = 4;             // Buffer frames internally.
                     camOptions.streamNumFramesBuffered = 20;             // Buffer frames internally.
-                    camOptions.streamMemoryLimitMax = 64 * 1024 * 1024;		// Adjust packet memory buffering limit.
+                    camOptions.streamMemoryLimitMax = 64 * 1024 * 1024;     // Adjust packet memory buffering limit.
                     camOptions.streamMemoryLimitMax =  2 * 20 * 8 * 1280 * 1024;     // Adjust packet memory buffering limit.
                     camOptions.streamPktSize = 8960;                            // Adjust the GVSP packet size.
                     camOptions.streamPktSize = 8960-1;                            // Adjust the GVSP packet size.
@@ -997,7 +1082,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
 
                         // Calculate the size of the image buffers.
                         // (Adjust the number of lines in the buffer to fit the maximum expected
-                        //	 chunk size - just in case it gets enabled !!!)
+                        //   chunk size - just in case it gets enabled !!!)
                         {
                             int extra_lines = (MAX_CHUNK_BYTES + width - 1) / width;
                             size = GetPixelSizeInBytes(format) * width * (height + extra_lines);
@@ -1030,7 +1115,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
                         // Create a thread to receive images from the API and save them
                         context.camHandle = handle;
                         context.base_name = output;
-                        context.exit = FALSE;
+                        context.exit = false;
                         pthread_create(&tid, NULL, ImageCaptureThread, &context);
 
                         // Call the main command loop or the example.
@@ -1070,13 +1155,13 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
 
                             if ((c == 0x1b) || (c == 'q') || (c == 'Q'))
                             {
-                                done = TRUE;
+                                done = true;
                            }
                         }
 
                         context.enable_sequence = 0; // End sequence if active.
                         GevStopTransfer(handle);
-                        context.exit = TRUE;
+                        context.exit = true;
                         pthread_join( tid, NULL);
 
                         //std::cout << "STATUS | " << get_timestamp() <<" | STOPPING GevStartTransfer" <<std::endl;
@@ -1103,7 +1188,7 @@ GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
     GevApiUninitialize();
 
     // Close socket API
-    _CloseSocketAPI ();	// must close API even on error
+    _CloseSocketAPI (); // must close API even on error
 
 
     //printf("Hit any key to exit\n");

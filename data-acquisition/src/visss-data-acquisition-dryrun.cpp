@@ -61,7 +61,7 @@ typedef struct tagMY_CONTEXT
     std::string                  quality;
     std::string                  preset;
     std::chrono::time_point<std::chrono::system_clock> t_reset;
-    BOOL              exit;
+    bool              exit;
 } MY_CONTEXT, *PMY_CONTEXT;
 
 
@@ -69,7 +69,7 @@ typedef struct tagMY_CONTEXT
 void *ImageCaptureThread( void *context)
 {
     MY_CONTEXT *captureContext = (MY_CONTEXT *)context;
-    bool was_active = FALSE;
+    bool was_active = false;
     printf("THREAD1 ImageCaptureThread\n");
 
 
@@ -83,7 +83,7 @@ void *ImageCaptureThread( void *context)
         OpenCV_Type = CV_8UC1;
         //int codec = cv:: VideoWriter::fourcc('H', '2', '6', '4'); // select desired codec (must be available at runtime)
         int codec = cv:: VideoWriter::fourcc('a', 'v', 'c', '1'); // select desired codec (must be available at runtime)
-        bool isColor = FALSE;
+        bool isColor = false;
 
         // The synchronized queues, one per video source/storage worker pair
         std::vector<frame_queue> queue(1);
@@ -117,7 +117,7 @@ void *ImageCaptureThread( void *context)
             if (!exportImg.empty())
             {
 
-                    was_active = TRUE;
+                    was_active = true;
 
 
                     // skip comment
@@ -439,7 +439,7 @@ MY_CONTEXT context ;
 
                         // Create a thread to receive images from the API and save them
                         context.base_name = output;
-                        context.exit = FALSE;
+                        context.exit = false;
                         pthread_create(&tid, NULL, ImageCaptureThread, &context);
 
                         // Call the main command loop or the example.
@@ -470,13 +470,13 @@ MY_CONTEXT context ;
 
                             if ((c == 0x1b) || (c == 'q') || (c == 'Q'))
                             {
-                                done = TRUE;
+                                done = true;
                            }
                         }
 
                         context.enable_sequence = 0; // End sequence if active.
 
-                        context.exit = TRUE;
+                        context.exit = true;
 
 
 
