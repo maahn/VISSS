@@ -113,7 +113,7 @@ void storage_worker_cv::add_meta_data()
           << t_reset_uint_ << "\n";
     
     fMeta_ << "# Camera serial number: "
-          << DeviceID << "\n";
+          << DeviceIDMeta << "\n";
      
     fMeta_ << "# Camera configuration: "
           <<  configFileRaw<< "\n";
@@ -141,20 +141,22 @@ void storage_worker_cv::open_files()
     create_filename();
 
     std::cout << std::flush;
-    writer_.open(filename_+".mov", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
+    if (storeVideo) {
+        writer_.open(filename_+".mov", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
+        std::cout << "STATUS | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
+    }
     //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=veryfast mb-tree=TRUE me=dia analyse=i8x8 rc-lookahead=20 subme=1 ! queue ! qtmux !  filesink location=video-h264_lookahead20.mov",
     //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=superfast rc-lookahead=80 subme=2 ! queue ! qtmux !  filesink location=video-h264_lookahead80a_subme2.mov",
     //                            cv::CAP_GSTREAMER, 0, fps_, frame_size_, is_color_);
 // 
    fileUsed = false;
-   std::cout << "STATUS | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
 
-
-    // Open the text file.
-    fMeta_.open(filename_+".txt");
-    add_meta_data();
-    std::cout << "STATUS | " << get_timestamp() << " | Opened "<< filename_+".txt"<< std::endl;
-
+    if (storeMeta) {
+        // Open the text file.
+        fMeta_.open(filename_+".txt");
+        add_meta_data();
+        std::cout << "STATUS | " << get_timestamp() << " | Opened "<< filename_+".txt"<< std::endl;
+    }
 
     return;
 }
@@ -166,7 +168,7 @@ void storage_worker_cv::close_files() {
         writer_.release();
         if (fileUsed) {
             create_symlink(filename_+".mov",  filename_latest_+".mov");
-        } else {
+        } else if (storeVideo) {
             std::remove((filename_+".mov").c_str());
             std::cout << std::endl << "STATUS | " << get_timestamp() << " | Empty file removed: " << filename_<<".mov" <<std::endl;
         }
@@ -235,16 +237,18 @@ void storage_worker_cv::run()
     long int frame_count_new_file = 0;
     firstImage = TRUE;
     t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
+    std::string message;
     cv::Mat imgSmall;
     cv::Mat imgWithMeta;
     cv::Mat imgOld;
     cv::Mat imgDiff;
-    cv::Mat img1Chan;
     cv::Mat nPixel;
     bool movingPixel;
     cv::Scalar borderColor;
     
-    cv::namedWindow( "VISSS Live Image", cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
+    if (showPreview) {
+        cv::namedWindow( "VISSS Live Image", cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
+    }
 
 
     try {
@@ -262,15 +266,12 @@ void storage_worker_cv::run()
 
 
                 timestamp = static_cast<long int> (time(NULL));
-                bool newFile = ((timestamp % new_file_interval == 0) && (frame_count-frame_count_new_file > 300));
-
-                cv::extractChannel(image.MatImage, img1Chan, 0);
+                bool newFile = ((new_file_interval > 0) && (timestamp % new_file_interval == 0) && (frame_count-frame_count_new_file > 300));
 
                 if (firstImage)  { 
-                    imgOld = img1Chan * 0;
+                    imgOld = image.MatImage * 0;
                 }   
-
-                cv::absdiff(img1Chan, imgOld, imgDiff);
+                cv::absdiff(image.MatImage, imgOld, imgDiff);
 
 
                 // get histogramm
@@ -308,7 +309,8 @@ void storage_worker_cv::run()
                 //    nPixel[tt] = cv::sum(imgDiff > thresholds[tt])[0];
                 //} https://webcache.googleusercontent.com/search?q=cache:iUCC_CSnaLwJ:https://answers.opencv.org/question/60753/counting-black-white-pixels-with-a-threshold/+&cd=1&hl=de&ct=clnk&gl=de
 
-                std::string textImg = get_timestamp() + " | " + configFileRaw + " | Q:" + std::to_string(queue_.size()) + " | M: ";
+                std::string textImg = get_timestamp() + " | " + configFileRaw + 
+                    " | Q:" + std::to_string(queue_.size()) + " | M: ";
                 for (int jj = histSize; jj --> 0; )
                 {
                      if (nPixelA[jj]> minMovingPixel) 
@@ -351,62 +353,71 @@ void storage_worker_cv::run()
                     close_files();
                     open_files();
 
-                    cv::imwrite(filename_+".jpg", imgWithMeta );
-                    create_symlink(filename_+".jpg",  filename_latest_+".jpg");
+                    if (storeVideo) {
+                        cv::imwrite(filename_+".jpg", imgWithMeta );
+                        create_symlink(filename_+".jpg",  filename_latest_+".jpg");
+                        std::cout ;
+                        std::cout << "STATUS | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
+                        }
 
                     frame_count_new_file = frame_count;
 
-                    std::cout ;
-                    std::cout << "STATUS | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
 
                 }
-                
+
+
                 if (writeallframes || movingPixel  || firstImage)
                      {
-                        writer_.write(imgWithMeta);
-                        fileUsed = true;
 
-                        fMeta_  <<image.timestamp +t_reset_uint_ << ", " << t_record
-                          << ", " << image.id ;
+                        if (storeVideo) { 
+                            writer_.write(imgWithMeta);
+                            fileUsed = true;
+                            }
+                        if (storeMeta) {
+                            message = std::to_string(image.timestamp +t_reset_uint_)
+                                + ", " + std::to_string(t_record)
+                                + ", " + std::to_string(image.id) ;
 
-                        for(int kk = 0; kk < histSize; kk++) 
-                        {
-                            fMeta_ << ", " << std::to_string((int)nPixelA[kk]);
+                            for(int kk = 0; kk < histSize; kk++) 
+                            {
+                                message = message + ", " + std::to_string((int)nPixelA[kk]);
+                            }
+                            message = message + "\n";
+                            
+                            fMeta_ << message;
                         }
-                        fMeta_ << "\n";
 
-                    std::cout << "WRITTEN | " << get_timestamp() << 
-                    " | Queue:" << queue_.size() <<" | ID:" << image.id <<
-                    //" | " << nPixelA <<
-                    "  \r"<<std::flush;
-                    // "  \r"<<std::endl;
+                }
+                if (frame_count % (int)fps_ == 0) {
 
-                     }
+                    message =  "STATUS | " + get_timestamp() + 
+                    " | Queue:" + std::to_string(queue_.size()) +" | ID:" + 
+                    std::to_string(image.id) +  " | M: ";
+                    for (int jj = histSize; jj --> 0; )
+                    {
+                         if (nPixelA[jj]> minMovingPixel) 
+                         {
+                            message = message + std::to_string((int)range[jj]);
+                            break;
+                         }
+                    }
+                    message = message +"  \r";
+                    std::cout << message<<std::flush;
 
-               //  if (frame_count % fps_int == 0)
-               //  {
-
-
-
-
-               // }
-
-
-                cv::extractChannel(image.MatImage.clone(), imgOld, 0);
-
-                if (frame_count % live_window_frame_ratio_ == 0)
+                }    
+                if ( showPreview && (frame_count % live_window_frame_ratio_ == 0))
                 {
                     
                     cv::resize(imgWithMeta, imgSmall, cv::Size(), 0.5, 0.5);
-
-
                     cv::imshow( "VISSS Live Image", imgSmall );
                     cv::waitKey(1);
                     }
  
+
+
+                imgOld = image.MatImage.clone();
                 firstImage = FALSE;
                 ++frame_count;
-
 
 
                 high_resolution_clock::time_point t2(high_resolution_clock::now());

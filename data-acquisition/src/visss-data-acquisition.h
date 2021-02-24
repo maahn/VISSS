@@ -49,6 +49,7 @@ using std::chrono::microseconds;
 
 
 char DeviceID[TELEDYNEDALSA_CHUNK_SIZE_DEVICEID];
+std::string DeviceIDMeta;
 char hostname[HOST_NAME_MAX];
 int n_timeouts = 0;
 int max_n_timeouts = 30;
@@ -60,6 +61,9 @@ int maxframes = -1;
 int frameborder = 64;
 int new_file_interval = 300;
 bool writeallframes = false;
+bool storeVideo = true;
+bool storeMeta = true;
+bool showPreview = true;
 
 //histogram
 float range[] = {10,20,30,40,60,80,100,120, 256  }; //the upper boundary is exclusive
@@ -264,3 +268,5 @@ std::string type2str(int type) {
 }
 //std::string ty =  type2str( nPixel.type() );
 //printf("nPixel: %s %dx%d \n", ty.c_str(), nPixel.cols, nPixel.rows );
+
+

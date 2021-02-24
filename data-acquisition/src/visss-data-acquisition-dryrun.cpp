@@ -15,15 +15,19 @@
 
 
 const char* params
-    = "{ help h           |                   | Print usage }"
-      "{ output o         | ./                | Output Path }"
-      "{ quality q        | 16                | quality 0-51 }"
-      "{ preset p         | veryfast          | preset (ultrafast - placebo) }"
-      "{ liveratio l      | 70                | every Xth frame will be displayed in the live window }"
-      "{ fps f            | 140               | frames per seconds of output }"
-      "{ maxframes m      | -1                | stop after this many frames (for debugging) }"
-      "{ writeallframes w |                   | write all frames whether sth is moving or not (for debugging) }"
-      "{ @videofile       | <none>            | video file }";
+    = "{ help h            |                   | Print usage }"
+      "{ output o          | ./                | Output Path }"
+      "{ quality q         | 16                | quality 0-51 }"
+      "{ preset p          | veryfast          | preset (ultrafast - placebo) }"
+      "{ liveratio l       | 70                | every Xth frame will be displayed in the live window }"
+      "{ fps f             | 140               | frames per seconds of output }"
+      "{ newfileinterval i | 300               | write new file very ?s. Set to 0 to deactivate}"
+      "{ maxframes m       | -1                | stop after this many frames (for debugging) }"
+      "{ writeallframes w  |                   | write all frames whether sth is moving or not (for debugging) }"
+      "{ nopreview         |                   | no preview window }"
+      "{ novideo           |                   | do not store video data }"
+      "{ nometadata        |                   | do not store meta data }"
+      "{ @videofile        | <none>            | video input file }";
 
 // ====================================
 
@@ -223,9 +227,10 @@ void *ImageCaptureThread( void *context)
             }
 
             else {
-                n_timeouts += 1;
-                std::cerr << "ERROR | " << get_timestamp() <<" | Could not get image " 
-                << " #" << n_timeouts << std::endl;
+                std::cerr << "STATUS | " << get_timestamp() <<" | Arrived at the end of the file" << std::endl;
+                captureContext->exit = 1;
+                captureContext->enable_sequence = 0;
+                global_error = true;
             }
 
             // See if a sequence in progress needs to be stopped here.
@@ -246,10 +251,11 @@ void *ImageCaptureThread( void *context)
             }
             id++;
 
-            // don'be too fast in dry run mode
-            int sleeptime = 1000/captureContext->fps;
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleeptime));
-
+            if (storeVideo) {
+                // don'be too fast in dry run mode
+                int sleeptime = 1000/captureContext->fps;
+                std::this_thread::sleep_for(std::chrono::milliseconds(sleeptime));
+            }
 
 
         } //while
@@ -301,7 +307,7 @@ MY_CONTEXT context ;
 
     cv :: CommandLineParser parser(argc, argv, params);
 
-    if (parser.has("help"))
+    if (parser.has("help") )
     {
         parser.printMessage();
         return 0;
@@ -325,19 +331,20 @@ MY_CONTEXT context ;
     context.live_window_frame_ratio = parser.get<int>("liveratio");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: liveratio "<< context.live_window_frame_ratio << std::endl;
 
+    new_file_interval = parser.get<int>("newfileinterval");
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: newfileinterval "<< new_file_interval << std::endl;
+
     context.fps = parser.get<double>("fps");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: fps "<< context.fps << std::endl;
 
     maxframes = parser.get<int>("maxframes");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: maxframes "<< maxframes << std::endl;
 
-    if (parser.has("writeallframes"))
-    {
-        writeallframes = true;
-    }
-    else {
-        writeallframes = false;
-    }
+    writeallframes = parser.has("writeallframes");
+    showPreview = !parser.has("nopreview");
+    storeVideo = !parser.has("novideo");
+    storeMeta = !parser.has("nometadata");
+
 
     std::set<std::string> presets = {
         "ultrafast",
@@ -364,8 +371,7 @@ MY_CONTEXT context ;
     strcpy(OPENCV_FFMPEG_CRF,"OPENCV_FFMPEG_CRF=");
     strcat(OPENCV_FFMPEG_CRF,context.quality.c_str());
     char OPENCV_FFMPEG_THREADCOUNT[100];
-    strcpy(OPENCV_FFMPEG_THREADCOUNT,"OPENCV_FFMPEG_THREADCOUNT=24"); // don't ask me why overloading the CPUs works better...
-    //strcat(OPENCV_FFMPEG_THREADCOUNT,context.quality.c_str());
+    strcpy(OPENCV_FFMPEG_THREADCOUNT,"OPENCV_FFMPEG_THREADCOUNT=1"); // don't ask me why overloading the CPUs works better...
 
 
     if(putenv(OPENCV_FFMPEG_PRESET)!=0)
@@ -379,17 +385,19 @@ MY_CONTEXT context ;
         global_error = true;
     }
 
-    //if(putenv(OPENCV_FFMPEG_THREADCOUNT)!=0)
-    //{
-    //    std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_FFMPEG_THREADCOUNT<< std::endl;
-    //    global_error = true;
-    //}
+    if(putenv(OPENCV_FFMPEG_THREADCOUNT)!=0)
+    {
+       std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_FFMPEG_THREADCOUNT<< std::endl;
+       global_error = true;
+    }
 
     gethostname(hostname, HOST_NAME_MAX);
 
     configFile = "DRYRUN";
     configFileRaw = "DRYRUN";
     strcpy(DeviceID, "DUMMY");
+
+    DeviceIDMeta = videoFileInRaw;
 
 std::cout << "**************************************************************************" << std::endl;
 

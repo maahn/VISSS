@@ -41,7 +41,7 @@ include src/commondefs.mk
 CXX_COMPILE_OPTIONS = -c $(DEBUGFLAGS) -std=c++11 -DPOSIX_HOSTPC -D_REENTRANT -fno-for-scope \
 			-Wall -Wno-parentheses -Wno-missing-braces -Wno-unused-but-set-variable \
 			-Wno-unknown-pragmas -Wno-cast-qual -Wno-unused-function -Wno-unused-label -DGIT_BRANCH=$(gitBranch) \
-			-DGIT_TAG=$(gitTag)
+			-DGIT_TAG=$(gitTag) #-Og -g
 
 C_COMPILE_OPTIONS= $(DEBUGFLAGS) -fhosted -Wall -Wno-parentheses -Wno-missing-braces \
 		   	-Wno-unknown-pragmas -Wno-cast-qual -Wno-unused-function -Wno-unused-label -Wno-unused-but-set-variable
