@@ -26,6 +26,7 @@
 #include <opencv2/core/utility.hpp>
 
 #include <iostream>
+#include <boost/algorithm/string.hpp>
 
 // #include <opencv2/opencv.hpp>
 
@@ -38,6 +39,7 @@
 #include <set>
 #include <signal.h>
 #include <stdlib.h>
+#include <iomanip>
 
 // ============================================================================
 using std::chrono::high_resolution_clock;
@@ -269,4 +271,43 @@ std::string type2str(int type) {
 //std::string ty =  type2str( nPixel.type() );
 //printf("nPixel: %s %dx%d \n", ty.c_str(), nPixel.cols, nPixel.rows );
 
+
+//https://stackoverflow.com/questions/1120140/how-can-i-read-and-parse-csv-files-in-c
+
+
+std::vector<std::string> getNextLineAndSplitIntoTokens(std::istream& str)
+{
+    std::vector<std::string>   result;
+    std::string                line;
+    std::getline(str,line);
+
+    std::stringstream          lineStream(line);
+    std::string                cell;
+
+    while(std::getline(lineStream,cell, ','))
+    {
+        result.push_back(cell);
+    }
+    // This checks for a trailing comma with no data after it.
+    if (!lineStream && cell.empty())
+    {
+        // If there was a trailing comma then add an empty element.
+        result.push_back("");
+    }
+    return result;
+}
+
+//https://stackoverflow.com/questions/1798112/removing-leading-and-trailing-spaces-from-a-string
+std::string trim(const std::string& str,
+                 const std::string& whitespace = " \t")
+{
+    const auto strBegin = str.find_first_not_of(whitespace);
+    if (strBegin == std::string::npos)
+        return ""; // no content
+
+    const auto strEnd = str.find_last_not_of(whitespace);
+    const auto strRange = strEnd - strBegin + 1;
+
+    return str.substr(strBegin, strRange);
+}
 

@@ -52,6 +52,7 @@ void PrintMenu()
 typedef struct tagMY_CONTEXT
 {
     cv::VideoCapture       fileHandle;
+    std::string            csvFile;
     std::string             base_name;
     int                     enable_sequence;
     int                     enable_save;
@@ -69,6 +70,8 @@ void *ImageCaptureThread( void *context)
 {
     MY_CONTEXT *captureContext = (MY_CONTEXT *)context;
     bool was_active = FALSE;
+    printf("THREAD1 ImageCaptureThread\n");
+
 
 
     if (captureContext != NULL)
@@ -93,10 +96,13 @@ void *ImageCaptureThread( void *context)
         double total_read_time(0.0);
         int32_t frame_count(0);
 
-        uint last_id = 0;
-        uint last_timestamp = 0;
+        uint ascii_id = 0;
+        unsigned long ascii_timestamp = 0;
 
         unsigned short id = 0; //TODO: ADD id from ascii file;
+
+        std::ifstream csvHandle(captureContext->csvFile);
+
 
         cv::Mat exportImg;
 
@@ -108,20 +114,25 @@ void *ImageCaptureThread( void *context)
             captureContext->fileHandle >> exportImg;
 
 
-
             if (!exportImg.empty())
             {
 
                     was_active = TRUE;
 
-                    // id max number is 65535
-                    if ((last_id>0) && (id != last_id+1)  && (last_id != 65535) ){
-                        std::cout << std::endl << "ERROR | " << get_timestamp() << " | missed frames between " << last_id << " and " << id << std::endl;
-                    }
 
+                    // skip comment
+                    std::string csvLine;
+                    std::getline(csvHandle, csvLine);   
+                     while (csvLine.rfind("#", 0) == 0) {
+                        std::getline(csvHandle, csvLine); 
+                     }
+                    // copy data form ascii file
+                    std::vector<std::string> csvLines;
+                    boost::split(csvLines, csvLine, boost::is_any_of(","));
+                    ascii_id = atoi(trim(csvLines[2]).c_str());
 
-                    last_id = id; 
-                    last_timestamp = 9999; //TODO: ADD timestamp from ascii file img->timestamp;
+                    ascii_timestamp = atol(trim(csvLines[0]).c_str());
+
                     if ((captureContext->enable_sequence) || (sequence_init == 1))
                     {
 
@@ -134,6 +145,10 @@ void *ImageCaptureThread( void *context)
                         //std:: cout << "STATUS | " << get_timestamp() << "| " << imgSize  << std::endl;
 
                         MatMeta exportImgMeta;
+
+
+
+
 
 
                         if (!sequence_init)
@@ -157,6 +172,7 @@ void *ImageCaptureThread( void *context)
 
                             // And start the worker threads for each storage worker
                             for (auto& s : storage) {
+                                    printf("THREAD1 storage_thread.emplace_back\n");
                                 storage_thread.emplace_back(&storage_worker_cv::run, &s);
                             }
 
@@ -175,8 +191,8 @@ void *ImageCaptureThread( void *context)
                         cv::Mat croppedImg = exportImg(cv::Rect(0,frameborder,imgSize.width,imgSize.height-frameborder)).clone();
                         cv::cvtColor(croppedImg, exportImgMeta.MatImage, cv::COLOR_BGR2GRAY);
 
-                        exportImgMeta.timestamp = last_timestamp;
-                        exportImgMeta.id = id;
+                        exportImgMeta.timestamp = ascii_timestamp;
+                        exportImgMeta.id = ascii_id;
 
                         // Insert a copy into all queues
                         for (auto& q : queue) {
@@ -261,6 +277,7 @@ void *ImageCaptureThread( void *context)
         } //while
 
         if (was_active) {
+
 
                 // We're done reading, cancel all the queues
             for (auto& q : queue) {
@@ -399,7 +416,7 @@ MY_CONTEXT context ;
 
     DeviceIDMeta = videoFileInRaw;
 
-std::cout << "**************************************************************************" << std::endl;
+    std::cout << "**************************************************************************" << std::endl;
 
 
     try {
@@ -414,7 +431,12 @@ std::cout << "******************************************************************
         return 1;
     }
 
+    context.csvFile= videoFileIn.substr(0,videoFileIn.find_last_of('.'))+".txt";
+
+
                 context.t_reset = std::chrono::system_clock::now();
+
+
                         // Create a thread to receive images from the API and save them
                         context.base_name = output;
                         context.exit = FALSE;

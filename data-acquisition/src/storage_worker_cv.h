@@ -82,6 +82,8 @@ storage_worker_cv::storage_worker_cv(frame_queue& queue
     , t_reset_(t_reset)
     , live_window_frame_ratio_(live_window_frame_ratio)
 {
+                                        printf("THREAD2 storage_worker_cv\n");
+
 }
 // // ----------------------------------------------------------------------------
 
@@ -182,6 +184,7 @@ void storage_worker_cv::close_files() {
 
 void storage_worker_cv::create_filename() {
 
+    std::string full_path;
     time_t t = time(0);   // get time now
     struct tm * now = localtime( & t );
     int res = 0;
@@ -191,9 +194,14 @@ void storage_worker_cv::create_filename() {
     strftime (timestamp2,80,"%Y%m%d-%H%M%S",now);
 
 
-    std::string full_path = path_ + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "/data/" + timestamp1 + "/" ;
 
-    filename_ = full_path + hostname + "_" + configFileRaw + "_" + DeviceID  + "_" + timestamp2;
+    if (configFileRaw != "DRYRUN") {
+        full_path = path_ + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "/data/" + timestamp1 + "/" ;
+        filename_ = full_path + hostname + "_" + configFileRaw + "_" + DeviceID  + "_" + timestamp2;
+    } else {
+        full_path = path_ + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "/data/"  ;
+        filename_ = full_path + DeviceIDMeta+ "_DRYRUN";
+    }
     filename_latest_ = path_ + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "_latest" ;
 
     res = mkdir_p(full_path.c_str());
@@ -236,7 +244,6 @@ void storage_worker_cv::run()
     long int timestamp = 0;
     long int frame_count_new_file = 0;
     firstImage = TRUE;
-    t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
     std::string message;
     cv::Mat imgSmall;
     cv::Mat imgWithMeta;
@@ -246,6 +253,13 @@ void storage_worker_cv::run()
     bool movingPixel;
     cv::Scalar borderColor;
     
+    if (configFileRaw != "DRYRUN") {
+        t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
+    } else {
+        t_reset_uint_ = 0;
+
+    }
+
     if (showPreview) {
         cv::namedWindow( "VISSS Live Image", cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
     }
