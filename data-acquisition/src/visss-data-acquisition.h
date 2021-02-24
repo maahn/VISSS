@@ -59,7 +59,7 @@ std::string configFileRaw;
 int maxframes = -1;
 int frameborder = 64;
 int new_file_interval = 300;
-
+bool writeallframes = false;
 
 //histogram
 float range[] = {10,20,30,40,60,80,100,120, 256  }; //the upper boundary is exclusive

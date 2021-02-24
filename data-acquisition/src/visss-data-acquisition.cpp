@@ -33,15 +33,18 @@
 
 
 const char* params
-    = "{ help h         |                   | Print usage }"
-      "{ output o       | ./                | Output Path }"
-      "{ camera n       | 0                 | camera number }"
-      "{ quality q      | 16                | quality 0-51 }"
-      "{ preset p       | veryfast          | preset (ultrafast - placebo) }"
-      "{ liveratio l    | 70                | every Xth frame will be displayed in the live window }"
-      "{ fps f          | 140               | frames per seconds of output }"
-      "{ maxframes m    | -1                | stop after this many frames (for debugging) }"
-      "{ @config        | <none>            | camera configuration file }";
+    = "{ help h           |                   | Print usage }"
+      "{ output o         | ./                | Output Path }"
+      "{ camera n         | 0                 | camera number }"
+      "{ quality q        | 16                | quality 0-51 }"
+      "{ preset p         | veryfast          | preset (ultrafast - placebo) }"
+      "{ liveratio l      | 70                | every Xth frame will be displayed in the live window }"
+      "{ fps f            | 140               | frames per seconds of output }"
+      "{ maxframes m      | -1                | stop after this many frames (for debugging) }"
+      "{ writeallframes w |                   | write all frames whether sth is moving or not (for debugging) }"
+      "{ nopreview        |                   | no preview window }"
+      "{ nooutput         |                   | do not store video data }"
+      "{ @config          | <none>            | camera configuration file }";
 
 // ====================================
 
@@ -494,6 +497,13 @@ int main(int argc, char *argv[])
     maxframes = parser.get<int>("maxframes");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: maxframes "<< maxframes << std::endl;
 
+    if (parser.has("writeallframes"))
+    {
+        writeallframes = true;
+    }
+    else {
+        writeallframes = false;
+    }
 
     std::set<std::string> presets = {
         "ultrafast",

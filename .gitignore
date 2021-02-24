@@ -31,8 +31,8 @@
 *.out
 *.app
 bin
-data-acquisiton/visss-data-acquisiton
-data-acquisiton/visss-data-acquisition-dryrun
+data-acquisition/visss-data-acquisition
+data-acquisition/visss-data-acquisition-dryrun
 
 # videos
 *gevbuf

@@ -361,7 +361,7 @@ void storage_worker_cv::run()
 
                 }
                 
-                if (movingPixel  || firstImage)
+                if (writeallframes || movingPixel  || firstImage)
                      {
                         writer_.write(imgWithMeta);
                         fileUsed = true;

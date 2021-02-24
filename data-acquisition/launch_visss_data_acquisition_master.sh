@@ -2,7 +2,7 @@
 df -H | grep /data | awk '{ print "STORAGE USED " $5 " " $6 }'
 
 ROOTPATH=/home/visss/Desktop/VISSS/
-EXE=$ROOTPATH/data-acquisiton/visss-data-acquisiton
+EXE=$ROOTPATH/data-acquisition/visss-data-acquisition
 OUTDIR=/data/lim
 HOST=`hostname`
 IP='192.168.100.2'
@@ -12,7 +12,7 @@ MAC='00:01:0D:C3:0F:34'
 
 set -o pipefail
 
-cd $ROOTPATH/data-acquisiton/
+cd $ROOTPATH/data-acquisition/
 
 MTU=$(/bin/cat /sys/class/net/enp35s0f0/mtu)
 if [[ "$MTU" != "9216" ]]

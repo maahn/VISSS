@@ -6,7 +6,7 @@ IROOT=/usr/dalsa/GigeV
 SRC_DIR = src
 OBJ_DIR = obj
 
-EXE = visss-data-acquisiton
+EXE = visss-data-acquisition
 EXE2 = visss-data-acquisition-dryrun
 
 SRC = $(wildcard $(SRC_DIR)/*.cpp)
