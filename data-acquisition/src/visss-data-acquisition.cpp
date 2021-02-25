@@ -39,7 +39,6 @@
 const char* params
     = "{ help h            |                   | Print usage }"
       "{ output o          | ./                | Output Path }"
-      "{ camera n          | 0                 | camera number }"
       "{ quality q         | 16                | quality  0-51 }"
       "{ preset p          | veryfast          | preset (ultrafast - placebo) }"
       "{ liveratio l       | 70                | every Xth frame will be displayed in the live window }"
@@ -50,7 +49,8 @@ const char* params
       "{ nopreview         |                   | no preview window }"
       "{ novideo           |                   | do not store video data }"
       "{ nometadata        |                   | do not store meta data }"
-      "{ @config           | <none>            | camera configuration file }";
+      "{ @config           | <none>            | camera configuration file }"
+      "{ @camera           | <none>            | camera IP }";
 
 // ====================================
 
@@ -524,7 +524,7 @@ int IsTurboDriveAvailable(GEV_CAMERA_HANDLE handle)
 
 int main(int argc, char *argv[])
 {
-    GEV_DEVICE_INTERFACE  pCamera[MAX_CAMERAS] = {0};
+    //GEV_DEVICE_INTERFACE  pCamera[MAX_CAMERAS] = {0};
     GEV_STATUS status;
     int numCamera = 0;
     MY_CONTEXT context = {0};
@@ -554,8 +554,6 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    int camIndex = parser.get<int>("camera");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: Camera index "<< camIndex << std::endl;
     cv::String output = parser.get<cv::String>("output");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: Output path "<< output << std::endl;
 
@@ -566,6 +564,11 @@ int main(int argc, char *argv[])
     if (sep != std::string::npos)
         configFileRaw = configFileRaw.substr(sep + 1, configFileRaw.size() - sep - 1);
 
+    std::string camIP = parser.get<cv::String>(1);
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: Camera IP "<< camIP << std::endl;
+    uint long camIPl = iptoul(camIP);
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: Camera IP long "<< camIPl << std::endl;
+    int camIndex = 0;
 
     context.quality = parser.get<cv::String>("quality");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: FFMPEG Quality "<< context.quality << std::endl;
@@ -697,133 +700,115 @@ int main(int argc, char *argv[])
     //====================================================================================
     // DISCOVER Cameras
     //
-    // Get all the IP addresses of attached network cards.
-
-    status = GevGetCameraList( pCamera, MAX_CAMERAS, &numCamera);
-
+    status = GevApiInitialize();
     //std::cout << "STATUS | " << get_timestamp() << " | " << numCamera << " camera(s) on the network"<< std::endl;
 
     // Select the first camera found (unless the command line has a parameter = the camera index)
-    if (numCamera == 0)
-    {
-        global_error = true;
-    } 
-    else   {
 
-        if (camIndex >= (int)numCamera)
+
+    //====================================================================
+    // Connect to Camera
+    //
+    // Direct instantiation of GenICam XML-based feature node map.
+    int i;
+    int type;
+    UINT32 val = 0;
+    UINT32 height = 0;
+    UINT32 width = 0;
+    UINT32 format = 0;
+    UINT32 maxHeight = 1600;
+    UINT32 maxWidth = 2048;
+    UINT32 maxDepth = 2;
+    UINT64 size;
+    UINT64 payload_size;
+    int numBuffers = NUM_BUF;
+    PUINT8 bufAddress[NUM_BUF];
+    GenApi::CNodeMapRef Camera; // The GenICam XML-based feature node map.
+    GEV_CAMERA_HANDLE handle = NULL;
+
+    //====================================================================
+    // Open the camera.
+    status = GevOpenCameraByAddress( camIPl, GevExclusiveMode, &handle);
+    if (status == 0)
+    {
+        //===================================================================
+        // Get the XML file onto disk and use it to make the CNodeMap object.
+        char xmlFileName[MAX_PATH] = {0};
+        
+        status = Gev_RetrieveXMLFile( handle, xmlFileName, sizeof(xmlFileName), false );
+        if ( status == GEVLIB_OK)
         {
-            std::cerr << "FATAL ERROR | " << get_timestamp() << "| Camera index " << camIndex<< " out of range" << std::endl;
-            std::cerr << "FATAL ERROR | " << get_timestamp() << "| only " << numCamera<< " camera(s) are present" << std::endl;
-            camIndex = -1;
-            global_error = true;
+            // printf("XML stored as %s\n", xmlFileName);
+            Camera._LoadXMLFromFile( xmlFileName );
         }
 
-
-        if (camIndex != -1)
+        // Connect the features in the node map to the camera handle.
+        status = GevConnectFeatures( handle, static_cast<void *>(&Camera));
+        if ( status != 0 )
         {
-            //====================================================================
-            // Connect to Camera
-            //
-            // Direct instantiation of GenICam XML-based feature node map.
-            int i;
-            int type;
-            UINT32 val = 0;
-            UINT32 height = 0;
-            UINT32 width = 0;
-            UINT32 format = 0;
-            UINT32 maxHeight = 1600;
-            UINT32 maxWidth = 2048;
-            UINT32 maxDepth = 2;
-            UINT64 size;
-            UINT64 payload_size;
-            int numBuffers = NUM_BUF;
-            PUINT8 bufAddress[NUM_BUF];
-            GenApi::CNodeMapRef Camera; // The GenICam XML-based feature node map.
-            GEV_CAMERA_HANDLE handle = NULL;
+            printf("Error %d connecting node map to handle\n", status);
+        }
 
-            //====================================================================
-            // Open the camera.
-            status = GevOpenCamera( &pCamera[camIndex], GevExclusiveMode, &handle);
-            if (status == 0)
+        // Put the camera in "streaming feature mode".
+        GenApi ::CCommandPtr start = Camera._GetNode("Std::DeviceRegistersStreamingStart");
+        if ( start )
+        {
+            try {
+                    int done = false;
+                    int timeout = 5;
+                    start->Execute();
+                    while(!done && (timeout-- > 0))
+                    {
+                        Sleep(10);
+                        done = start->IsDone();
+                    }
+            }
+            // Catch all possible exceptions from a node access.
+            CATCH_GENAPI_ERROR(status);
+        }
+              
+
+        std::cout << "STATUS | " << get_timestamp() << " | Loading settings"<< std::endl;
+        std::cout << "**************************************************************************" << std::endl;
+
+
+
+        // Read the file as { feature value } pairs and write them to the camera.
+        if ( status == 0 )
+        {
+            char feature_name[MAX_GEVSTRING_LENGTH+1] = {0};
+            char value_str[MAX_GEVSTRING_LENGTH+1] = {0};
+            
+            while ( 2 == fscanf(fp, "%s %s", feature_name, value_str) )
             {
-                //===================================================================
-                // Get the XML file onto disk and use it to make the CNodeMap object.
-                char xmlFileName[MAX_PATH] = {0};
-                
-                status = Gev_RetrieveXMLFile( handle, xmlFileName, sizeof(xmlFileName), false );
-                if ( status == GEVLIB_OK)
+                status = 0;
+                printf("%s %s\n", feature_name, value_str);
+                // Find node and write the feature string (without validation).
+                GenApi::CNodePtr pNode = Camera._GetNode(feature_name);
+                if (pNode)
                 {
-                    // printf("XML stored as %s\n", xmlFileName);
-                    Camera._LoadXMLFromFile( xmlFileName );
-                }
-
-                // Connect the features in the node map to the camera handle.
-                status = GevConnectFeatures( handle, static_cast<void *>(&Camera));
-                if ( status != 0 )
-                {
-                    printf("Error %d connecting node map to handle\n", status);
-                }
-
-                // Put the camera in "streaming feature mode".
-                GenApi ::CCommandPtr start = Camera._GetNode("Std::DeviceRegistersStreamingStart");
-                if ( start )
-                {
+                    GenApi ::CValuePtr valNode(pNode);  
                     try {
-                            int done = false;
-                            int timeout = 5;
-                            start->Execute();
-                            while(!done && (timeout-- > 0))
-                            {
-                                Sleep(10);
-                                done = start->IsDone();
-                            }
+                        valNode->FromString(value_str, false);
                     }
                     // Catch all possible exceptions from a node access.
                     CATCH_GENAPI_ERROR(status);
-                }
-                      
-
-                std::cout << "STATUS | " << get_timestamp() << " | Loading settings"<< std::endl;
-                std::cout << "**************************************************************************" << std::endl;
-
-
-
-                // Read the file as { feature value } pairs and write them to the camera.
-                if ( status == 0 )
-                {
-                    char feature_name[MAX_GEVSTRING_LENGTH+1] = {0};
-                    char value_str[MAX_GEVSTRING_LENGTH+1] = {0};
-                    
-                    while ( 2 == fscanf(fp, "%s %s", feature_name, value_str) )
+                    if (status != 0)
                     {
-                        status = 0;
-                        printf("%s %s\n", feature_name, value_str);
-                        // Find node and write the feature string (without validation).
-                        GenApi::CNodePtr pNode = Camera._GetNode(feature_name);
-                        if (pNode)
-                        {
-                            GenApi ::CValuePtr valNode(pNode);  
-                            try {
-                                valNode->FromString(value_str, false);
-                            }
-                            // Catch all possible exceptions from a node access.
-                            CATCH_GENAPI_ERROR(status);
-                            if (status != 0)
-                            {
-                                error_count++;
-                                printf("Error restoring feature %s : with value %s\n", feature_name, value_str); 
-                            }
-                            else
-                            {
-                                feature_count++;
-                            }
-                        }
-                        else
-                        {
-                            error_count++;
-                            printf("Error restoring feature %s : with value %s\n", feature_name, value_str);
-                        }
+                        error_count++;
+                        printf("Error restoring feature %s : with value %s\n", feature_name, value_str); 
                     }
+                    else
+                    {
+                        feature_count++;
+                    }
+                }
+                else
+                {
+                    error_count++;
+                    printf("Error restoring feature %s : with value %s\n", feature_name, value_str);
+                }
+            }
 
 
 
@@ -834,26 +819,26 @@ char value_str2[] = "1";
 GenApi::CNodePtr pNode = Camera._GetNode(feature_name2);
 if (pNode)
 {
-    GenApi ::CValuePtr valNode(pNode);  
-    try {
-        valNode->FromString(value_str2, false);
-    }
-    // Catch all possible exceptions from a node access.
-    CATCH_GENAPI_ERROR(status);
-    if (status != 0)
-    {
-        error_count++;
-        printf("Error restoring feature %s : with value %s\n", feature_name, value_str); 
-    }
-    else
-    {
-        feature_count++;
-    }
+GenApi ::CValuePtr valNode(pNode);  
+try {
+valNode->FromString(value_str2, false);
+}
+// Catch all possible exceptions from a node access.
+CATCH_GENAPI_ERROR(status);
+if (status != 0)
+{
+error_count++;
+printf("Error restoring feature %s : with value %s\n", feature_name, value_str); 
 }
 else
 {
-    error_count++;
-    printf("Error restoring feature %s : with value %s\n", feature_name2, value_str2);
+feature_count++;
+}
+}
+else
+{
+error_count++;
+printf("Error restoring feature %s : with value %s\n", feature_name2, value_str2);
 }
 
 std::cout << "**************************************************************************" << std::endl;
@@ -867,322 +852,324 @@ std::cout << "STATUS | " << get_timestamp() << "| Camera clock reset around " <<
 GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
 DeviceIDMeta += DeviceID;
 
-                }
-                // End the "streaming feature mode".
-                GenApi ::CCommandPtr end = Camera._GetNode("Std::DeviceRegistersStreamingEnd");
-                if ( end  )
-                {
-                    try {
-                            int done = false;
-                            int timeout = 5;
-                            end->Execute();
-                            while(!done && (timeout-- > 0))
-                            {
-                                Sleep(10);
-                                done = end->IsDone();
-                            }
+        }
+        // End the "streaming feature mode".
+        GenApi ::CCommandPtr end = Camera._GetNode("Std::DeviceRegistersStreamingEnd");
+        if ( end  )
+        {
+            try {
+                    int done = false;
+                    int timeout = 5;
+                    end->Execute();
+                    while(!done && (timeout-- > 0))
+                    {
+                        Sleep(10);
+                        done = end->IsDone();
                     }
-                    // Catch all possible exceptions from a node access.
-                    CATCH_GENAPI_ERROR(status);
-                }
-                
-                // Validate.
-                if (status == 0)
-                {
-                    // Iterate through all of the features calling "Get" with validation enabled.
-                    // Find the standard "Root" node and dump the features.
-                    GenApi::CNodePtr pRoot = Camera._GetNode("Root");
-                    ValidateFeatureValues( pRoot );
-                }
-                
+            }
+            // Catch all possible exceptions from a node access.
+            CATCH_GENAPI_ERROR(status);
+        }
+        
+        // Validate.
+        if (status == 0)
+        {
+            // Iterate through all of the features calling "Get" with validation enabled.
+            // Find the standard "Root" node and dump the features.
+            GenApi::CNodePtr pRoot = Camera._GetNode("Root");
+            ValidateFeatureValues( pRoot );
+        }
+        
 
-                if (error_count == 0)
-                {
-                    std::cout << "STATUS | " << get_timestamp() << "| " << feature_count << " Features loaded successfully" << std::endl;
-                }
-                else
-                {
-                    std::cerr << "FATAL ERROR | " << get_timestamp() << "| " << feature_count << " Features loaded successfully, " << 
-                    error_count << " Features had errors " << std::endl;
-                    global_error = true;
-                }
+        if (error_count == 0)
+        {
+            std::cout << "STATUS | " << get_timestamp() << "| " << feature_count << " Features loaded successfully" << std::endl;
+        }
+        else
+        {
+            std::cerr << "FATAL ERROR | " << get_timestamp() << "| " << feature_count << " Features loaded successfully, " << 
+            error_count << " Features had errors " << std::endl;
+            global_error = true;
+        }
 
 
 // get ALL settings to dump the to file
-                time_t t = time(0);   // get time now
-                struct tm * now = localtime( & t );
-                char timestamp3[80];
-                strftime (timestamp3,80,"%Y%m%d-%H%M%S",now);
-                std::string full_path = output + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "/applied_config/" ;
-                std::string config_out = full_path + hostname + "_" + DeviceID + "_" + timestamp3 + ".config" ;
+        time_t t = time(0);   // get time now
+        struct tm * now = localtime( & t );
+        char timestamp3[80];
+        strftime (timestamp3,80,"%Y%m%d-%H%M%S",now);
+        std::string full_path = output + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "/applied_config/" ;
+        std::string config_out = full_path + hostname + "_" + DeviceID + "_" + timestamp3 + ".config" ;
 
-                res = mkdir_p(full_path.c_str());
-                if (res != 0) {
-                    std::cerr << "FATAL ERROR | " << get_timestamp() << " | Cannot create path "<< full_path <<std::endl;
-                    global_error = true;
-                }
-                // Open the file to dump the configuration
-                fp2 = fopen(config_out.c_str(), "w");
-                if (fp2 == NULL)
-                {
-                    std::cerr << "FATAL ERROR | " << get_timestamp() << " | Error opening configuration file "<< config_out <<std::endl;
-                    global_error = true;
-                }   
+        res = mkdir_p(full_path.c_str());
+        if (res != 0) {
+            std::cerr << "FATAL ERROR | " << get_timestamp() << " | Cannot create path "<< full_path <<std::endl;
+            global_error = true;
+        }
+        // Open the file to dump the configuration
+        fp2 = fopen(config_out.c_str(), "w");
+        if (fp2 == NULL)
+        {
+            std::cerr << "FATAL ERROR | " << get_timestamp() << " | Error opening configuration file "<< config_out <<std::endl;
+            global_error = true;
+        }   
 
-                // Put the camera in "streaming feature mode".
-                GenApi::CCommandPtr start1 = Camera._GetNode("Std::DeviceFeaturePersistenceStart");
-                if ( start1 )
-                {
-                    try {
-                            int done = false;
-                            int timeout = 5;
-                            start1->Execute();
-                            while(!done && (timeout-- > 0))
-                            {
-                                Sleep(10);
-                                done = start1->IsDone();
-                            }
-                    }
-                    // Catch all possible exceptions from a node access.
-                    CATCH_GENAPI_ERROR(status);
-                }
-                                
-                // Traverse the node map and dump all the { feature value } pairs.
-                if ( status == 0 )
-                {
-                    // Find the standard "Root" node and dump the features.
-                    GenApi::CNodePtr pRoot = Camera._GetNode("Root");
-                    OutputFeatureValues( pRoot, fp2);
-                }
-
-                // End the "streaming feature mode".
-                GenApi::CCommandPtr end1 = Camera._GetNode("Std::DeviceFeaturePersistenceEnd");
-                if ( end1  )
-                {
-                    try {
-                            int done = false;
-                            int timeout = 5;
-                            end1->Execute();
-                            while(!done && (timeout-- > 0))
-                            {
-                                Sleep(10);
-                                done = end1->IsDone();
-                            }
-                    }
-                    // Catch all possible exceptions from a node access.
-                    CATCH_GENAPI_ERROR(status);
-                }
-
-                fclose(fp2);
-                std::cout << "STATUS | " << get_timestamp() << "| applied configuration written to: " << config_out << std::endl;
-
-
-                if((not global_error) && (error_count == 0))
-                {
-                    GEV_CAMERA_OPTIONS camOptions = {0};
-
-                    // Get the low part of the MAC address (use it as part of a unique file name for saving images).
-                    // Generate a unique base name to be used for saving image files
-                    // based on the last 3 octets of the MAC address.
-                    // macLow = pCamera[camIndex].macLow;
-                    // macLow &= 0x00FFFFFF;
-                    // snprintf(uniqueName, sizeof(uniqueName), "%s/visss_%06x", output.c_str(), macLow);
-
-                    // // If there are multiple pixel formats supported on this camera, get one.
-                    // {
-                    //     char feature_name[MAX_GEVSTRING_LENGTH] =  {0};
-                    //     GetPixelFormatSelection( handle, sizeof(feature_name), feature_name);
-                    //     if ( GevSetFeatureValueAsString(handle, "PixelFormat", feature_name) == 0)
-                    //     {
-                    //         printf("\n\tUsing selected PixelFormat = %s\n\n", feature_name);
-                    //     }
-                    // }
-
-                    // Go on to adjust some API related settings (for tuning / diagnostics / etc....).
-                    // Adjust the camera interface options if desired (see the manual)
-                    GevGetCameraInterfaceOptions( handle, &camOptions);
-                    //camOptions.heartbeat_timeout_ms = 60000;      // For debugging (delay camera timeout while in debugger)
-                    camOptions.heartbeat_timeout_ms = 5000;     // Disconnect detection (5 seconds)
-                    camOptions.enable_passthru_mode = false;
-    #if TUNE_STREAMING_THREADS
-                    // Some tuning can be done here. (see the manual)
-                    camOptions.streamFrame_timeout_ms = 2001;               // Internal timeout for frame reception.
-                    camOptions.streamNumFramesBuffered = 4;             // Buffer frames internally.
-                    camOptions.streamNumFramesBuffered = 20;             // Buffer frames internally.
-                    camOptions.streamMemoryLimitMax = 64 * 1024 * 1024;     // Adjust packet memory buffering limit.
-                    camOptions.streamMemoryLimitMax =  2 * 20 * 8 * 1280 * 1024;     // Adjust packet memory buffering limit.
-                    camOptions.streamPktSize = 8960;                            // Adjust the GVSP packet size.
-                    camOptions.streamPktSize = 8960-1;                            // Adjust the GVSP packet size.
-                    camOptions.streamPktDelay = 10;                         // Add usecs between packets to pace arrival at NIC.
-                    camOptions.streamPktDelay = 0;                         // Add usecs between packets to pace arrival at NIC.
-                    // Assign specific CPUs to threads (affinity) - if required for better performance.
+        // Put the camera in "streaming feature mode".
+        GenApi::CCommandPtr start1 = Camera._GetNode("Std::DeviceFeaturePersistenceStart");
+        if ( start1 )
+        {
+            try {
+                    int done = false;
+                    int timeout = 5;
+                    start1->Execute();
+                    while(!done && (timeout-- > 0))
                     {
-                        int numCpus = _GetNumCpus();
-                        if (numCpus > 1)
-                        {
-                            //camOptions.streamThreadAffinity = numCpus - 1;
-                            camOptions.serverThreadAffinity = 4;
-                        }
+                        Sleep(10);
+                        done = start1->IsDone();
                     }
-    #endif
-                    // Write the adjusted interface options back.
-                    GevSetCameraInterfaceOptions( handle, &camOptions);
+            }
+            // Catch all possible exceptions from a node access.
+            CATCH_GENAPI_ERROR(status);
+        }
+                        
+        // Traverse the node map and dump all the { feature value } pairs.
+        if ( status == 0 )
+        {
+            // Find the standard "Root" node and dump the features.
+            GenApi::CNodePtr pRoot = Camera._GetNode("Root");
+            OutputFeatureValues( pRoot, fp2);
+        }
 
-                    //===========================================================
-                    // Set up the frame information.....
-                    // printf("Camera ROI set for \n");
-                    // GevGetFeatureValue(handle, "Width", &type, sizeof(width), &width);
-                    // printf("\tWidth = %d\n", width);
-                    // GevGetFeatureValue(handle, "Height", &type, sizeof(height), &height);
-                    // printf("\tHeight = %d\n", height);
-                    // GevGetFeatureValue(handle, "PixelFormat", &type, sizeof(format), &format);
-                    // printf("\tPixelFormat  = 0x%x\n", format);
-
-                    if (camOptions.enable_passthru_mode)
+        // End the "streaming feature mode".
+        GenApi::CCommandPtr end1 = Camera._GetNode("Std::DeviceFeaturePersistenceEnd");
+        if ( end1  )
+        {
+            try {
+                    int done = false;
+                    int timeout = 5;
+                    end1->Execute();
+                    while(!done && (timeout-- > 0))
                     {
-                        // printf("\n\tPASSTHRU Mode is ON\n");
+                        Sleep(10);
+                        done = end1->IsDone();
                     }
+            }
+            // Catch all possible exceptions from a node access.
+            CATCH_GENAPI_ERROR(status);
+        }
 
-                    if (IsTurboDriveAvailable(handle))
-                    {
-                        val = 1;
-                        if ( GevGetFeatureValue(handle, "transferTurboMode", &type, sizeof(UINT32), &val) == 0)
-                        {
-                            if (val != 1)
-                            {
-                                std::cerr << "FATAL ERROR | " << get_timestamp() << "| Turbodrive off" << std::endl;
-                                global_error = true;
-                            }
-                            //else
-                            //{
-                            //    std::cout << "STATUS | " << get_timestamp() << "| Turbodrive on" << std::endl;
-                            //}
-                        }
-                    }
-                    else
-                    {
-                        std::cerr << "FATAL ERROR | " << get_timestamp() << "| TurboDrive is NOT Available" << std::endl;
-
-                        global_error = true;  
-                    }
-
-                    //
-                    // End frame info
-                    //============================================================
-
-                    if ((not global_error) && (status == 0))
-                    {
-                        //=================================================================
-                        // Set up a grab/transfer from this camera based on the settings...
-                        //
-                        GevGetPayloadParameters( handle,  &payload_size, (UINT32 *)&type);
-                        maxHeight = height;
-                        maxWidth = width;
-                        maxDepth = GetPixelSizeInBytes(format);
-
-                        // Calculate the size of the image buffers.
-                        // (Adjust the number of lines in the buffer to fit the maximum expected
-                        //   chunk size - just in case it gets enabled !!!)
-                        {
-                            int extra_lines = (MAX_CHUNK_BYTES + width - 1) / width;
-                            size = GetPixelSizeInBytes(format) * width * (height + extra_lines);
-                        }
-
-                        // Allocate image buffers
-                        // (Either the image size or the payload_size, whichever is larger - allows for packed pixel formats and metadata).
-                        size = (payload_size > size) ? payload_size : size;
-
-                        for (i = 0; i < numBuffers; i++)
-                        {
-                            bufAddress[i] = (PUINT8)malloc(size);
-                            memset(bufAddress[i], 0, size);
-                        }
+        fclose(fp2);
+        std::cout << "STATUS | " << get_timestamp() << "| applied configuration written to: " << config_out << std::endl;
 
 
-                        // Generate a file name from the unique base name
-                        // (leave at least 16 digits for index and extension)
-                        // _GetUniqueFilename_sec(filename, (sizeof(filename) - 17), uniqueName);
+        if((not global_error) && (error_count == 0))
+        {
+            GEV_CAMERA_OPTIONS camOptions = {0};
 
-                        // Initialize a transfer with synchronous buffer handling.
-                        // (To avoid overwriting data buffer while saving to disk).
-    #if USE_SYNCHRONOUS_BUFFER_CYCLING
-                        // Initialize a transfer with synchronous buffer handling.
-                        status = GevInitializeTransfer( handle, SynchronousNextEmpty, size, numBuffers, bufAddress);
-    #else
-                        // Initialize a transfer with asynchronous buffer handling.
-                        status = GevInitializeTransfer( handle, Asynchronous, size, numBuffers, bufAddress);
-    #endif
-                        // Create a thread to receive images from the API and save them
-                        context.camHandle = handle;
-                        context.base_name = output;
-                        context.exit = false;
-                        pthread_create(&tid, NULL, ImageCaptureThread, &context);
+            // Get the low part of the MAC address (use it as part of a unique file name for saving images).
+            // Generate a unique base name to be used for saving image files
+            // based on the last 3 octets of the MAC address.
+            // macLow = pCamera[camIndex].macLow;
+            // macLow &= 0x00FFFFFF;
+            // snprintf(uniqueName, sizeof(uniqueName), "%s/visss_%06x", output.c_str(), macLow);
 
-                        // Call the main command loop or the example.
-                        PrintMenu();
+            // // If there are multiple pixel formats supported on this camera, get one.
+            // {
+            //     char feature_name[MAX_GEVSTRING_LENGTH] =  {0};
+            //     GetPixelFormatSelection( handle, sizeof(feature_name), feature_name);
+            //     if ( GevSetFeatureValueAsString(handle, "PixelFormat", feature_name) == 0)
+            //     {
+            //         printf("\n\tUsing selected PixelFormat = %s\n\n", feature_name);
+            //     }
+            // }
 
-                        for (i = 0; i < numBuffers; i++)
-                        {
-                            memset(bufAddress[i], 0, size);
-                        }
-                        //std::cout << "STATUS | " << get_timestamp() <<" | STARTING GevStartTransfer" <<std::endl;
-
-                        status = GevStartTransfer( handle, -1);
-                        if (status != 0) {
-                            std::cerr << "FATAL ERROR | " << get_timestamp() <<" | Error starting grab" <<std::endl;
-                            printf("0x%x  or %d\n", status, status);
-                            global_error = true;
-                        }
-                        context.enable_sequence = 1;
-
-                       struct sigaction sigIntHandler;
-                       sigIntHandler.sa_handler = signal_handler;
-                       sigemptyset(&sigIntHandler.sa_mask);
-                       sigIntHandler.sa_flags = 0;
-                       sigaction(SIGINT, &sigIntHandler, NULL);
-                       sigaction(SIGTERM, &sigIntHandler, NULL);
-
-                       struct sigaction sigIntHandler_null;
-                       sigIntHandler_null.sa_handler = signal_handler_null;
-                       sigemptyset(&sigIntHandler_null.sa_mask);
-                       sigIntHandler_null.sa_flags = 0;
-                       sigaction(SIGALRM, &sigIntHandler_null, NULL);
-
-                        while(!(global_error) && (!done))
-                        {
-                            alarm(1);
-                            c = GetKey();
-
-                            if ((c == 0x1b) || (c == 'q') || (c == 'Q'))
-                            {
-                                done = true;
-                           }
-                        }
-
-                        context.enable_sequence = 0; // End sequence if active.
-                        GevStopTransfer(handle);
-                        context.exit = true;
-                        pthread_join( tid, NULL);
-
-                        //std::cout << "STATUS | " << get_timestamp() <<" | STOPPING GevStartTransfer" <<std::endl;
-                        GevAbortTransfer(handle);
-                        status = GevFreeTransfer(handle);
-                        for (i = 0; i < numBuffers; i++)
-                        {
-                            free(bufAddress[i]);
-                        }
-
-                    }
+            // Go on to adjust some API related settings (for tuning / diagnostics / etc....).
+            // Adjust the camera interface options if desired (see the manual)
+            GevGetCameraInterfaceOptions( handle, &camOptions);
+            //camOptions.heartbeat_timeout_ms = 60000;      // For debugging (delay camera timeout while in debugger)
+            camOptions.heartbeat_timeout_ms = 5000;     // Disconnect detection (5 seconds)
+            camOptions.enable_passthru_mode = false;
+#if TUNE_STREAMING_THREADS
+            // Some tuning can be done here. (see the manual)
+            camOptions.streamFrame_timeout_ms = 2001;               // Internal timeout for frame reception.
+            camOptions.streamNumFramesBuffered = 4;             // Buffer frames internally.
+            camOptions.streamNumFramesBuffered = 20;             // Buffer frames internally.
+            camOptions.streamMemoryLimitMax = 64 * 1024 * 1024;     // Adjust packet memory buffering limit.
+            camOptions.streamMemoryLimitMax =  2 * 20 * 8 * 1280 * 1024;     // Adjust packet memory buffering limit.
+            camOptions.streamPktSize = 8960;                            // Adjust the GVSP packet size.
+            camOptions.streamPktSize = 8960-1;                            // Adjust the GVSP packet size.
+            camOptions.streamPktDelay = 10;                         // Add usecs between packets to pace arrival at NIC.
+            camOptions.streamPktDelay = 0;                         // Add usecs between packets to pace arrival at NIC.
+            // Assign specific CPUs to threads (affinity) - if required for better performance.
+            {
+                int numCpus = _GetNumCpus();
+                if (numCpus > 1)
+                {
+                    //camOptions.streamThreadAffinity = numCpus - 1;
+                    camOptions.serverThreadAffinity = 4;
                 }
-                GevCloseCamera(&handle);
+            }
+#endif
+            // Write the adjusted interface options back.
+            GevSetCameraInterfaceOptions( handle, &camOptions);
+
+            //===========================================================
+            // Set up the frame information.....
+            // printf("Camera ROI set for \n");
+            // GevGetFeatureValue(handle, "Width", &type, sizeof(width), &width);
+            // printf("\tWidth = %d\n", width);
+            // GevGetFeatureValue(handle, "Height", &type, sizeof(height), &height);
+            // printf("\tHeight = %d\n", height);
+            // GevGetFeatureValue(handle, "PixelFormat", &type, sizeof(format), &format);
+            // printf("\tPixelFormat  = 0x%x\n", format);
+
+            if (camOptions.enable_passthru_mode)
+            {
+                // printf("\n\tPASSTHRU Mode is ON\n");
+            }
+
+            if (IsTurboDriveAvailable(handle))
+            {
+                val = 1;
+                if ( GevGetFeatureValue(handle, "transferTurboMode", &type, sizeof(UINT32), &val) == 0)
+                {
+                    if (val != 1)
+                    {
+                        std::cerr << "FATAL ERROR | " << get_timestamp() << "| Turbodrive off" << std::endl;
+                        global_error = true;
+                    }
+                    //else
+                    //{
+                    //    std::cout << "STATUS | " << get_timestamp() << "| Turbodrive on" << std::endl;
+                    //}
+                }
             }
             else
             {
-                std::cerr << "FATAL ERROR | " << get_timestamp() << " | Error : "<< status <<" : opening camera" << std::endl;
-                global_error = true;
+                std::cerr << "FATAL ERROR | " << get_timestamp() << "| TurboDrive is NOT Available" << std::endl;
+
+                global_error = true;  
+            }
+
+            //
+            // End frame info
+            //============================================================
+
+            if ((not global_error) && (status == 0))
+            {
+                //=================================================================
+                // Set up a grab/transfer from this camera based on the settings...
+                //
+                GevGetPayloadParameters( handle,  &payload_size, (UINT32 *)&type);
+                maxHeight = height;
+                maxWidth = width;
+                maxDepth = GetPixelSizeInBytes(format);
+
+                // Calculate the size of the image buffers.
+                // (Adjust the number of lines in the buffer to fit the maximum expected
+                //   chunk size - just in case it gets enabled !!!)
+                {
+                    int extra_lines = (MAX_CHUNK_BYTES + width - 1) / width;
+                    size = GetPixelSizeInBytes(format) * width * (height + extra_lines);
+                }
+
+                // Allocate image buffers
+                // (Either the image size or the payload_size, whichever is larger - allows for packed pixel formats and metadata).
+                size = (payload_size > size) ? payload_size : size;
+
+                for (i = 0; i < numBuffers; i++)
+                {
+                    bufAddress[i] = (PUINT8)malloc(size);
+                    memset(bufAddress[i], 0, size);
+                }
+
+
+                // Generate a file name from the unique base name
+                // (leave at least 16 digits for index and extension)
+                // _GetUniqueFilename_sec(filename, (sizeof(filename) - 17), uniqueName);
+
+                // Initialize a transfer with synchronous buffer handling.
+                // (To avoid overwriting data buffer while saving to disk).
+#if USE_SYNCHRONOUS_BUFFER_CYCLING
+                // Initialize a transfer with synchronous buffer handling.
+                status = GevInitializeTransfer( handle, SynchronousNextEmpty, size, numBuffers, bufAddress);
+#else
+                // Initialize a transfer with asynchronous buffer handling.
+                status = GevInitializeTransfer( handle, Asynchronous, size, numBuffers, bufAddress);
+#endif
+                // Create a thread to receive images from the API and save them
+                context.camHandle = handle;
+                context.base_name = output;
+                context.exit = false;
+                pthread_create(&tid, NULL, ImageCaptureThread, &context);
+
+                // Call the main command loop or the example.
+                PrintMenu();
+
+                for (i = 0; i < numBuffers; i++)
+                {
+                    memset(bufAddress[i], 0, size);
+                }
+                //std::cout << "STATUS | " << get_timestamp() <<" | STARTING GevStartTransfer" <<std::endl;
+
+                status = GevStartTransfer( handle, -1);
+                if (status != 0) {
+                    std::cerr << "FATAL ERROR | " << get_timestamp() <<" | Error starting grab" <<std::endl;
+                    printf("0x%x  or %d\n", status, status);
+                    global_error = true;
+                }
+                context.enable_sequence = 1;
+
+               struct sigaction sigIntHandler;
+               sigIntHandler.sa_handler = signal_handler;
+               sigemptyset(&sigIntHandler.sa_mask);
+               sigIntHandler.sa_flags = 0;
+               sigaction(SIGINT, &sigIntHandler, NULL);
+               sigaction(SIGTERM, &sigIntHandler, NULL);
+
+               struct sigaction sigIntHandler_null;
+               sigIntHandler_null.sa_handler = signal_handler_null;
+               sigemptyset(&sigIntHandler_null.sa_mask);
+               sigIntHandler_null.sa_flags = 0;
+               sigaction(SIGALRM, &sigIntHandler_null, NULL);
+
+                while(!(global_error) && (!done))
+                {
+                    alarm(1);
+                    c = GetKey();
+
+                    if ((c == 0x1b) || (c == 'q') || (c == 'Q'))
+                    {
+                        done = true;
+                   }
+                }
+
+                context.enable_sequence = 0; // End sequence if active.
+                GevStopTransfer(handle);
+                context.exit = true;
+                pthread_join( tid, NULL);
+
+                //std::cout << "STATUS | " << get_timestamp() <<" | STOPPING GevStartTransfer" <<std::endl;
+                GevAbortTransfer(handle);
+                status = GevFreeTransfer(handle);
+                for (i = 0; i < numBuffers; i++)
+                {
+                    free(bufAddress[i]);
+                }
+
             }
         }
+        GevCloseCamera(&handle);
     }
+    else
+    {
+        std::cerr << "FATAL ERROR | " << get_timestamp() << " | Error : "<< status <<" : opening camera" << std::endl;
+        
+        std::cerr << "ERRORS: " << GEVLIB_ERROR_API_NOT_INITIALIZED<< " FATAL " <<GEVLIB_ERROR_INVALID_HANDLE<< " FATAL "GEVLIB_ERROR_INSUFFICIENT_MEMORY<< " FATAL "GEVLIB_ERROR_NO_CAMERA<< " FATAL "<<GEV_STATUS_ACCESS_DENIED<< std::endl;
+        global_error = true;
+    }
+
+
 
     // Close down the API.
     GevApiUninitialize();

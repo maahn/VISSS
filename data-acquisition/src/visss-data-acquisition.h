@@ -227,3 +227,22 @@ std::string trim(const std::string& str,
     return str.substr(strBegin, strRange);
 }
 
+//https://bytes.com/topic/c/answers/451533-convert-ip-address-long-value
+unsigned long iptoul(std::string ipstr)
+{
+
+char *ip = &ipstr[0];
+
+char i,*tmp;
+unsigned long val=0, cvt;
+
+tmp=strtok(ip,".");
+for (i=0;i<4;i++)
+{
+sscanf(tmp,"%lu",&cvt);
+val<<=8;
+val|=(unsigned char)cvt;
+tmp=strtok(NULL,".");
+}
+return(val);
+}

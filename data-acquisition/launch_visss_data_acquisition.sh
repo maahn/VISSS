@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-df -H | grep /data | awk '{ print "STORAGE USED " $5 " " $6 }'
 
-ROOTPATH=/home/visss/Desktop/VISSS/
-EXE=$ROOTPATH/data-acquisition/visss-data-acquisition
-OUTDIR=/data/lim
-HOST=`hostname`
-IP='192.168.200.2'
-MAC='00:01:0D:C3:04:9F'
+#load settings
+source $"$(dirname "$0")/$1"
+
+echo $IP
+
+if [ -z "$IP" ]
+	then echo "variable IP not set. EXIT"
+	exit
+fi
+
+
+df -H | grep /data | awk '{ print "STORAGE USED " $5 " " $6 }'
 
 /bin/mkdir -p $OUTDIR/logs
 
@@ -14,10 +19,10 @@ set -o pipefail
 
 cd $ROOTPATH/data-acquisition/
 
-MTU=$(/bin/cat /sys/class/net/enp35s0f1/mtu)
-if [[ "$MTU" != "9216" ]]
+MTU=$(/bin/cat /sys/class/net/$INTERFACE/mtu)
+if [[ "$MTU" != "$MAXMTU" ]]
 then
-	/usr/bin/sudo /home/visss/DALSA/GigeV/bin/gev_nettweak enp35s0f1
+	/usr/bin/sudo /home/visss/DALSA/GigeV/bin/gev_nettweak $INTERFACE
 	/bin/echo "It takes some time for the camera to come online... Sleep 25"
 	/bin/sleep 25
 fi
@@ -37,8 +42,9 @@ for (( ; ; ))
 do
 
 timestamp=$(/bin/date +%FT%T)
-#if $EXE -n=1 -p=superfast -q=21 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_slave.config | /usr/bin/tee $OUTDIR/logs/$HOST-$timestamp.txt
-if $EXE -n=1 -p=ultrafast -q=17 -o=$OUTDIR $ROOTPATH/camera-configuration/visss_slave.config | /usr/bin/tee $OUTDIR/logs/slave-$timestamp.txt
+COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR $ROOTPATH/camera-configuration/$CAMERACONFIG $IP| /usr/bin/tee $OUTDIR/logs/$MASTERSLAVE-$timestamp.txt"
+echo $COMMAND
+if $COMMAND
 		then
 			/bin/echo "worked"
 			exit
@@ -74,4 +80,5 @@ done
 
 
 #190 MB per 5min
+#38 MB per min
 # 4mb per 1000 images!
