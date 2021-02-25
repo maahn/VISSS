@@ -1,3 +1,7 @@
+#for LIM
+export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/opt/opencv/current/lib/pkgconfig
+
+
 CC= gcc
 # IROOT directory based on installed distribution tree (not archive/development tree). 
 # IROOT=../..
@@ -47,7 +51,7 @@ C_COMPILE_OPTIONS= $(DEBUGFLAGS) -fhosted -Wall -Wno-parentheses -Wno-missing-br
 		   	-Wno-unknown-pragmas -Wno-cast-qual -Wno-unused-function -Wno-unused-label -Wno-unused-but-set-variable
 
 
-LCLLIBS=  $(COMMONLIBS) -lpthread  -lCorW32 -lm
+LCLLIBS=  $(COMMONLIBS) -lpthread  -lm
 
 # %.o : %.cpp
 # 	$(CC) -I. $(INC_PATH) $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -I/home/mmaahn/ffmpeg_build/include/ -L/home/mmaahn/ffmpeg_build/lib/ -lavcodec -lavutil -c $< -o $@
@@ -76,7 +80,7 @@ install:
 
 
 $(EXE): $(OBJ_DIR)/visss-data-acquisition.o
-	$(CC) -g  $^ $(LCLLIBS) -L/usr/local/lib -lGevApi $(openCV)  $(GENICAM_LIBS) -L$(ARCHLIBDIR) -lstdc++ -o $@
+	$(CC) -g  $^ $(LCLLIBS) -L/usr/local/lib -lGevApi  -lCorW32 $(openCV)  $(GENICAM_LIBS) -L$(ARCHLIBDIR) -lstdc++ -o $@
 	/usr/bin/sudo /sbin/setcap cap_sys_nice,cap_net_raw+ep $(EXE)
 
 $(OBJ_DIR)/visss-data-acquisition.o: $(SRC_DIR)/visss-data-acquisition.cpp
