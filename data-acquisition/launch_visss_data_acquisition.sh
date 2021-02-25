@@ -3,8 +3,6 @@
 #load settings
 source $"$(dirname "$0")/$1"
 
-echo $IP
-
 if [ -z "$IP" ]
 	then echo "variable IP not set. EXIT"
 	exit
