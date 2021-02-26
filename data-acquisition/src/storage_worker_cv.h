@@ -250,7 +250,12 @@ void storage_worker_cv::run()
     cv::Mat imgOld;
     cv::Mat imgDiff;
     cv::Mat nPixel;
-    bool movingPixel;
+
+    // boost::container::vector<bool>[histSize] movingPixels;
+    bool movingPixels[histSize];
+    float movingPixelThreshold;
+    bool movingPixel = false;
+    int tt = 0;
     cv::Scalar borderColor;
     
     if (configFileRaw != "DRYRUN") {
@@ -294,8 +299,9 @@ void storage_worker_cv::run()
                 cv::calcHist( &imgDiff, 1, 0, cv::Mat(), nPixel, 1,&histSize, &histRange, uniform, accumulate );
 
                 // Mat to array
-                std::vector<float> nPixelA;
+                std::vector<float> nPixelA ;
                 nPixelA.assign((float*)nPixel.data, (float*)nPixel.data + nPixel.total()*nPixel.channels());
+
 
                 //std::cout <<  "M1 = " << std::endl << " "  << nPixelA[0]<< " "<< nPixelA[1]<< " "<< nPixelA[2]<< " "<< nPixelA[3]<< " "<< nPixelA[4]<< " "<< nPixelA[5] << " "<< nPixelA[6]<< std::endl << std::endl;
                     //cumsum
@@ -304,15 +310,26 @@ void storage_worker_cv::run()
                      nPixelA[ii] = nPixelA[ii] + nPixelA[ii+1];
                 }
 
+//std::cout << "TEST | " ;
+                movingPixel = false;
+                tt = 1;
+                for (int ll = 0; ll < nPixelA.size(); ll++) {
+                    movingPixels[ll] = false;
+                    movingPixelThreshold = minMovingPixel/tt;
+                    if (movingPixelThreshold < 2) {
+                        movingPixelThreshold = 2;
+                    }
+                    if (nPixelA[ll] >= movingPixelThreshold) {
+                            movingPixels[ll] = true;
+                            movingPixel = true;
+                    }
+//std::cout << "ll "<< ll << " |tt "<< tt << " |movingPixelThreshold "<< movingPixelThreshold << " |nPixelA "<< nPixelA[ll] << " |movingPixels " << movingPixels[ll] ;
 
-                if (nPixelA[1] > minMovingPixel) 
-                 {
-                     movingPixel = true;
-                }      
-                else       
-                 {
-                     movingPixel = false;
-                }  
+
+                    tt = tt*2;
+
+                }
+//std::cout << std::endl;
 
                 //std::cout <<  "M2 = " << std::endl << " "  << nPixelA[0]<< " "<< nPixelA[1]<< " "<< nPixelA[2]<< " "<< nPixelA[3]<< " "<< nPixelA[4]<< " "<< nPixelA[5] << " "<< nPixelA[6]<< std::endl << std::endl;
 
@@ -327,7 +344,7 @@ void storage_worker_cv::run()
                     " | Q:" + std::to_string(queue_.size()) + " | M: ";
                 for (int jj = histSize; jj --> 0; )
                 {
-                     if (nPixelA[jj]> minMovingPixel) 
+                     if (movingPixels[jj]) 
                      {
                         textImg = textImg + std::to_string((int)range[jj]);
                         break;
@@ -343,7 +360,7 @@ void storage_worker_cv::run()
                  else
                      {
                         borderColor = ( 100 );
-                        textImg = textImg + " | NOT RECORDING";
+                        textImg = textImg + "NOT RECORDING";
                      }
 
                 cv::copyMakeBorder(image.MatImage, imgWithMeta, frameborder, 0, 0, 0, cv::BORDER_CONSTANT, borderColor );
@@ -409,7 +426,7 @@ void storage_worker_cv::run()
                     std::to_string(image.id) +  " | M: ";
                     for (int jj = histSize; jj --> 0; )
                     {
-                         if (nPixelA[jj]> minMovingPixel) 
+                         if (movingPixels[jj]) 
                          {
                             message = message + std::to_string((int)range[jj]);
                             break;

@@ -588,9 +588,13 @@ int main(int argc, char *argv[])
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: maxframes "<< maxframes << std::endl;
 
     writeallframes = parser.has("writeallframes");
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: writeallframes "<< writeallframes << std::endl;
     showPreview = !parser.has("nopreview");
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: showPreview "<< showPreview << std::endl;
     storeVideo = !parser.has("novideo");
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: storeVideo "<< storeVideo << std::endl;
     storeMeta = !parser.has("nometadata");
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: storeMeta "<< storeMeta << std::endl;
 
     std::set<std::string> presets = {
         "ultrafast",
