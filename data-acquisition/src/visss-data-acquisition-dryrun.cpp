@@ -322,6 +322,9 @@ MY_CONTEXT context ;
     std::cout << "VISSS data acquisition (" << __DATE__ << ")" << std::endl;
     std::cout << "**************************************************************************" << std::endl;
 
+    cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_VERBOSE);
+
+
     cv :: CommandLineParser parser(argc, argv, params);
 
     if (parser.has("help") )
@@ -388,7 +391,7 @@ MY_CONTEXT context ;
     strcpy(OPENCV_FFMPEG_CRF,"OPENCV_FFMPEG_CRF=");
     strcat(OPENCV_FFMPEG_CRF,context.quality.c_str());
     char OPENCV_FFMPEG_THREADCOUNT[100];
-    strcpy(OPENCV_FFMPEG_THREADCOUNT,"OPENCV_FFMPEG_THREADCOUNT=1"); // don't ask me why overloading the CPUs works better...
+    strcpy(OPENCV_FFMPEG_THREADCOUNT,"OPENCV_FFMPEG_THREADCOUNT=1");
 
 
     if(putenv(OPENCV_FFMPEG_PRESET)!=0)
