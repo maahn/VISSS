@@ -1,6 +1,3 @@
-#for LIM
-export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/opt/opencv/current/lib/pkgconfig
-
 
 CC= gcc
 # IROOT directory based on installed distribution tree (not archive/development tree). 
@@ -80,17 +77,17 @@ install:
 
 
 $(EXE): $(OBJ_DIR)/visss-data-acquisition.o
-	$(CC) -g  $^ $(LCLLIBS) -L/usr/local/lib -lGevApi  -lCorW32 $(openCV)  $(GENICAM_LIBS) -L$(ARCHLIBDIR) -lstdc++ -o $@
+	$(CC) -g  $^ $(LCLLIBS) -L/usr/local/lib -lGevApi  -lCorW32  -lavcodec -lavutil $(openCV)  $(GENICAM_LIBS) -L$(ARCHLIBDIR) -lstdc++ -o $@
 	/usr/bin/sudo /sbin/setcap cap_sys_nice,cap_net_raw+ep $(EXE)
 
 $(OBJ_DIR)/visss-data-acquisition.o: $(SRC_DIR)/visss-data-acquisition.cpp
-	$(CC) -I. $(INC_PATH) $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -lavcodec -lavutil -c $< -o $@
+	$(CC) -I. $(INC_PATH) $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -c $< -o $@
 
 $(EXE2): $(OBJ_DIR)/visss-data-acquisition-dryrun.o
-	$(CC) -g  $^ $(LCLLIBS) $(openCV)   -lstdc++ -o $@
+	$(CC) -g  $^ $(LCLLIBS) $(openCV) -lavcodec -lavutil  -lstdc++ -o $@
 
 $(OBJ_DIR)/visss-data-acquisition-dryrun.o: $(SRC_DIR)/visss-data-acquisition-dryrun.cpp
-	$(CC) -I. $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -lavcodec -lavutil -c $< -o $@
+	$(CC) -I. $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -c $< -o $@
 
 clean:
 # 	$(RM) $(OBJ)
