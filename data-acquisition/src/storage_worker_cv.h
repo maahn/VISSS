@@ -250,6 +250,8 @@ void storage_worker_cv::run()
     cv::Mat imgOld;
     cv::Mat imgDiff;
     cv::Mat nPixel;
+    std::string old_string;
+    std::string new_string;
 
     // boost::container::vector<bool>[histSize] movingPixels;
     bool movingPixels[histSize];
@@ -346,7 +348,9 @@ void storage_worker_cv::run()
                 {
                      if (movingPixels[jj]) 
                      {
-                        textImg = textImg + std::to_string((int)range[jj]);
+                        old_string = std::to_string((int)range[jj]);
+                        new_string = std::string(3 - old_string.length(), '0') + old_string;
+                        textImg = textImg + new_string;
                         break;
                      }
                 }
