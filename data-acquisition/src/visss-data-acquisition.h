@@ -57,6 +57,7 @@ bool global_error = false;
 int done = false;
 cv::String configFile;
 std::string configFileRaw;
+std::string site = "none";
 int maxframes = -1;
 int frameborder = 64;
 int new_file_interval = 300;

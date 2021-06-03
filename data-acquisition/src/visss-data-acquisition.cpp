@@ -39,6 +39,7 @@
 const char* params
     = "{ help h            |                   | Print usage }"
       "{ output o          | ./                | Output Path }"
+      "{ site s            | none              | site string }"
       "{ quality q         | 16                | quality  0-51 }"
       "{ preset p          | veryfast          | preset (ultrafast - placebo) }"
       "{ liveratio l       | 70                | every Xth frame will be displayed in the live window }"
@@ -574,6 +575,9 @@ int main(int argc, char *argv[])
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: FFMPEG Quality "<< context.quality << std::endl;
     context.preset = parser.get<cv::String>("preset");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: FFMPEG preset "<< context.preset << std::endl;
+    site = parser.get<cv::String>("site");
+    std::cout << "STATUS | " << get_timestamp() << " | PARSER: site "<< site << std::endl;
+
 
     context.live_window_frame_ratio = parser.get<int>("liveratio");
     std::cout << "STATUS | " << get_timestamp() << " | PARSER: liveratio "<< context.live_window_frame_ratio << std::endl;

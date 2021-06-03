@@ -252,6 +252,7 @@ void storage_worker_cv::run()
     cv::Mat nPixel;
     std::string old_string;
     std::string new_string;
+    std::string textImg;
 
     // boost::container::vector<bool>[histSize] movingPixels;
     bool movingPixels[histSize];
@@ -342,7 +343,12 @@ void storage_worker_cv::run()
                 //    nPixel[tt] = cv::sum(imgDiff > thresholds[tt])[0];
                 //} https://webcache.googleusercontent.com/search?q=cache:iUCC_CSnaLwJ:https://answers.opencv.org/question/60753/counting-black-white-pixels-with-a-threshold/+&cd=1&hl=de&ct=clnk&gl=de
 
-                std::string textImg = get_timestamp() + " | " + configFileRaw + 
+                if (site == "none") {
+                    textImg = "";
+                } else {
+                    textImg = site + " | ";
+                }
+                textImg = textImg + get_timestamp() + " | " + configFileRaw + 
                     " | Q:" + std::to_string(queue_.size()) + " | M: ";
                 for (int jj = histSize; jj --> 0; )
                 {
@@ -373,11 +379,11 @@ void storage_worker_cv::run()
 
                 cv::putText(imgWithMeta, 
                         textImg,
-                        cv::Point(20,50), // Coordinates
+                        cv::Point(20,40), // Coordinates
                         cv::FONT_HERSHEY_PLAIN, // Font
-                        2, // Scale. 2.0 = 2x bigger
+                        1.8, // Scale. 2.0 = 2x bigger
                         cv::Scalar(255), // BGR Color
-                        2, // Line Thickness (Optional)
+                        1, // Line Thickness (Optional)
                         cv::LINE_AA); // Anti-alias (Optional)
 
 
@@ -396,7 +402,6 @@ void storage_worker_cv::run()
                         }
 
                     frame_count_new_file = frame_count;
-
 
                 }
 

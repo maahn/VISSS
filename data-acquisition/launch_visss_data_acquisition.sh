@@ -40,7 +40,7 @@ for (( ; ; ))
 do
 
 timestamp=$(/bin/date +%FT%T)
-COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR $ROOTPATH/camera-configuration/$CAMERACONFIG $IP| /usr/bin/tee $OUTDIR/logs/$MASTERSLAVE-$timestamp.txt"
+COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR -s=$SITE $ROOTPATH/camera-configuration/$CAMERACONFIG $IP| /usr/bin/tee $OUTDIR/logs/$MASTERSLAVE-$timestamp.txt"
 echo $COMMAND
 if $COMMAND
 		then
