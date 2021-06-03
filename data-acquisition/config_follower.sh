@@ -9,8 +9,8 @@ SITE='LIM'
 PRESET='ultrafast'
 QUALITY=17
 
-CAMERACONFIG='visss_slave.config'
-MASTERSLAVE='slave'
+CAMERACONFIG='visss_follower.config'
+TRIGGERFOLLOWER='follower'
 
 ROOTPATH=/home/visss/Desktop/VISSS/
 OUTDIR=/data/lim

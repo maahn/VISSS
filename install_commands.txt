@@ -85,13 +85,13 @@ sudo cp /home/visss/Desktop/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
 #### VISSSS #################
 cd Desktop
 git clone https://github.com/maahn/VISSS
-ln -s /home/visss/Desktop/VISSS/scripts/visss_master.desktop /home/visss/.local/share/applications/
-ln -s /home/visss/Desktop/VISSS/scripts/visss_slave.desktop /home/visss/.local/share/applications/
+ln -s /home/visss/Desktop/VISSS/scripts/visss_trigger.desktop /home/visss/.local/share/applications/
+ln -s /home/visss/Desktop/VISSS/scripts/visss_follower.desktop /home/visss/.local/share/applications/
 
 #launch apps to sign them
 
 mkdir -p ~/.config/autostart
-ln -s /home/visss/Desktop/VISSS/scripts/visss_master.desktop /home/visss/.config/autostart/
+ln -s /home/visss/Desktop/VISSS/scripts/visss_trigger.desktop /home/visss/.config/autostart/
 
 
 

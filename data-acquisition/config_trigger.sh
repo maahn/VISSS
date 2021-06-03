@@ -9,8 +9,8 @@ SITE='LIM'
 PRESET='ultrafast'
 QUALITY=17
 
-CAMERACONFIG='visss_master.config'
-MASTERSLAVE='master'
+CAMERACONFIG='visss_trigger.config'
+TRIGGERFOLLOWER='trigger'
 
 ROOTPATH=/home/visss/Desktop/VISSS/
 OUTDIR=/data/lim

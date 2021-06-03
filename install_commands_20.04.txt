@@ -82,8 +82,8 @@ export PKG_CONFIG_PATH='/usr/local/lib/pkgconfig'
 cd
 cd Desktop
 git clone https://github.com/maahn/VISSS
-ln -s /home/visss/Desktop/VISSS/scripts/visss_master.desktop /home/visss/.local/share/applications/
-ln -s /home/visss/Desktop/VISSS/scripts/visss_slave.desktop /home/visss/.local/share/applications/
+ln -s /home/visss/Desktop/VISSS/scripts/visss_trigger.desktop /home/visss/.local/share/applications/
+ln -s /home/visss/Desktop/VISSS/scripts/visss_follower.desktop /home/visss/.local/share/applications/
 
 sudo cp /home/visss/Desktop/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
 
@@ -91,7 +91,7 @@ sudo cp /home/visss/Desktop/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
 #launch apps to sign them
 
 mkdir -p ~/.config/autostart
-ln -s /home/visss/Desktop/VISSS/scripts/visss_master.desktop /home/visss/.config/autostart/
+ln -s /home/visss/Desktop/VISSS/scripts/visss_trigger.desktop /home/visss/.config/autostart/
 
 
 
