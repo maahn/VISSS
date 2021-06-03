@@ -2,7 +2,7 @@
 Version=1.0
 Name=Visss-follower
 Comment=Launch VISSS Follower process
-Exec=gnome-terminal -e 'sh -c "/home/visss/Desktop/VISSS/data-acquisition/launch_visss_data_acquisition.sh config_follower.sh; exec bash"'
+Exec=gnome-terminal -e 'sh -c "/home/visss/Desktop/VISSS/data-acquisition/launch_visss_data_acquisition.sh config_follower.sh"'
 Icon=applets-screenshooter
 Terminal=false
 Type=Application
