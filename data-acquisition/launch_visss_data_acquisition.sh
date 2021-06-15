@@ -1,7 +1,57 @@
 #!/usr/bin/env bash
 
 #load settings
-source $"$(dirname "$0")/$1"
+#source $"$(dirname "$0")/$1"
+
+set -u
+
+#parse arguments 
+#only overides settings file if present
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --IP=*)
+      IP="${1#*=}"
+      ;;
+    --MAC=*)
+      MAC="${1#*=}"
+      ;;
+    --INTERFACE=*)
+      INTERFACE="${1#*=}"
+      ;;
+    --MAXMTU=*)
+      MAXMTU="${1#*=}"
+      ;;
+    --PRESET=*)
+      PRESET="${1#*=}"
+      ;;
+    --QUALITY=*)
+      QUALITY="${1#*=}"
+      ;;
+    --CAMERACONFIG=*)
+      CAMERACONFIG="${1#*=}"
+      ;;
+    --ROOTPATH=*)
+      ROOTPATH="${1#*=}"
+      ;;
+    --OUTDIR=*)
+      OUTDIR="${1#*=}"
+      ;;
+    --SITE=*)
+      SITE="${1#*=}"
+      ;;
+    *)
+      printf "***************************\n"
+      printf "* Error: Invalid argument.*\n"
+      printf "$1 ${1#*=}\n"
+      printf "***************************\n"
+      # exit 1
+  esac
+  shift
+done
+
+HOST=`hostname`
+EXE=$ROOTPATH/visss-data-acquisition
+CAMERACONFIGname="${CAMERACONFIG%.*}"
 
 if [ -z "$IP" ]
 	then echo "variable IP not set. EXIT"
@@ -15,7 +65,7 @@ df -H | grep /data | awk '{ print "STORAGE USED " $5 " " $6 }'
 
 set -o pipefail
 
-cd $ROOTPATH/data-acquisition/
+cd $ROOTPATH
 
 MTU=$(/bin/cat /sys/class/net/$INTERFACE/mtu)
 if [[ "$MTU" != "$MAXMTU" ]]
@@ -39,18 +89,18 @@ fi
 for (( ; ; ))
 do
 
-timestamp=$(/bin/date +%FT%T)
-COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR -s=$SITE $ROOTPATH/camera-configuration/$CAMERACONFIG $IP| /usr/bin/tee $OUTDIR/logs/$TRIGGERFOLLOWER-$timestamp.txt"
-echo $COMMAND
-if $COMMAND
-		then
-			/bin/echo "worked"
-			exit
-else
-	/bin/echo "Didn't work, trying again in 5s"
-	/usr/bin/paplay /usr/share/sounds/ubuntu/stereo/dialog-question.ogg
-	/bin/sleep 5
-fi
+	timestamp=$(/bin/date +%FT%T)
+	COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR -s=$SITE $ROOTPATH/camera-configuration/$CAMERACONFIG $IP| /usr/bin/tee $OUTDIR/logs/$CAMERACONFIGname-$timestamp.txt"
+	echo $COMMAND
+	if $COMMAND
+			then
+				/bin/echo "worked"
+				exit
+	else
+		/bin/echo "Didn't work, trying again in 5s"
+		/usr/bin/paplay /usr/share/sounds/ubuntu/stereo/dialog-question.ogg
+		/bin/sleep 5
+	fi
 done
 
 
