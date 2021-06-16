@@ -12,7 +12,6 @@ QUALITY=17
 CAMERACONFIG='visss_follower.config'
 TRIGGERFOLLOWER='follower'
 
-ROOTPATH=/home/visss/Desktop/VISSS/
+ROOTPATH=/home/visss/Desktop/VISSS/data-acquisition
 OUTDIR=/data/lim
-HOST=`hostname`
-EXE=$ROOTPATH/data-acquisition/visss-data-acquisition
+

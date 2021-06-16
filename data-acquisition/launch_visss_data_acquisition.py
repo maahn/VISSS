@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 - read output from a subprocess in a background thread
 - show the output in the GUI
@@ -13,6 +13,7 @@ https://stackoverflow.com/questions/60966568/example-of-ipc-between-two-process-
 """
 import sys
 import os
+import signal
 from itertools import islice
 from subprocess import Popen, PIPE, STDOUT
 from textwrap import dedent
@@ -95,6 +96,7 @@ class DisplaySubprocessOutputDemo:
         s.pack(side=tk.RIGHT,fill=tk.Y)
         self.text['yscrollcommand'] = s.set
 
+        self.carReturn = False
         if autostart:
             self.clickStartStop()
 
@@ -111,7 +113,7 @@ class DisplaySubprocessOutputDemo:
     def start(self, command):
         self.status.set('running')
         # start dummy subprocess to generate some output
-        self.process = Popen(command, stdout=PIPE, stderr=STDOUT)
+        self.process = Popen(command, stdout=PIPE, stderr=STDOUT, preexec_fn=os.setsid)
 
         # launch thread to read the subprocess output
         #   (put the subprocess output into the queue in a background thread,
@@ -141,7 +143,15 @@ class DisplaySubprocessOutputDemo:
                 self.quit()
                 return
             else:
+                # if self.carReturn:
+                #     self.text.delete("insert linestart", "insert lineend")
+
                 # self.label['text'] = line # update GUI
+                # if line.endswith(b'\r'):
+                line =  line.replace(b'\r',b'\n')
+                #     self.carReturn = True
+                # else:
+                #     self.carReturn = False
                 self.text.insert(tk.END, line)
                 self.text.see("end")
                 # break # display no more than one line per 40 milliseconds
@@ -149,15 +159,21 @@ class DisplaySubprocessOutputDemo:
 
     def quit(self):
         try:
-            self.process.terminate()
+            # self.process.terminate()
+            os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+            print('quit')
         except AttributeError:
+            print('tried quit')
             pass
         self.status.set('idle')
 
     def kill(self):
         try:
-            self.process.kill() # exit subprocess if GUI is closed (zombie!)
+            #self.process.kill() # exit subprocess if GUI is closed (zombie!)
+            os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
+            print('kill')
         except AttributeError:
+            print('tried to kill')
             pass
         self.root.destroy()
 
@@ -210,10 +226,10 @@ OUTDIR='/data/lim'
 
 
 
-camera1Command = (f'{ROOTPATH}/launch_visss_data_acquisition.sh '
+camera1Command = (f'/usr/bin/env bash {ROOTPATH}/launch_visss_data_acquisition.sh '
     f'--IP={IP} --MAC={MAC} --INTERFACE={INTERFACE} --MAXMTU={MAXMTU} ' 
     f'--PRESET={PRESET} --QUALITY={QUALITY} --CAMERACONFIG={CAMERACONFIG} '
-    f'--ROOTPATH={ROOTPATH} --OUTDIR={OUTDIR} --SITE={SITE}  ')
+    f'--ROOTPATH={ROOTPATH} --OUTDIR={OUTDIR} --SITE={SITE}')
 
 
 IP='192.168.200.2'
@@ -221,20 +237,28 @@ MAC='00:01:0D:C3:04:9F'
 INTERFACE='enp35s0f1'
 CAMERACONFIG='visss_follower.config'
 
-camera2Command = (f'{ROOTPATH}/launch_visss_data_acquisition.sh '
+camera2Command = (f'/usr/bin/env bash {ROOTPATH}/launch_visss_data_acquisition.sh '
     f'--IP={IP} --MAC={MAC} --INTERFACE={INTERFACE} --MAXMTU={MAXMTU} ' 
     f'--PRESET={PRESET} --QUALITY={QUALITY} --CAMERACONFIG={CAMERACONFIG} '
-    f'--ROOTPATH={ROOTPATH} --OUTDIR={OUTDIR} --SITE={SITE}  ')
+    f'--ROOTPATH={ROOTPATH} --OUTDIR={OUTDIR} --SITE={SITE}')
+
+# camera1Command= 'ping spiegel.de'
+# camera2Command= './test.sh'
 
 
 print(camera1Command)
 print(camera2Command)
 
-app1 = DisplaySubprocessOutputDemo(root, mainframe, camera1Command, True)
-app2 = DisplaySubprocessOutputDemo(root, mainframe, camera2Command, True)
+apps = []
 
-root.protocol("WM_DELETE_WINDOW", app1.kill)
-root.protocol("WM_DELETE_WINDOW", app2.kill)
+apps.append(DisplaySubprocessOutputDemo(root, mainframe, camera1Command, True))
+apps.append(DisplaySubprocessOutputDemo(root, mainframe, camera2Command, True))
+
+def killall():
+    for app in apps:
+        app.kill()
+
+root.protocol("WM_DELETE_WINDOW", killall)
 
 root.mainloop() 
 

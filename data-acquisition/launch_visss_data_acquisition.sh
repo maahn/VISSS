@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 
-#load settings
-#source $"$(dirname "$0")/$1"
+
+
+#echo $@
 
 set -u
+SETTINGS=""
 
 #parse arguments 
 #only overides settings file if present
@@ -39,15 +41,31 @@ while [ $# -gt 0 ]; do
     --SITE=*)
       SITE="${1#*=}"
       ;;
+    --SETTINGS=*)
+      SETTINGS="${1#*=}"
+      ;;
     *)
       printf "***************************\n"
       printf "* Error: Invalid argument.*\n"
       printf "$1 ${1#*=}\n"
       printf "***************************\n"
-      # exit 1
+      exit 1
   esac
   shift
 done
+
+# read old settings  file
+if [ ! -z "$SETTINGS" ]; then   
+  SETTINGS=$"$(dirname "$0")/$SETTINGS"
+  if [ -f $SETTINGS ]; then
+    echo "Reading SETTINGS"
+    source "$SETTINGS"
+  else
+    echo "SETTINGS $SETTINGS does not exist."
+    exit 1
+  fi
+fi
+
 
 HOST=`hostname`
 EXE=$ROOTPATH/visss-data-acquisition

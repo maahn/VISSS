@@ -12,7 +12,5 @@ QUALITY=17
 CAMERACONFIG='visss_testimage.config'
 TRIGGERFOLLOWER='trigger'
 
-ROOTPATH=/home/visss/Desktop/VISSS/
+ROOTPATH=/home/visss/Desktop/VISSS/data-acquisition
 OUTDIR=/data/test
-HOST=`hostname`
-EXE=$ROOTPATH/data-acquisition/visss-data-acquisition
