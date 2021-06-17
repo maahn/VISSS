@@ -116,9 +116,11 @@ void storage_worker_cv::add_meta_data()
     
     fMeta_ << "# Camera serial number: "
           << DeviceIDMeta << "\n";
-     
+                            
+
+    std::cout << "TODO | " << get_timestamp() << " | CHANGE Camera configuration to name!!!"<< std::endl;
     fMeta_ << "# Camera configuration: "
-          <<  configFileRaw<< "\n";
+          <<  name<< "\n";
 
     fMeta_ << "# Hostname: "
           <<  hostname<< "\n";
@@ -145,7 +147,7 @@ void storage_worker_cv::open_files()
     std::cout << std::flush;
     if (storeVideo) {
         writer_.open(filename_+".mov", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
-        std::cout << "STATUS | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
+        std::cout << "INFO | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
     }
     //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=veryfast mb-tree=true me=dia analyse=i8x8 rc-lookahead=20 subme=1 ! queue ! qtmux !  filesink location=video-h264_lookahead20.mov",
     //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=superfast rc-lookahead=80 subme=2 ! queue ! qtmux !  filesink location=video-h264_lookahead80a_subme2.mov",
@@ -157,7 +159,7 @@ void storage_worker_cv::open_files()
         // Open the text file.
         fMeta_.open(filename_+".txt");
         add_meta_data();
-        std::cout << "STATUS | " << get_timestamp() << " | Opened "<< filename_+".txt"<< std::endl;
+        std::cout << "INFO | " << get_timestamp() << " | Opened "<< filename_+".txt"<< std::endl;
     }
 
     return;
@@ -172,7 +174,7 @@ void storage_worker_cv::close_files() {
             create_symlink(filename_+".mov",  filename_latest_+".mov");
         } else if (storeVideo) {
             std::remove((filename_+".mov").c_str());
-            std::cout << std::endl << "STATUS | " << get_timestamp() << " | Empty file removed: " << filename_<<".mov" <<std::endl;
+            std::cout << std::endl << "INFO | " << get_timestamp() << " | Empty file removed: " << filename_<<".mov" <<std::endl;
         }
     }
     //std::cout << std::endl << "STATUS | " << get_timestamp() << " | All files closed. "<<std::endl;
@@ -195,14 +197,14 @@ void storage_worker_cv::create_filename() {
 
 
 
-    if (configFileRaw != "DRYRUN") {
-        full_path = path_ + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "/data/" + timestamp1 + "/" ;
-        filename_ = full_path + hostname + "_" + configFileRaw + "_" + DeviceID  + "_" + timestamp2;
+    if (name != "DRYRUN") {
+        full_path = path_ + "/" + hostname + "_" + name + "_" + DeviceID + "/data/" + timestamp1 + "/" ;
+        filename_ = full_path + hostname + "_" + name + "_" + DeviceID  + "_" + timestamp2;
     } else {
         full_path = path_  + "/" ;
         filename_ = full_path + DeviceIDMeta+ "_DRYRUN";
     }
-    filename_latest_ = path_ + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "_latest" ;
+    filename_latest_ = path_ + "/" + hostname + "_" + name + "_" + DeviceID + "_latest" ;
 
     res = mkdir_p(full_path.c_str());
     if (res != 0) {
@@ -261,7 +263,7 @@ void storage_worker_cv::run()
     int tt = 0;
     cv::Scalar borderColor;
     
-    if (configFileRaw != "DRYRUN") {
+    if (name != "DRYRUN") {
         t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
     } else {
         t_reset_uint_ = 0;
@@ -348,7 +350,7 @@ void storage_worker_cv::run()
                 } else {
                     textImg = site + " | ";
                 }
-                textImg = textImg + get_timestamp() + " | " + configFileRaw + 
+                textImg = textImg + get_timestamp() + " | " + name + 
                     " | Q:" + std::to_string(queue_.size()) + " | M: ";
                 for (int jj = histSize; jj --> 0; )
                 {
@@ -398,7 +400,7 @@ void storage_worker_cv::run()
                         cv::imwrite(filename_+".jpg", imgWithMeta );
                         create_symlink(filename_+".jpg",  filename_latest_+".jpg");
                         std::cout ;
-                        std::cout << "STATUS | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
+                        std::cout << "INFO | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
                         }
 
                     frame_count_new_file = frame_count;
@@ -441,8 +443,7 @@ void storage_worker_cv::run()
                             break;
                          }
                     }
-                    message = message +"  \r";
-                    std::cout << message<<std::flush;
+                    std::cout << message<<std::endl;
 
                 }    
                 if ( showPreview && (frame_count % live_window_frame_ratio_ == 0))
@@ -476,7 +477,7 @@ void storage_worker_cv::run()
         }
     } catch (frame_queue::cancelled& /*e*/) {
         // Nothing more to process, we're done
-        std::cout << "Storage queue " << id_ << " cancelled, storage worker finished. Closing files." << std::endl;
+        std::cout << "INFO | " << get_timestamp() << " | Storage queue " << id_ << " cancelled, storage worker finished. Closing files." << std::endl;
         close_files();
     }
 }

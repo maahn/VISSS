@@ -56,8 +56,8 @@ int max_n_timeouts = 30;
 bool global_error = false;
 int done = false;
 cv::String configFile;
-std::string configFileRaw;
 std::string site = "none";
+std::string name = "VISSS";
 int maxframes = -1;
 int frameborder = 64;
 int new_file_interval = 300;
@@ -123,7 +123,7 @@ void create_symlink(std::string target, std::string link)
 
 
 void signal_handler(int s){
-   std::cout << "STATUS | " << get_timestamp() << "| Catched signal Ctrl-C" <<std::endl;
+   std::cout << "INFO | " << get_timestamp() << "| Catched signal Ctrl-C" <<std::endl;
    done = true; 
 
 }

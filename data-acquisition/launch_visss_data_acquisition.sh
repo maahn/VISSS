@@ -32,6 +32,9 @@ while [ $# -gt 0 ]; do
     --CAMERACONFIG=*)
       CAMERACONFIG="${1#*=}"
       ;;
+    --NAME=*)
+      NAME="${1#*=}"
+      ;;
     --ROOTPATH=*)
       ROOTPATH="${1#*=}"
       ;;
@@ -69,8 +72,10 @@ fi
 
 HOST=`hostname`
 EXE=$ROOTPATH/visss-data-acquisition
-CAMERACONFIGname="${CAMERACONFIG%.*}"
 
+if [ -z "$NAME" ]; then   
+  NAME="${CAMERACONFIG%.*}"
+fi
 if [ -z "$IP" ]
 	then echo "variable IP not set. EXIT"
 	exit
@@ -108,7 +113,7 @@ for (( ; ; ))
 do
 
 	timestamp=$(/bin/date +%FT%T)
-	COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR -s=$SITE $ROOTPATH/camera-configuration/$CAMERACONFIG $IP| /usr/bin/tee $OUTDIR/logs/$CAMERACONFIGname-$timestamp.txt"
+	COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR -n=$NAME -s=$SITE $CAMERACONFIG $IP| /usr/bin/tee $OUTDIR/logs/$NAME-$timestamp.txt"
 	echo $COMMAND
 	if $COMMAND
 			then

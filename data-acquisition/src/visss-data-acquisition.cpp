@@ -50,6 +50,7 @@ const char* params
       "{ nopreview         |                   | no preview window }"
       "{ novideo           |                   | do not store video data }"
       "{ nometadata        |                   | do not store meta data }"
+      "{ name n            | VISSS             | camera name }"
       "{ @config           | <none>            | camera configuration file }"
       "{ @camera           | <none>            | camera IP }";
 
@@ -381,7 +382,7 @@ void *ImageCaptureThread( void *context)
                         if ( !captureContext->enable_sequence )
                         {
                             // GEVBUFFILE_Close( seqFP, sequence_count );
-                            std::cout << "STATUS | " << get_timestamp() << " | Complete sequence has " << sequence_count << " frames" << std::endl;
+                            std::cout << "INFO | " << get_timestamp() << " | Complete sequence has " << sequence_count << " frames" << std::endl;
                             sequence_count = 0;
                             sequence_init = 0;
 
@@ -394,7 +395,7 @@ void *ImageCaptureThread( void *context)
                     else
                     {
                         //printf("chunk_data = %p  : chunk_size = %d\n", img->chunk_data, img->chunk_size); //???????????
-                        printf("WAITING Frame %llu\r", (unsigned long long)img->id);
+                        printf("STATUS | WAITING Frame %llu\n", (unsigned long long)img->id);
                         fflush(stdout);
                     }
                 }
@@ -407,9 +408,11 @@ void *ImageCaptureThread( void *context)
             }
             else if (status  == GEVLIB_ERROR_TIME_OUT)
             {
-                n_timeouts += 1;
-                std::cerr << "ERROR | " << get_timestamp() <<" | Camera time out"
-                << " #" << n_timeouts << std::endl;
+                if (captureContext->enable_sequence) {
+                    n_timeouts += 1;
+                    std::cerr << "ERROR | " << get_timestamp() <<" | Camera time out"
+                    << " #" << n_timeouts << std::endl;
+                }
             }
             else {
                 n_timeouts += 1;
@@ -427,7 +430,7 @@ void *ImageCaptureThread( void *context)
             if (global_error || ((!captureContext->enable_sequence) && (sequence_init == 1)))
             {
                 // GEVBUFFILE_Close( seqFP, sequence_count );
-                std::cout << "STATUS | " << get_timestamp() << " | Complete sequence has " << sequence_count << "frames" << std::endl;
+                std::cout << "INFO | " << get_timestamp() << " | Complete sequence has " << sequence_count << "frames" << std::endl;
                 sequence_count = 0;
                 sequence_init = 0;
             }
@@ -469,7 +472,7 @@ void *ImageCaptureThread( void *context)
             //double total_write_time_a(storage[0].storage[0].total_time_ms());
             // double total_write_time_b(storage[1].total_time_ms());
 
-            std::cout << "STATUS | " << get_timestamp() 
+            std::cout << "INFO | " << get_timestamp() 
                 << " | Completed storage " << frame_count << " images:\n"
                 << "  average capture time = " << (total_read_time / frame_count) << " ms\n"
                 << "  average storage time = " << (total_storage_time / frame_count) << " ms\n"
@@ -556,49 +559,50 @@ int main(int argc, char *argv[])
     }
 
     cv::String output = parser.get<cv::String>("output");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: Output path "<< output << std::endl;
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: Output path "<< output << std::endl;
 
     configFile = parser.get<cv::String>(0);
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: Configuration file "<< configFile << std::endl;
-    configFileRaw = configFile.substr(0, configFile.find_last_of("."));
-    size_t sep = configFileRaw.find_last_of("\\/");
-    if (sep != std::string::npos)
-        configFileRaw = configFileRaw.substr(sep + 1, configFileRaw.size() - sep - 1);
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: Configuration file "<< configFile << std::endl;
 
     std::string camIP = parser.get<cv::String>(1);
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: Camera IP "<< camIP << std::endl;
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: Camera IP "<< camIP << std::endl;
     uint long camIPl = iptoul(camIP);
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: Camera IP long "<< camIPl << std::endl;
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: Camera IP long "<< camIPl << std::endl;
     int camIndex = 0;
 
     context.quality = parser.get<cv::String>("quality");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: FFMPEG Quality "<< context.quality << std::endl;
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: FFMPEG Quality "<< context.quality << std::endl;
+
     context.preset = parser.get<cv::String>("preset");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: FFMPEG preset "<< context.preset << std::endl;
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: FFMPEG preset "<< context.preset << std::endl;
+
     site = parser.get<cv::String>("site");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: site "<< site << std::endl;
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: site "<< site << std::endl;
+
+    name = parser.get<cv::String>("name");
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: name "<< name << std::endl;
 
 
     context.live_window_frame_ratio = parser.get<int>("liveratio");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: liveratio "<< context.live_window_frame_ratio << std::endl;
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: liveratio "<< context.live_window_frame_ratio << std::endl;
 
     new_file_interval = parser.get<int>("newfileinterval");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: newfileinterval "<< new_file_interval << std::endl;
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: newfileinterval "<< new_file_interval << std::endl;
 
     context.fps = parser.get<double>("fps");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: fps "<< context.fps << std::endl;
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: fps "<< context.fps << std::endl;
 
     maxframes = parser.get<int>("maxframes");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: maxframes "<< maxframes << std::endl;
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: maxframes "<< maxframes << std::endl;
 
     writeallframes = parser.has("writeallframes");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: writeallframes "<< writeallframes << std::endl;
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: writeallframes "<< writeallframes << std::endl;
     showPreview = !parser.has("nopreview");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: showPreview "<< showPreview << std::endl;
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: showPreview "<< showPreview << std::endl;
     storeVideo = !parser.has("novideo");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: storeVideo "<< storeVideo << std::endl;
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: storeVideo "<< storeVideo << std::endl;
     storeMeta = !parser.has("nometadata");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: storeMeta "<< storeMeta << std::endl;
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: storeMeta "<< storeMeta << std::endl;
 
     std::set<std::string> presets = {
         "ultrafast",
@@ -776,7 +780,7 @@ int main(int argc, char *argv[])
         }
               
 
-        std::cout << "STATUS | " << get_timestamp() << " | Loading settings"<< std::endl;
+        std::cout << "INFO | " << get_timestamp() << " | Loading settings"<< std::endl;
         std::cout << "**************************************************************************" << std::endl;
 
 
@@ -855,7 +859,7 @@ std::cout << "******************************************************************
 
 context.t_reset = std::chrono::system_clock::now();
 
-std::cout << "STATUS | " << get_timestamp() << "| Camera clock reset around " << context.t_reset.time_since_epoch().count()/1000  << std::endl;
+std::cout << "INFO | " << get_timestamp() << "| Camera clock reset around " << context.t_reset.time_since_epoch().count()/1000  << std::endl;
 
 GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
 DeviceIDMeta += DeviceID;
@@ -891,7 +895,7 @@ DeviceIDMeta += DeviceID;
 
         if (error_count == 0)
         {
-            std::cout << "STATUS | " << get_timestamp() << "| " << feature_count << " Features loaded successfully" << std::endl;
+            std::cout << "INFO | " << get_timestamp() << "| " << feature_count << " Features loaded successfully" << std::endl;
         }
         else
         {
@@ -906,7 +910,7 @@ DeviceIDMeta += DeviceID;
         struct tm * now = localtime( & t );
         char timestamp3[80];
         strftime (timestamp3,80,"%Y%m%d-%H%M%S",now);
-        std::string full_path = output + "/" + hostname + "_" + configFileRaw + "_" + DeviceID + "/applied_config/" ;
+        std::string full_path = output + "/" + hostname + "_" + name + "_" + DeviceID + "/applied_config/" ;
         std::string config_out = full_path + hostname + "_" + DeviceID + "_" + timestamp3 + ".config" ;
 
         res = mkdir_p(full_path.c_str());
@@ -967,7 +971,7 @@ DeviceIDMeta += DeviceID;
         }
 
         fclose(fp2);
-        std::cout << "STATUS | " << get_timestamp() << "| applied configuration written to: " << config_out << std::endl;
+        std::cout << "INFO | " << get_timestamp() << "| applied configuration written to: " << config_out << std::endl;
 
 
         if((not global_error) && (error_count == 0))
@@ -1193,7 +1197,7 @@ DeviceIDMeta += DeviceID;
         std::cerr << "FATAL ERROR | " << get_timestamp() << " | EXIT due to fatal error" <<std::endl;
         return 1;
     } else {
-        std::cout << "STATUS | " << get_timestamp() << " | All done" <<std::endl;
+        std::cout << "INFO | " << get_timestamp() << " | All done" <<std::endl;
         return 0;
     }
 }

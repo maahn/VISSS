@@ -22,12 +22,21 @@ import yaml
 from pathlib import Path
 from copy import deepcopy
 import time
+import random
+import string
 
 import tkinter as tk # Python 3
-from tkinter import ttk
+from tkinter import ttk, filedialog, messagebox
 
 
 from queue import Queue, Empty # Python 3
+
+#make sure on stays on and off stays off
+from yaml.constructor import SafeConstructor
+def add_bool(self, node):
+    return self.construct_scalar(node)
+SafeConstructor.add_constructor(u'tag:yaml.org,2002:bool', add_bool)
+
 
 def iter_except(function, exception):
     """Works like builtin 2-argument `iter()`, but stops on `exception`."""
@@ -46,9 +55,12 @@ def save_settings(event):
         yaml.dump(settings, stream, default_flow_style=False, allow_unicode=True)
 
 
-def read_settings():
+def read_settings(fname):
+    if fname is None:
+        return {}
+
     try:
-        with open(SETTINGSFILE, 'r') as stream:
+        with open(fname, 'r') as stream:
             return yaml.safe_load(stream)
     except (FileNotFoundError, yaml.YAMLError) as e:
         print(e)
@@ -61,57 +73,94 @@ home = str(Path.home())
 SETTINGSFILE = "%s/.visss.yaml"%home
 DEFAULTSETTINGS = {
         'geometry' : "%dx%d" % (300,300),
-        'environmentFile' : None,
-        'camera1File' : None,
-        'camera2File' : None,
+        'configFile' : None,
     }
 
+
 class DisplaySubprocessOutputDemo:
-    def __init__(self, root, mainframe, command, autostart):
+    def __init__(self, root, mainframe, cameraConfig, configuration):
         self.root = root
         self.mainframe = mainframe
-        self.command = command
+        self.cameraConfig = cameraConfig
+        self.configuration = configuration
+
+        self.running = tk.StringVar()
+        self.running.set('idle: %s'%cameraConfig['name'])
 
         self.status = tk.StringVar()
-        self.status.set('idle')
+        self.status.set('-')
+
+        self.configFName = '/tmp/visss_%s.config'%(''.join(random.choice(string.ascii_lowercase) for i in range(16)))
+
+
+        self.command = (f"/usr/bin/env bash {ROOTPATH}/launch_visss_data_acquisition.sh "
+            f"--IP={cameraConfig['ip']} --MAC={cameraConfig['mac']} --INTERFACE={cameraConfig['interface']} --MAXMTU={configuration['maxmtu']} "
+            f"--PRESET={configuration['preset']} --QUALITY={configuration['quality']} --CAMERACONFIG={self.configFName} "
+            f"--ROOTPATH={ROOTPATH} --OUTDIR={configuration['outdir']} --SITE={configuration['site']} --NAME={cameraConfig['name']}" )
+
+        print(self.command)
 
         frame1=ttk.Frame(mainframe)
         frame1.pack(side=tk.LEFT,fill=tk.BOTH, expand=True)
 
+        self.statusWidget = ttk.Label(frame1, textvariable=self.status)
+        self.statusWidget.pack(side=tk.BOTTOM,fill=tk.X,pady=6, padx=(6,6))
 
         config = ttk.Frame(frame1)
-        config.pack(side=tk.TOP, fill=tk.X)
+        config.pack(side=tk.TOP, fill=tk.X,pady=6, padx=(6,6))
         self.startStopButton = ttk.Button(config, text="Start/Stop", command=self.clickStartStop)
         self.startStopButton.pack(side = tk.LEFT, anchor=tk.NW)
 
 
-        self.statusWidget = ttk.Label(config, textvariable=self.status)
-        self.statusWidget.pack(side = tk.LEFT, anchor=tk.NW)
+        self.runningWidget = ttk.Label(config, textvariable=self.running)
+        self.runningWidget.pack(side = tk.LEFT, anchor=tk.NW,fill=tk.Y, expand=True)
 
         # show subprocess' stdout in GUI
         self.text = tk.Text(frame1, height=4, width = 30)
-        self.text.pack(side=tk.LEFT,fill=tk.BOTH, expand=True)
+        self.text.pack(side=tk.LEFT,fill=tk.BOTH, expand=True, pady=6, padx=(6,0))
         
         s = ttk.Scrollbar(frame1, orient=tk.VERTICAL, command=self.text.yview)
-        s.pack(side=tk.RIGHT,fill=tk.Y)
+        s.pack(side=tk.RIGHT,fill=tk.Y, pady=6, padx=(0,6))
         self.text['yscrollcommand'] = s.set
 
+        
+
         self.carReturn = False
-        if autostart:
+        if configuration['autostart']:
             self.clickStartStop()
+
+
+
+    def witeParamFile(self):
+        
+        file = open(self.configFName, 'w')
+        for k, v in self.cameraConfig['teledyneparameters'].items():
+            if k == 'IO':
+                for ii in range(len(self.cameraConfig['teledyneparameters'][k])):
+                    for k1, v1 in self.cameraConfig['teledyneparameters'][k][ii].items():
+                        print("%s %s"%(k1,v1))
+                        file.write("%s %s\n"%(k1,v1))
+            else:
+                print("%s %s"%(k,v))
+                file.write("%s %s\n"%(k,v))
+        return 
 
     def clickStartStop(self):
 
-        if self.status.get() == 'idle':
+        if self.running.get().startswith('idle'):
             self.start(self.command.split(' '))
 
-        elif self.status.get() == 'running':
+        elif self.running.get().startswith('running'):
             self.quit()
         else:
             pass
 
     def start(self, command):
-        self.status.set('running')
+        self.running.set('running: %s'%cameraConfig['name'])
+
+        self.witeParamFile()
+
+
         # start dummy subprocess to generate some output
         self.process = Popen(command, stdout=PIPE, stderr=STDOUT, preexec_fn=os.setsid)
 
@@ -152,8 +201,16 @@ class DisplaySubprocessOutputDemo:
                 #     self.carReturn = True
                 # else:
                 #     self.carReturn = False
-                self.text.insert(tk.END, line)
-                self.text.see("end")
+
+                if line.startswith(b'STATUS'):
+                    self.status.set(line[:-2])
+                    self.statusWidget.config(background="green")
+                else:
+                    if line.startswith(b'ERROR') or line.startswith(b'FATAL'):
+                        self.status.set(line[:-2])
+                        self.statusWidget.config(background="red")
+                    self.text.insert(tk.END, line)
+                    self.text.see("end")
                 # break # display no more than one line per 40 milliseconds
         self.mainframe.after(40, self.update, q) # schedule next update
 
@@ -165,7 +222,13 @@ class DisplaySubprocessOutputDemo:
         except AttributeError:
             print('tried quit')
             pass
-        self.status.set('idle')
+        self.running.set('idle: %s'%cameraConfig['name'])
+        self.status.set('NOT RUNNING (YET)')
+        self.statusWidget.config(background="yellow")
+        try:
+            os.remove(self.configFName)
+        except FileNotFoundError:
+            pass
 
     def kill(self):
         try:
@@ -175,10 +238,17 @@ class DisplaySubprocessOutputDemo:
         except AttributeError:
             print('tried to kill')
             pass
-        self.root.destroy()
+        self.running.set('idle: %s'%cameraConfig['name'])
+        self.status.set('NOT RUNNING (YET)')
+        self.statusWidget.config(background="yellow")
+
+        try:
+            os.remove(self.configFName)
+        except FileNotFoundError:
+            pass
 
 settings = deepcopy(DEFAULTSETTINGS)
-settings.update(read_settings())
+settings.update(read_settings(SETTINGSFILE))
 
 #reset geometery if broken
 if settings['geometry'].startswith('1x1'):
@@ -203,60 +273,69 @@ root.rowconfigure(0, weight=1)
 
 config = ttk.Frame(mainframe)
 config.pack(side=tk.TOP, fill=tk.X)
-button = ttk.Button(config, text="Dummy")
-button.pack(side = tk.LEFT, anchor=tk.NW)
-status = ttk.Label(config, text="Text")
-status.pack(side = tk.LEFT)
+button = ttk.Button(config, text="Configuration File", command=lambda:askopenfile())
+
+def askopenfile():
+    file = filedialog.askopenfilename(filetypes=[("YAML files", ".yaml")])
+    if file is not None: 
+        settings['configFile'] = file
+        configuration = read_settings(file)
+        save_settings(None)
+        messagebox.showwarning(title=None, message='Restart to apply settings')
+    else:
+        messagebox.showerror(title=None, message='File not found')
+
+button.pack(side = tk.LEFT, anchor=tk.NW, pady=6, padx=(6,0))
+status = ttk.Label(config, text=settings['configFile'])
+status.pack(side = tk.LEFT, pady=6, padx=(6,0))
+
+configuration = read_settings(settings['configFile'])
+
+
+
+
+# configuration = {
+#     'maxmtu':'9216',
+#     'site':'LIM',
+#     'preset':'ultrafast',
+#     'quality':17,
+#     'outdir':'/data/lim',
+#     'autostart':True,
+#     'camera' : [
+#         {
+#         'ip':'192.168.100.2',
+#         'mac':'00:01:0D:C3:0F:34',
+#         'interface':'enp35s0f0',
+#         'name':'visss_trigger.config',
+#         }, 
+#         {
+#         'ip':'192.168.200.2',
+#         'mac':'00:01:0D:C3:04:9F',
+#         'interface':'enp35s0f1',
+#         'name':'visss_follower.config',
+#         },
+#     ],
+# }
 
 
 
 #load settings
-IP='192.168.100.2'
-MAC='00:01:0D:C3:0F:34'
-INTERFACE='enp35s0f0'
-MAXMTU='9216'
-SITE='LIM'
-
-PRESET='ultrafast'
-QUALITY=17
-
-CAMERACONFIG='visss_trigger.config'
-
-OUTDIR='/data/lim'
 
 
 
-camera1Command = (f'/usr/bin/env bash {ROOTPATH}/launch_visss_data_acquisition.sh '
-    f'--IP={IP} --MAC={MAC} --INTERFACE={INTERFACE} --MAXMTU={MAXMTU} ' 
-    f'--PRESET={PRESET} --QUALITY={QUALITY} --CAMERACONFIG={CAMERACONFIG} '
-    f'--ROOTPATH={ROOTPATH} --OUTDIR={OUTDIR} --SITE={SITE}')
-
-
-IP='192.168.200.2'
-MAC='00:01:0D:C3:04:9F'
-INTERFACE='enp35s0f1'
-CAMERACONFIG='visss_follower.config'
-
-camera2Command = (f'/usr/bin/env bash {ROOTPATH}/launch_visss_data_acquisition.sh '
-    f'--IP={IP} --MAC={MAC} --INTERFACE={INTERFACE} --MAXMTU={MAXMTU} ' 
-    f'--PRESET={PRESET} --QUALITY={QUALITY} --CAMERACONFIG={CAMERACONFIG} '
-    f'--ROOTPATH={ROOTPATH} --OUTDIR={OUTDIR} --SITE={SITE}')
-
-# camera1Command= 'ping spiegel.de'
-# camera2Command= './test.sh'
-
-
-print(camera1Command)
-print(camera2Command)
 
 apps = []
+if 'camera' in configuration.keys():
+    for cameraConfig in configuration['camera']:
+        apps.append(DisplaySubprocessOutputDemo(root, mainframe, cameraConfig, configuration))
 
-apps.append(DisplaySubprocessOutputDemo(root, mainframe, camera1Command, True))
-apps.append(DisplaySubprocessOutputDemo(root, mainframe, camera2Command, True))
+
+# apps.append(DisplaySubprocessOutputDemo(root, mainframe, camera2Command, autostart))
 
 def killall():
     for app in apps:
-        app.kill()
+        app.quit()
+    root.destroy()
 
 root.protocol("WM_DELETE_WINDOW", killall)
 

@@ -417,7 +417,7 @@ MY_CONTEXT context ;
     gethostname(hostname, HOST_NAME_MAX);
 
     configFile = "DRYRUN";
-    configFileRaw = "DRYRUN";
+    name = "DRYRUN";
     strcpy(DeviceID, "DUMMY");
 
     DeviceIDMeta = videoFileInRaw;

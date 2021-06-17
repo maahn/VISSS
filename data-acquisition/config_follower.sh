@@ -9,7 +9,8 @@ SITE='LIM'
 PRESET='ultrafast'
 QUALITY=17
 
-CAMERACONFIG='visss_follower.config'
+NAME='visss_follower'
+CAMERACONFIG='/home/visss/Desktop/VISSS/data-acquisition/camera-configuration/visss_follower.config'
 TRIGGERFOLLOWER='follower'
 
 ROOTPATH=/home/visss/Desktop/VISSS/data-acquisition

@@ -1,0 +1,31 @@
+autostart: true
+camera:
+- name: visss_trigger
+  interface: enp35s0f0
+  ip: 192.168.100.2
+  mac: 00:01:0D:C3:0F:34
+  teledyneparameters:
+    TestImageSelector: Off
+    fastReadoutMode: Off
+    ExposureMode: Timed
+    ExposureTime: 200
+    GainSelector: SensorAnalog
+    Gain: 1
+    BlackLevelRaw: 1
+    TriggerMode: Off
+    AcquisitionFrameRate: 140
+    IO:
+    - LineSelector: Line3
+      outputLineSource: PulseOnStartofExposure
+      outputLinePulseDuration: 60
+      outputLinePulseDelay: 40
+    - LineSelector: Line4
+      outputLineSource: PulseOnStartofExposure
+      outputLinePulseDuration: 30
+      outputLinePulseDelay: 0
+    sensorFpnCorrectionMode: Off
+maxmtu: '9216'
+outdir: /data/lim
+preset: ultrafast
+quality: 17
+site: LIM

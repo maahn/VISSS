@@ -9,7 +9,8 @@ SITE='LIM'
 PRESET='ultrafast'
 QUALITY=17
 
-CAMERACONFIG='visss_trigger.config'
+NAME='visss_trigger'
+CAMERACONFIG='/home/visss/Desktop/VISSS/data-acquisition/camera-configuration/visss_trigger.config'
 TRIGGERFOLLOWER='trigger'
 
 ROOTPATH=/home/visss/Desktop/VISSS/data-acquisition
