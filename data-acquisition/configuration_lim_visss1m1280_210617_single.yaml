@@ -1,4 +1,4 @@
-autostart: true
+autostart: True
 camera:
 - name: visss_trigger
   interface: enp35s0f0
@@ -29,3 +29,6 @@ outdir: /data/lim
 preset: ultrafast
 quality: 17
 site: LIM
+storagethreads: 1
+fps: 140
+storeallframes: False

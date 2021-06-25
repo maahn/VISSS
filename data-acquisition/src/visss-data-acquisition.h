@@ -65,6 +65,7 @@ bool writeallframes = false;
 bool storeVideo = true;
 bool storeMeta = true;
 bool showPreview = true;
+int nStorageThreads = 1;
 
 //histogram
 float range[] = {20,30,40,60,80,100,120, 256  }; //the upper boundary is exclusive

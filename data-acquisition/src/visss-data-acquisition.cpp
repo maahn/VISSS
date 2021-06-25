@@ -46,11 +46,12 @@ const char* params
       "{ fps f             | 140               | frames per seconds of output }"
       "{ newfileinterval i | 300               | write new file very ?s. Set to 0 to deactivate}"
       "{ maxframes m       | -1                | stop after this many frames (for debugging) }"
-      "{ writeallframes w  |                   | write all frames whether sth is moving or not (for debugging) }"
+      "{ writeallframes w  | 0                 | write all frames whether sth is moving or not (for debugging) }"
       "{ nopreview         |                   | no preview window }"
       "{ novideo           |                   | do not store video data }"
       "{ nometadata        |                   | do not store meta data }"
       "{ name n            | VISSS             | camera name }"
+      "{ threads t         | 1                 | number of storage threads }"
       "{ @config           | <none>            | camera configuration file }"
       "{ @camera           | <none>            | camera IP }";
 
@@ -233,9 +234,10 @@ void *ImageCaptureThread( void *context)
         //int codec = cv:: VideoWriter::fourcc('H', '2', '6', '4'); // select desired codec (must be available at runtime)
         int codec = cv:: VideoWriter::fourcc('a', 'v', 'c', '1'); // select desired codec (must be available at runtime)
         bool isColor = false;
+        int tt = 0;
 
         // The synchronized queues, one per video source/storage worker pair
-        std::vector<frame_queue> queue(1);
+        std::vector<frame_queue> queue(nStorageThreads);
 
         // Let's create our storage workers -- let's have two, to simulate your scenario
         // and to keep it interesting, have each one write a different format
@@ -308,77 +310,71 @@ void *ImageCaptureThread( void *context)
                         //std:: cout << "STATUS | " << get_timestamp() << "| " << imgSize  << std::endl;
 
                         MatMeta exportImgMeta;
-
-
                         if (!sequence_init)
                         {
                         // init
-
                             //--- INITIALIZE VIDEOWRITER
-
-                            storage.emplace_back(std::ref(queue[0]), 0
-                                , captureContext->base_name
-                                , codec
-                                , captureContext->fps
-                                , imgSize
-                                , isColor
-                                //, captureContext->quality
-                                //, captureContext->preset
-                                , captureContext->t_reset
-                                , captureContext->live_window_frame_ratio
-                                );
-                            //std:: cout << "STATUS | " << get_timestamp() << "| storage worker started" << std::endl;
-
-                            // And start the worker threads for each storage worker
-                            for (auto& s : storage) {
-                                storage_thread.emplace_back(&storage_worker_cv::run, &s);
+                            for (int ss=0; ss<nStorageThreads; ++ss) {
+                                storage.emplace_back(
+                                    std::ref(queue[ss])
+                                    , ss
+                                    , captureContext->base_name
+                                    , codec
+                                    , captureContext->fps
+                                    , imgSize
+                                    , isColor
+                                    , captureContext->t_reset
+                                    , captureContext->live_window_frame_ratio
+                                    );
                             }
-
+                            for (int uu=0; uu<nStorageThreads; ++uu) {
+                                // And start the worker threads for each storage worker
+                                storage_thread.emplace_back(&storage_worker_cv::run, &storage[uu]);
+                            }
+     // std::cout << "INFOmain 4: "  << std::endl;
 
                             sequence_init = 1;
                             sequence_count = 0;
                             // }
-                        } else {
-                        // else if (writer.isOpened())
-                        // {
-                            // cout << filename << ": FILE OPEN\n";
+                        }
+                        // Insert a copy into all queues
+                        // for (auto& q : queue) {
+
+                        // Now the main capture loop
+                        exportImgMeta.MatImage = exportImg.clone();
+                        exportImgMeta.timestamp = img->timestamp;
+                        exportImgMeta.id = img->id;
+
+                        tt = exportImgMeta.id % nStorageThreads; 
+ // std::cout << "INFOmain 5: "<< tt <<" "<< exportImgMeta.id << " "<< nStorageThreads << std::endl;
+
+                        queue[tt].push(exportImgMeta);
+                        // }        
+ // std::cout << "INFOmain 6: "  << queue[tt].size() << std::endl;
+
+                        high_resolution_clock::time_point t2(high_resolution_clock::now());
+                         double dt_us(static_cast<double>(duration_cast<microseconds>(t2 - t1).count()));
+                        total_read_time += dt_us;
+
+                        // std::cout << "Captured image #" << frame_count << " in "
+                        //     << (dt_us / 1000.0) << " ms" << std::endl;
+
+                        fflush(stdout);
 
 
-                            // Now the main capture loop
-                            exportImgMeta.MatImage = exportImg.clone();
-                            exportImgMeta.timestamp = img->timestamp;
-                            exportImgMeta.id = img->id;
+                        ++frame_count;
 
-                            // Insert a copy into all queues
-                            for (auto& q : queue) {
-                                q.push(exportImgMeta);
-                            }        
+                        sequence_count++;
 
-                            high_resolution_clock::time_point t2(high_resolution_clock::now());
-                             double dt_us(static_cast<double>(duration_cast<microseconds>(t2 - t1).count()));
-                            total_read_time += dt_us;
+                        //rest n_timeout after success
+                        n_timeouts = 0;
 
-                            // std::cout << "Captured image #" << frame_count << " in "
-                            //     << (dt_us / 1000.0) << " ms" << std::endl;
-                        
- 
-                            fflush(stdout);
-
-
-                            ++frame_count;
-
-                            sequence_count++;
-
-                            //rest n_timeout after success
-                            n_timeouts = 0;
-
-                            if ((maxframes>0) && (frame_count >=maxframes)) {
-                                std::cout << "FATAL ERROR | " << get_timestamp() << " | Reached maximum number of frames" << std::endl;
-                                global_error = true;
-                            }
+                        if ((maxframes>0) && (frame_count >=maxframes)) {
+                            std::cout << "FATAL ERROR | " << get_timestamp() << " | Reached maximum number of frames" << std::endl;
+                            global_error = true;
+                        }
 
                         // See if we  are done.
-                        }
                         if ( !captureContext->enable_sequence )
                         {
                             // GEVBUFFILE_Close( seqFP, sequence_count );
@@ -389,7 +385,6 @@ void *ImageCaptureThread( void *context)
                             // writer.release();
 
                         }
-
                     }
 
                     else
@@ -462,22 +457,25 @@ void *ImageCaptureThread( void *context)
             }
 
             // And join all the worker threads, waiting for them to finish
-            storage_thread[0].join();
-            // for (auto& st2 : storage_thread) {
-            //     st2.join();
-            // }
-            // Report the timings
-            total_read_time /= 1000.0;
-            double total_storage_time(storage[0].total_time_ms());
-            //double total_write_time_a(storage[0].storage[0].total_time_ms());
-            // double total_write_time_b(storage[1].total_time_ms());
+            for (int ss=0; ss<nStorageThreads; ++ss) {
+                storage_thread[ss].join();
+            
+                // for (auto& st2 : storage_thread) {
+                //     st2.join();
+                // }
+                // Report the timings
+                total_read_time /= 1000.0;
+                double total_storage_time(storage[ss].total_time_ms());
+                //double total_write_time_a(storage[0].storage[0].total_time_ms());
+                // double total_write_time_b(storage[1].total_time_ms());
 
-            std::cout << "INFO | " << get_timestamp() 
-                << " | Completed storage " << frame_count << " images:\n"
-                << "  average capture time = " << (total_read_time / frame_count) << " ms\n"
-                << "  average storage time = " << (total_storage_time / frame_count) << " ms\n"
-                //<< "  average write time A = " << (total_write_time_a / frame_count) << " ms\n"
-                ;
+                std::cout << "INFO" << ss << " | " << get_timestamp() 
+                    << " | Completed storage " << frame_count << " images:\n"
+                    << "  average capture time = " << (total_read_time / frame_count) << " ms\n"
+                    << "  average storage time = " << (total_storage_time / frame_count) << " ms\n"
+                    //<< "  average write time A = " << (total_write_time_a / frame_count) << " ms\n"
+                    ;
+                }
         }
 
     }
@@ -535,6 +533,7 @@ int main(int argc, char *argv[])
     pthread_t  tid;
     char c;
     int res = 0;
+    int writeallframes1;
     FILE *fp = NULL;
     FILE *fp2 = NULL;
     // char uniqueName[FILENAME_MAX];
@@ -582,6 +581,8 @@ int main(int argc, char *argv[])
     name = parser.get<cv::String>("name");
     std::cout << "INFO | " << get_timestamp() << " | PARSER: name "<< name << std::endl;
 
+    nStorageThreads = parser.get<int>("threads");
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: threads "<< nStorageThreads << std::endl;
 
     context.live_window_frame_ratio = parser.get<int>("liveratio");
     std::cout << "INFO | " << get_timestamp() << " | PARSER: liveratio "<< context.live_window_frame_ratio << std::endl;
@@ -595,8 +596,16 @@ int main(int argc, char *argv[])
     maxframes = parser.get<int>("maxframes");
     std::cout << "INFO | " << get_timestamp() << " | PARSER: maxframes "<< maxframes << std::endl;
 
-    writeallframes = parser.has("writeallframes");
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: writeallframes "<< writeallframes << std::endl;
+    writeallframes1 = parser.get<int>("writeallframes");
+    if (writeallframes1 == 0) {
+        writeallframes = false;
+    } else if (writeallframes1 == 1) {
+        writeallframes = true;
+    } else {
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| writeallframes must be 0 or 1 " << context.preset<< std::endl;
+        global_error = true;
+    }
+    std::cout << "INFO | " << get_timestamp() << " | PARSER: writeallframes "<< writeallframes << " " << writeallframes1 << std::endl;
     showPreview = !parser.has("nopreview");
     std::cout << "INFO | " << get_timestamp() << " | PARSER: showPreview "<< showPreview << std::endl;
     storeVideo = !parser.has("novideo");
@@ -620,7 +629,6 @@ int main(int argc, char *argv[])
         std::cerr << "FATAL ERROR | " << get_timestamp() << "| Do not know preset " << context.preset<< std::endl;
         global_error = true;
     }
-
 
     char OPENCV_FFMPEG_PRESET[100];
     strcpy(OPENCV_FFMPEG_PRESET,"OPENCV_FFMPEG_PRESET=");

@@ -11,8 +11,8 @@ class storage_worker_cv
 {
 public:
     storage_worker_cv(frame_queue& queue
-        , int32_t id
-        , std::string const& path
+        , int id
+        , std::string path
         , int32_t fourcc
         , double fps
         , cv::Size frame_size
@@ -28,7 +28,7 @@ public:
 private:
     frame_queue& queue_;
 
-    int32_t id_;
+    int id_;
     std::ofstream fMeta_;
 
     std::string path_;
@@ -59,8 +59,8 @@ private:
 };
 // ----------------------------------------------------------------------------
 storage_worker_cv::storage_worker_cv(frame_queue& queue
-    , int32_t id
-    , std::string const& path
+    , int id
+    , std::string path
     , int32_t fourcc
     , double fps
     , cv::Size frame_size
@@ -82,7 +82,7 @@ storage_worker_cv::storage_worker_cv(frame_queue& queue
     , t_reset_(t_reset)
     , live_window_frame_ratio_(live_window_frame_ratio)
 {
-                                        printf("THREAD2 storage_worker_cv\n");
+     std::cout << "INFO-"<< id_ << " | " << get_timestamp() << " | Thread storage_worker_cv created!" << std::endl;
 
 }
 // // ----------------------------------------------------------------------------
@@ -102,26 +102,22 @@ void storage_worker_cv::add_meta_data()
     //0.2 with mean and standard deviation
     //0.3 with number of changing pixels
 
+//TODO 0.4: thread number, all settings??
+
 
     fMeta_ << "# VISSS file format version: 0.3"<< "\n";
     fMeta_ << "# VISSS git tag: " << GIT_TAG
           <<  "\n";
     fMeta_ << "# VISSS git branch: " << GIT_BRANCH
           <<  "\n";
-
     fMeta_ << "# Camera start time: " << ctime_no_newline << ' '
             << fractional_seconds  << "\n";
     fMeta_ << "# us since epoche: " 
           << t_reset_uint_ << "\n";
-    
     fMeta_ << "# Camera serial number: "
           << DeviceIDMeta << "\n";
-                            
-
-    std::cout << "TODO | " << get_timestamp() << " | CHANGE Camera configuration to name!!!"<< std::endl;
     fMeta_ << "# Camera configuration: "
           <<  name<< "\n";
-
     fMeta_ << "# Hostname: "
           <<  hostname<< "\n";
      
@@ -133,8 +129,6 @@ void storage_worker_cv::add_meta_data()
         fMeta_ << ", " << std::to_string((int)range[ll]);
     }
     fMeta_ << "\n";
- 
-
     return;
 
 }
@@ -146,8 +140,8 @@ void storage_worker_cv::open_files()
 
     std::cout << std::flush;
     if (storeVideo) {
-        writer_.open(filename_+".mov", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
-        std::cout << "INFO | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
+        writer_.open(filename_ + ".mov", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
+        std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
     }
     //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=veryfast mb-tree=true me=dia analyse=i8x8 rc-lookahead=20 subme=1 ! queue ! qtmux !  filesink location=video-h264_lookahead20.mov",
     //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=superfast rc-lookahead=80 subme=2 ! queue ! qtmux !  filesink location=video-h264_lookahead80a_subme2.mov",
@@ -159,7 +153,7 @@ void storage_worker_cv::open_files()
         // Open the text file.
         fMeta_.open(filename_+".txt");
         add_meta_data();
-        std::cout << "INFO | " << get_timestamp() << " | Opened "<< filename_+".txt"<< std::endl;
+        std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | Opened "<< filename_+".txt"<< std::endl;
     }
 
     return;
@@ -174,7 +168,7 @@ void storage_worker_cv::close_files() {
             create_symlink(filename_+".mov",  filename_latest_+".mov");
         } else if (storeVideo) {
             std::remove((filename_+".mov").c_str());
-            std::cout << std::endl << "INFO | " << get_timestamp() << " | Empty file removed: " << filename_<<".mov" <<std::endl;
+            std::cout << std::endl << "INFO-" << id_ << " | " << get_timestamp() << " | Empty file removed: " << filename_<<".mov" <<std::endl;
         }
     }
     //std::cout << std::endl << "STATUS | " << get_timestamp() << " | All files closed. "<<std::endl;
@@ -199,16 +193,16 @@ void storage_worker_cv::create_filename() {
 
     if (name != "DRYRUN") {
         full_path = path_ + "/" + hostname + "_" + name + "_" + DeviceID + "/data/" + timestamp1 + "/" ;
-        filename_ = full_path + hostname + "_" + name + "_" + DeviceID  + "_" + timestamp2;
+        filename_ = full_path + hostname + "_" + name + "_" + DeviceID  + "_" + timestamp2 + "_" + std::to_string(id_);
     } else {
         full_path = path_  + "/" ;
-        filename_ = full_path + DeviceIDMeta+ "_DRYRUN";
+        filename_ = full_path + DeviceIDMeta+ "_DRYRUN" + "_" + std::to_string(id_);
     }
-    filename_latest_ = path_ + "/" + hostname + "_" + name + "_" + DeviceID + "_latest" ;
+    filename_latest_ = path_ + "/" + hostname + "_" + name + "_" + DeviceID + "_latest" + "_" + std::to_string(id_) ;
 
     res = mkdir_p(full_path.c_str());
     if (res != 0) {
-        std::cerr << "FATAL ERROR | " << get_timestamp() << " | Cannot create path "<< full_path.c_str() <<std::endl;
+        std::cerr << "FATAL ERROR"<< id_ << " | " << get_timestamp() << " | Cannot create path "<< full_path.c_str() <<std::endl;
         global_error = true;
     }
 
@@ -263,22 +257,33 @@ void storage_worker_cv::run()
     int tt = 0;
     cv::Scalar borderColor;
     
+        // std::cout << "INFO-"<< id_ << " | " << get_timestamp() << " | Thread Running!" << std::endl;
+        // std::cout << "INFO-"<< id_ << " path " << path_ << std::endl;
+        // std::cout << "INFO-"<< id_ << " fourcc " << fourcc_ << std::endl;
+        // std::cout << "INFO-"<< id_ << " fps " << fps_ << std::endl;
+        // std::cout << "INFO-"<< id_ << " frame_size " << frame_size_ << std::endl;
+        // std::cout << "INFO-"<< id_ << " is_color " << is_color_ << std::endl;
+        // std::cout << "INFO-"<< id_ << " live_window_frame_ratio " << live_window_frame_ratio_ << std::endl;
+
     if (name != "DRYRUN") {
         t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
     } else {
         t_reset_uint_ = 0;
-
     }
 
-    if (showPreview) {
-        cv::namedWindow( "VISSS Live Image", cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
+    // std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | A" << std::endl;
+    if ((id_ == 0) && showPreview) {
+        cv::namedWindow( "VISSS Live Image "+std::to_string(id_), cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
     }
-
+    // std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | B" << std::endl;
 
     try {
         int32_t frame_count(0);
         for (;;) {
+            // std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | Waiting to pop" << std::endl;
+
             MatMeta image(queue_.pop());
+            // std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | popped" << std::endl;
             if (!image.MatImage.empty()) {
                 high_resolution_clock::time_point t1(high_resolution_clock::now());
                 
@@ -318,7 +323,7 @@ void storage_worker_cv::run()
 //std::cout << "TEST | " ;
                 movingPixel = false;
                 tt = 1;
-                for (int ll = 0; ll < nPixelA.size(); ll++) {
+                for (uint ll = 0; ll < nPixelA.size(); ll++) {
                     movingPixels[ll] = false;
                     movingPixelThreshold = minMovingPixel/tt;
                     if (movingPixelThreshold < 2) {
@@ -375,6 +380,8 @@ void storage_worker_cv::run()
                         textImg = textImg + "NOT RECORDING";
                      }
 
+                 textImg = textImg+ " | " + std::to_string(id_);
+
                 cv::copyMakeBorder(image.MatImage, imgWithMeta, frameborder, 0, 0, 0, cv::BORDER_CONSTANT, borderColor );
                 
 
@@ -400,7 +407,7 @@ void storage_worker_cv::run()
                         cv::imwrite(filename_+".jpg", imgWithMeta );
                         create_symlink(filename_+".jpg",  filename_latest_+".jpg");
                         std::cout ;
-                        std::cout << "INFO | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
+                        std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
                         }
 
                     frame_count_new_file = frame_count;
@@ -432,7 +439,7 @@ void storage_worker_cv::run()
                 }
                 if (frame_count % (int)fps_ == 0) {
 
-                    message =  "STATUS | " + get_timestamp() + 
+                    message =  "STATUS" + std::to_string(id_) +" | " + get_timestamp() + 
                     " | Queue:" + std::to_string(queue_.size()) +" | ID:" + 
                     std::to_string(image.id) +  " | M: ";
                     for (int jj = histSize; jj --> 0; )
@@ -446,11 +453,11 @@ void storage_worker_cv::run()
                     std::cout << message<<std::endl;
 
                 }    
-                if ( showPreview && (frame_count % live_window_frame_ratio_ == 0))
+                if ( (id_ == 0) && showPreview && (frame_count % live_window_frame_ratio_ == 0))
                 {
                     
                     cv::resize(imgWithMeta, imgSmall, cv::Size(), 0.5, 0.5);
-                    cv::imshow( "VISSS Live Image", imgSmall );
+                    cv::imshow( "VISSS Live Image "+std::to_string(id_), imgSmall );
                     cv::waitKey(1);
                     }
  
@@ -477,7 +484,7 @@ void storage_worker_cv::run()
         }
     } catch (frame_queue::cancelled& /*e*/) {
         // Nothing more to process, we're done
-        std::cout << "INFO | " << get_timestamp() << " | Storage queue " << id_ << " cancelled, storage worker finished. Closing files." << std::endl;
+        std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | Storage queue " << id_ << " cancelled, storage worker finished. Closing files." << std::endl;
         close_files();
     }
 }

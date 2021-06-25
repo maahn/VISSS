@@ -44,6 +44,15 @@ while [ $# -gt 0 ]; do
     --SITE=*)
       SITE="${1#*=}"
       ;;
+    --FPS=*)
+      FPS="${1#*=}"
+      ;;
+    --NTHREADS=*)
+      NTHREADS="${1#*=}"
+      ;;
+    --STOREALLFRAMES=*)
+      STOREALLFRAMES="${1#*=}"
+      ;;
     --SETTINGS=*)
       SETTINGS="${1#*=}"
       ;;
@@ -113,7 +122,7 @@ for (( ; ; ))
 do
 
 	timestamp=$(/bin/date +%FT%T)
-	COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR -n=$NAME -s=$SITE $CAMERACONFIG $IP| /usr/bin/tee $OUTDIR/logs/$NAME-$timestamp.txt"
+	COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -s=$SITE -w=$STOREALLFRAMES $CAMERACONFIG $IP| /usr/bin/tee $OUTDIR/logs/$NAME-$timestamp.txt"
 	echo $COMMAND
 	if $COMMAND
 			then

@@ -92,11 +92,13 @@ class DisplaySubprocessOutputDemo:
 
         self.configFName = '/tmp/visss_%s.config'%(''.join(random.choice(string.ascii_lowercase) for i in range(16)))
 
-
         self.command = (f"/usr/bin/env bash {ROOTPATH}/launch_visss_data_acquisition.sh "
             f"--IP={cameraConfig['ip']} --MAC={cameraConfig['mac']} --INTERFACE={cameraConfig['interface']} --MAXMTU={configuration['maxmtu']} "
             f"--PRESET={configuration['preset']} --QUALITY={configuration['quality']} --CAMERACONFIG={self.configFName} "
-            f"--ROOTPATH={ROOTPATH} --OUTDIR={configuration['outdir']} --SITE={configuration['site']} --NAME={cameraConfig['name']}" )
+            f"--ROOTPATH={ROOTPATH} --OUTDIR={configuration['outdir']} --SITE={configuration['site']} --NAME={cameraConfig['name']} " 
+            f"--FPS={configuration['fps']} --NTHREADS={configuration['storagethreads']} --STOREALLFRAMES={configuration['storeallframes']}" 
+
+            )
 
         print(self.command)
 
@@ -126,9 +128,8 @@ class DisplaySubprocessOutputDemo:
         
 
         self.carReturn = False
-        if configuration['autostart']:
+        if configuration['autostart'] in ['true', 'True', 1]:
             self.clickStartStop()
-
 
 
     def witeParamFile(self):
@@ -290,6 +291,13 @@ status = ttk.Label(config, text=settings['configFile'])
 status.pack(side = tk.LEFT, pady=6, padx=(6,0))
 
 configuration = read_settings(settings['configFile'])
+print(111, configuration['storeallframes'])
+if configuration['storeallframes'] in ['true', 'True', 1]:
+    configuration['storeallframes'] = 1
+elif configuration['storeallframes'] in ['false', 'False', 0]:
+    configuration['storeallframes'] = 0
+else:
+    sys.exit('storeallframes: %s'%configuration['storeallframes'])
 
 
 

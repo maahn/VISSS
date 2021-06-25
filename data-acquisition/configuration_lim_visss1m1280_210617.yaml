@@ -1,9 +1,12 @@
-autostart: false
+autostart: True
 maxmtu: '9216'
 outdir: /data/lim
 preset: ultrafast
 quality: 17
 site: LIM
+storagethreads: 2
+fps: 140
+storeallframes: False
 camera:
 - name: visss_trigger
   interface: enp35s0f0
