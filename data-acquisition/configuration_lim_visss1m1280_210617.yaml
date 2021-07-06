@@ -1,10 +1,9 @@
-autostart: True
 maxmtu: '9216'
 outdir: /data/lim
 preset: ultrafast
 quality: 17
 site: LIM
-storagethreads: 2
+storagethreads: 1
 fps: 140
 storeallframes: False
 camera:
@@ -48,3 +47,11 @@ camera:
     TriggerMode: On
     TriggerSource: Line1
     sensorFpnCorrectionMode: Off
+externalTrigger:
+- name: MiRAC
+  address: http://localhost:8123/
+  interval: 10
+  threshold: 0
+  minMax: min
+  stopOnTimeout: True
+  nBuffer: 5

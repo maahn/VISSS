@@ -1,4 +1,3 @@
-autostart: True
 camera:
 - name: visss_trigger
   interface: enp35s0f0
@@ -32,3 +31,11 @@ site: LIM
 storagethreads: 1
 fps: 140
 storeallframes: False
+externalTrigger:
+- name: MiRAC
+  address: http://localhost:8123/
+  interval: 60
+  threshold: 0
+  minMax: min
+  stopOnTimeout: True
+  nBuffer: 5
