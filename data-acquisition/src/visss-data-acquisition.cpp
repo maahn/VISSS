@@ -269,24 +269,23 @@ void *ImageCaptureThread( void *context)
                         std::cout << std::endl << "ERROR | " << get_timestamp() << " | missed frames between " << last_id << " and " << img->id << std::endl;
                     }
 
+                    // status = GevSetFeatureValueAsString(captureContext->camHandle, "timestampControlReset", "1");
+                    // std::cout << "TRESET: "<<status << std::endl;
 
                     // UINT32 TotalBuffers ;
                     // UINT32 NumUsed ;
                     // UINT32 NumFree;
                     // UINT32 NumTrashed;
                     // GevBufferCyclingMode Mode;
-                    UINT32 pTotalBuffers  ;
-                    UINT32 pNumUsed  ;
-                    UINT32 pNumFree  ;
-                    UINT32 pNumTrashed;  
-                    GevBufferCyclingMode *pMode ;
-
-
-                    status = GevQueryTransferStatus (captureContext->camHandle,
-                    &pTotalBuffers, &pNumUsed,
-                    &pNumFree, &pNumTrashed,
-                     pMode);
-
+                    // UINT32 pTotalBuffers  ;
+                    // UINT32 pNumUsed  ;
+                    // UINT32 pNumFree  ;
+                    // UINT32 pNumTrashed;  
+                    // GevBufferCyclingMode *pMode ;
+                    // status = GevQueryTransferStatus (captureContext->camHandle,
+                    // &pTotalBuffers, &pNumUsed,
+                    // &pNumFree, &pNumTrashed,
+                    //  pMode);
 // if (pNumUsed>0) {
 //                     printf("%d ",pTotalBuffers);
 //                     printf("%d ",pNumUsed);

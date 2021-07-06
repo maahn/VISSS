@@ -198,7 +198,7 @@ void storage_worker_cv::create_filename() {
         full_path = path_  + "/" ;
         filename_ = full_path + DeviceIDMeta+ "_DRYRUN" + "_" + std::to_string(id_);
     }
-    filename_latest_ = path_ + "/" + hostname + "_" + name + "_" + DeviceID + "_latest" + "_" + std::to_string(id_) ;
+    filename_latest_ = path_ + "/" + name  + "_latest" + "_" + std::to_string(id_) ;
 
     res = mkdir_p(full_path.c_str());
     if (res != 0) {
@@ -273,7 +273,7 @@ void storage_worker_cv::run()
 
     // std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | A" << std::endl;
     if ((id_ == 0) && showPreview) {
-        cv::namedWindow( "VISSS Live Image "+std::to_string(id_), cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
+        cv::namedWindow( "VISSS Live Image | "+ name +" | "+std::to_string(id_), cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
     }
     // std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | B" << std::endl;
 
@@ -457,7 +457,7 @@ void storage_worker_cv::run()
                 {
                     
                     cv::resize(imgWithMeta, imgSmall, cv::Size(), 0.5, 0.5);
-                    cv::imshow( "VISSS Live Image "+std::to_string(id_), imgSmall );
+                    cv::imshow( "VISSS Live Image | "+ name +" | "+std::to_string(id_), imgSmall );
                     cv::waitKey(1);
                     }
  
