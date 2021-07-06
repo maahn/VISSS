@@ -61,7 +61,6 @@ typedef struct tagMY_CONTEXT
     double                     fps;
     std::string                  quality;
     std::string                  preset;
-    std::chrono::time_point<std::chrono::system_clock> t_reset;
     bool              exit;
 } MY_CONTEXT, *PMY_CONTEXT;
 
@@ -166,7 +165,7 @@ void *ImageCaptureThread( void *context)
                                 , isColor
                                 //, captureContext->quality
                                 //, captureContext->preset
-                                , captureContext->t_reset
+                                // , captureContext->t_reset
                                 , captureContext->live_window_frame_ratio
                                 );
                             //std:: cout << "STATUS | " << get_timestamp() << "| storage worker started" << std::endl;
@@ -440,7 +439,7 @@ MY_CONTEXT context ;
     context.csvFile= videoFileIn.substr(0,videoFileIn.find_last_of('.'))+".txt";
 
 
-                context.t_reset = std::chrono::system_clock::now();
+                t_reset = std::chrono::system_clock::now();
 
 
                         // Create a thread to receive images from the API and save them

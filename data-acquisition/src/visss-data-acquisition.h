@@ -66,6 +66,7 @@ bool storeVideo = true;
 bool storeMeta = true;
 bool showPreview = true;
 int nStorageThreads = 1;
+std::chrono::time_point<std::chrono::system_clock> t_reset;
 
 //histogram
 float range[] = {20,30,40,60,80,100,120, 256  }; //the upper boundary is exclusive
@@ -78,6 +79,7 @@ struct MatMeta {
   cv::Mat MatImage;
   unsigned long timestamp;
   unsigned long id;
+  bool newFile;
 }; 
 
 std::string get_timestamp(){
@@ -104,7 +106,7 @@ std::string get_timestamp(){
   //t_string = t_string + '.' + std::string(n_zero - millisec_str.length(), '0') + millisec_str;
   t_string = t_string + '.' + millisec_str;
 
-    return t_string;
+  return t_string;
    
 }
 

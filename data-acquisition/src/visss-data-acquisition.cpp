@@ -72,7 +72,6 @@ typedef struct tagMY_CONTEXT
     double                     fps;
     std::string                  quality;
     std::string                  preset;
-    std::chrono::time_point<std::chrono::system_clock> t_reset;
     bool              exit;
 } MY_CONTEXT, *PMY_CONTEXT;
 
@@ -213,6 +212,12 @@ void *ImageCaptureThread( void *context)
 {
     MY_CONTEXT *captureContext = (MY_CONTEXT *)context;
     bool was_active = false;
+    bool reset_clock = true;
+    bool first_image = true;
+    long int timeNow = 0;
+    long int framesInFile = 0;
+   GEV_STATUS status = 0;
+    GEV_STATUS statusF = 0;
 
     if (captureContext != NULL)
     {
@@ -251,9 +256,28 @@ void *ImageCaptureThread( void *context)
         // While we are still running.
         while(!captureContext->exit)
         {
+            timeNow = static_cast<long int> (time(NULL));
+            reset_clock  = (
+                (new_file_interval > 0) && 
+                (timeNow % new_file_interval == 0) && 
+                (framesInFile > (captureContext->fps * 2))
+                ) ;
+
+            if (reset_clock || first_image) { 
+                t_reset = std::chrono::system_clock::now();
+                statusF = GevSetFeatureValueAsString(captureContext->camHandle, "timestampControlReset", "1");
+                if (statusF == GEVLIB_OK) {
+                    std::cout << std::endl << "INFO | " << get_timestamp() << " | Did reset clock" << std::endl;
+                } else {
+                    std::cout << std::endl << "ERROR | " << get_timestamp() << " | Unable to reset clock" << std::endl;
+                }
+                first_image = false;
+                framesInFile = 0;
+            }
+
+
             GEV_BUFFER_OBJECT *img = NULL;
             GEV_STATUS status = 0;
-
             // Wait for images to be received
             status = GevWaitForNextImage(captureContext->camHandle, &img, 2000);
 
@@ -269,8 +293,6 @@ void *ImageCaptureThread( void *context)
                         std::cout << std::endl << "ERROR | " << get_timestamp() << " | missed frames between " << last_id << " and " << img->id << std::endl;
                     }
 
-                    // status = GevSetFeatureValueAsString(captureContext->camHandle, "timestampControlReset", "1");
-                    // std::cout << "TRESET: "<<status << std::endl;
 
                     // UINT32 TotalBuffers ;
                     // UINT32 NumUsed ;
@@ -322,7 +344,6 @@ void *ImageCaptureThread( void *context)
                                     , captureContext->fps
                                     , imgSize
                                     , isColor
-                                    , captureContext->t_reset
                                     , captureContext->live_window_frame_ratio
                                     );
                             }
@@ -344,6 +365,12 @@ void *ImageCaptureThread( void *context)
                         exportImgMeta.timestamp = img->timestamp;
                         exportImgMeta.id = img->id;
 
+                        // we need new files in every thread
+                        if (framesInFile < nStorageThreads) {
+                            exportImgMeta.newFile = true; 
+                        } else {
+                            exportImgMeta.newFile = false; 
+                        }
                         tt = exportImgMeta.id % nStorageThreads; 
  // std::cout << "INFOmain 5: "<< tt <<" "<< exportImgMeta.id << " "<< nStorageThreads << std::endl;
 
@@ -362,9 +389,8 @@ void *ImageCaptureThread( void *context)
 
 
                         ++frame_count;
-
                         sequence_count++;
-
+                        framesInFile++;
                         //rest n_timeout after success
                         n_timeouts = 0;
 
@@ -828,48 +854,47 @@ int main(int argc, char *argv[])
                     printf("Error restoring feature %s : with value %s\n", feature_name, value_str);
                 }
             }
+            std::cout << "**************************************************************************" << std::endl;
 
 
 
-char feature_name2[] = "timestampControlReset";
-char value_str2[] = "1";
-// status = 0;
-// Find node and write the feature string (without validation).
-GenApi::CNodePtr pNode = Camera._GetNode(feature_name2);
-if (pNode)
-{
-GenApi ::CValuePtr valNode(pNode);  
-try {
-valNode->FromString(value_str2, false);
-}
-// Catch all possible exceptions from a node access.
-CATCH_GENAPI_ERROR(status);
-if (status != 0)
-{
-error_count++;
-printf("Error restoring feature %s : with value %s\n", feature_name, value_str); 
-}
-else
-{
-feature_count++;
-}
-}
-else
-{
-error_count++;
-printf("Error restoring feature %s : with value %s\n", feature_name2, value_str2);
-}
-
-std::cout << "**************************************************************************" << std::endl;
+// char feature_name2[] = "timestampControlReset";
+// char value_str2[] = "1";
+// // status = 0;
+// // Find node and write the feature string (without validation).
+// GenApi::CNodePtr pNode = Camera._GetNode(feature_name2);
+// if (pNode)
+// {
+// GenApi ::CValuePtr valNode(pNode);  
+// try {
+// valNode->FromString(value_str2, false);
+// }
+// // Catch all possible exceptions from a node access.
+// CATCH_GENAPI_ERROR(status);
+// if (status != 0)
+// {
+// error_count++;
+// printf("Error restoring feature %s : with value %s\n", feature_name, value_str); 
+// }
+// else
+// {
+// feature_count++;
+// }
+// }
+// else
+// {
+// error_count++;
+// printf("Error restoring feature %s : with value %s\n", feature_name2, value_str2);
+// }
 
 
+// context.t_reset = std::chrono::system_clock::now();
 
-context.t_reset = std::chrono::system_clock::now();
+// std::cout << "INFO | " << get_timestamp() << "| Camera clock reset around " << context.t_reset.time_since_epoch().count()/1000  << std::endl;
 
-std::cout << "INFO | " << get_timestamp() << "| Camera clock reset around " << context.t_reset.time_since_epoch().count()/1000  << std::endl;
-
-GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
-DeviceIDMeta += DeviceID;
+        // get device ID
+        GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID), &DeviceID);
+        DeviceIDMeta += DeviceID;
 
         }
         // End the "streaming feature mode".

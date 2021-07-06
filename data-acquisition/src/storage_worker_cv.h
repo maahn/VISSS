@@ -19,7 +19,7 @@ public:
         , bool is_color
 //        , double qualityƒ√
 //        , double preset
-        , std::chrono::time_point<std::chrono::system_clock> t_reset
+        // , std::chrono::time_point<std::chrono::system_clock> t_reset
         , int live_window_frame_ratio);
     void run();
 
@@ -41,7 +41,7 @@ private:
 //    double quality_;
 //    double preset_;
     double total_time_;
-    std::chrono::time_point<std::chrono::system_clock> t_reset_;
+    // std::chrono::time_point<std::chrono::system_clock> t_reset;
     int live_window_frame_ratio_;
     unsigned long t_reset_uint_;
     unsigned long t_record;
@@ -67,7 +67,7 @@ storage_worker_cv::storage_worker_cv(frame_queue& queue
     , bool is_color
 //    , double quality
 //    , double preset
-    , std::chrono::time_point<std::chrono::system_clock> t_reset
+    // , std::chrono::time_point<std::chrono::system_clock> t_reset
     , int live_window_frame_ratio)    :
       queue_(queue)
     , id_(id)
@@ -79,7 +79,6 @@ storage_worker_cv::storage_worker_cv(frame_queue& queue
     , total_time_(0.0)
 //    , quality_(quality)
 //    , preset_(preset)
-    , t_reset_(t_reset)
     , live_window_frame_ratio_(live_window_frame_ratio)
 {
      std::cout << "INFO-"<< id_ << " | " << get_timestamp() << " | Thread storage_worker_cv created!" << std::endl;
@@ -92,7 +91,7 @@ void storage_worker_cv::add_meta_data()
 {
 
 
-    std::chrono::milliseconds ms = duration_cast<std::chrono::milliseconds>(t_reset_.time_since_epoch());
+    std::chrono::milliseconds ms = duration_cast<std::chrono::milliseconds>(t_reset.time_since_epoch());
     std::chrono::seconds s = duration_cast<std::chrono::seconds>(ms);
     std::time_t t = s.count();
     std::size_t fractional_seconds = ms.count() % 1000;
@@ -237,7 +236,6 @@ void storage_worker_cv::run()
     result = nice(-25);
 
 
-    long int timestamp = 0;
     long int frame_count_new_file = 0;
     firstImage = true;
     std::string message;
@@ -265,11 +263,6 @@ void storage_worker_cv::run()
         // std::cout << "INFO-"<< id_ << " is_color " << is_color_ << std::endl;
         // std::cout << "INFO-"<< id_ << " live_window_frame_ratio " << live_window_frame_ratio_ << std::endl;
 
-    if (name != "DRYRUN") {
-        t_reset_uint_ = t_reset_.time_since_epoch().count()/1000;
-    } else {
-        t_reset_uint_ = 0;
-    }
 
     // std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | A" << std::endl;
     if ((id_ == 0) && showPreview) {
@@ -294,8 +287,6 @@ void storage_worker_cv::run()
                 // printf("image.MatImage: %s %dx%d \n", ty.c_str(), image.MatImage.cols, image.MatImage.rows );
 
 
-                timestamp = static_cast<long int> (time(NULL));
-                bool newFile = ((new_file_interval > 0) && (timestamp % new_file_interval == 0) && (frame_count-frame_count_new_file > 300));
 
                 if (firstImage)  { 
                     imgOld = image.MatImage * 0;
@@ -397,8 +388,15 @@ void storage_worker_cv::run()
 
 
 
-                if (firstImage || newFile)
+                if (firstImage || image.newFile)
                 {
+
+                    if (name != "DRYRUN") {
+                        t_reset_uint_ = t_reset.time_since_epoch().count()/1000;
+                    } else {
+                        t_reset_uint_ = 0;
+                    }
+
 
                     close_files();
                     open_files();
@@ -453,7 +451,7 @@ void storage_worker_cv::run()
                     std::cout << message<<std::endl;
 
                 }    
-                if ( (id_ == 0) && showPreview && (frame_count % live_window_frame_ratio_ == 0))
+                if ( (id_ == 0) && showPreview && (frame_count % (live_window_frame_ratio_ / nStorageThreads) == 0))
                 {
                     
                     cv::resize(imgWithMeta, imgSmall, cv::Size(), 0.5, 0.5);
