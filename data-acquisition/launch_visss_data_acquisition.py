@@ -89,7 +89,7 @@ def read_settings(fname):
                 elif settings[k] in ['false', 'False', 0]:
                     settings[k] = False
                 else:
-                    sys.exit('%s: %s' % (k, settings[k]))
+                    raise ValueError('%s: %s' % (k, settings[k]))
 
     print('READ:', settings)
     return settings
@@ -209,7 +209,7 @@ class DisplaySubprocessOutputDemo:
                 else:
                     pass
             else:
-                sys.exit('do not understand %s' % list(map(list, externalTriggerStatus)))
+                raise ValueError('do not understand %s' % list(map(list, externalTriggerStatus)))
             self.startStopButton.state(["disabled"])
         else:
             self.startStopButton.state(["!disabled"])
@@ -248,6 +248,14 @@ class DisplaySubprocessOutputDemo:
 
     def update(self, q):
         """Update GUI with items from the queue."""
+
+        #cut very long text
+        text = self.text.get("1.0",tk.END)
+        if len(text) > 50000:
+            self.text.delete("1.0", tk.END)
+            self.text.insert(tk.END, text[-5000:])
+            self.text.see("end")
+
         for line in iter_except(q.get_nowait, Empty):  # display all content
             if line is None:
                 self.quit()
@@ -395,14 +403,14 @@ def queryExternalTrigger(
     elif minMax == 'min':
         oper = operator.le
     else:
-        sys.exit('minMax must be min or max')
+        raise ValueError('minMax must be min or max')
 
     if stopOnTimeout in ['true', 'True', 1]:
         stopOnTimeout = True
     elif stopOnTimeout in ['false', 'False', 0]:
         stopOnTimeout = False
     else:
-        sys.exit('stopOnTimeout: %s' % stopOnTimeout)
+        raise ValueError('stopOnTimeout: %s' % stopOnTimeout)
 
     now = np.datetime64('now')
     try:
