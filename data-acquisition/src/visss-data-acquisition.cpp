@@ -481,6 +481,11 @@ void *ImageCaptureThread( void *context)
                 q.cancel();
             }
 
+            std::cout << "INFO"  << " | " << get_timestamp() 
+                << " | Completed storage " << frame_count << " image, "
+                << "  average capture time = " << (total_read_time / frame_count) << " ms\n";
+
+
             // And join all the worker threads, waiting for them to finish
             for (int ss=0; ss<nStorageThreads; ++ss) {
                 storage_thread[ss].join();
@@ -495,8 +500,7 @@ void *ImageCaptureThread( void *context)
                 // double total_write_time_b(storage[1].total_time_ms());
 
                 std::cout << "INFO" << ss << " | " << get_timestamp() 
-                    << " | Completed storage " << frame_count << " images:\n"
-                    << "  average capture time = " << (total_read_time / frame_count) << " ms\n"
+                    << " | Completed thread " << frame_count/nStorageThreads << " images:\n"
                     << "  average storage time = " << (total_storage_time / frame_count) << " ms\n"
                     //<< "  average write time A = " << (total_write_time_a / frame_count) << " ms\n"
                     ;

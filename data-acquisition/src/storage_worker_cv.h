@@ -100,11 +100,10 @@ void storage_worker_cv::add_meta_data()
 
     //0.2 with mean and standard deviation
     //0.3 with number of changing pixels
+    //0.4 with queue length and thread number
 
-//TODO 0.4: thread number, all settings??
 
-
-    fMeta_ << "# VISSS file format version: 0.3"<< "\n";
+    fMeta_ << "# VISSS file format version: 0.4"<< "\n";
     fMeta_ << "# VISSS git tag: " << GIT_TAG
           <<  "\n";
     fMeta_ << "# VISSS git branch: " << GIT_BRANCH
@@ -119,9 +118,10 @@ void storage_worker_cv::add_meta_data()
           <<  name<< "\n";
     fMeta_ << "# Hostname: "
           <<  hostname<< "\n";
-     
-    fMeta_ << "# Capture time, Record time, Frame id";
-
+    fMeta_ << "# Storage Thread: "
+          <<  std::to_string(id_)<< "\n";
+    
+    fMeta_ << "# Capture time, Record time, Frame id, Queue length";
 
     for(int ll = 0; ll < histSize; ll++) 
     {
@@ -180,14 +180,23 @@ void storage_worker_cv::close_files() {
 void storage_worker_cv::create_filename() {
 
     std::string full_path;
-    time_t t = time(0);   // get time now
-    struct tm * now = localtime( & t );
     int res = 0;
+
+    // time_t t = time(0);   // get time now
+    // struct tm * now = localtime( & t );
+    // char timestamp1 [80];
+    // strftime (timestamp1,80,"%Y/%m/%d",now);
+    // char timestamp2 [80];
+    // strftime (timestamp2,80,"%Y%m%d-%H%M%S",now);
+
+    std::chrono::milliseconds ms = duration_cast<std::chrono::milliseconds>(t_reset.time_since_epoch());
+    std::chrono::seconds s = duration_cast<std::chrono::seconds>(ms);
+    std::time_t t = s.count();
+    struct tm * now = localtime( & t );
     char timestamp1 [80];
     strftime (timestamp1,80,"%Y/%m/%d",now);
     char timestamp2 [80];
     strftime (timestamp2,80,"%Y%m%d-%H%M%S",now);
-
 
 
     if (name != "DRYRUN") {
@@ -423,8 +432,8 @@ void storage_worker_cv::run()
                         if (storeMeta) {
                             message = std::to_string(image.timestamp +t_reset_uint_)
                                 + ", " + std::to_string(t_record)
-                                + ", " + std::to_string(image.id) ;
-
+                                + ", " + std::to_string(image.id) 
+                                + ", " + std::to_string(queue_.size()) ;
                             for(int kk = 0; kk < histSize; kk++) 
                             {
                                 message = message + ", " + std::to_string((int)nPixelA[kk]);
