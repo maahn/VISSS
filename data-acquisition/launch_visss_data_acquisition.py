@@ -11,34 +11,31 @@ https://stackoverflow.com/questions/60949451/how-to-send-a-cvmat-to-python-over-
 https://stackoverflow.com/questions/60966568/example-of-ipc-between-two-process-with-opencv-cvmat-object-c-as-server-an
 
 """
-import sys
-import os
-import signal
-import operator
 import collections
+import json
+import logging
+import operator
+import os
+import random
+import signal
+import string
+import sys
+import time
+import tkinter as tk
+import urllib.request
+from copy import deepcopy
 from itertools import islice
-from subprocess import Popen, PIPE, STDOUT
+from pathlib import Path
+from queue import Empty, Queue
+from socket import timeout
+from subprocess import PIPE, STDOUT, Popen
 from textwrap import dedent
 from threading import Thread
-import yaml
-from pathlib import Path
-from copy import deepcopy
-import time
-import random
-import string
-import urllib.request
+from tkinter import filedialog, messagebox, ttk
 from urllib.error import HTTPError, URLError
-from socket import timeout
-import json
+
 import numpy as np
-
-import tkinter as tk  # Python 3
-from tkinter import ttk, filedialog, messagebox
-
-
-from queue import Queue, Empty  # Python 3
-
-# make sure on stays on and off stays off
+import yaml
 from yaml.constructor import SafeConstructor
 
 
@@ -106,6 +103,7 @@ DEFAULTSETTINGS = {
     'autopilot': False,
 }
 triggerIntervalFactor = 2  # data can be factor 2 older than interval
+
 
 class DisplaySubprocessOutputDemo:
     def __init__(self, root, mainframe, cameraConfig, configuration):
@@ -195,20 +193,23 @@ class DisplaySubprocessOutputDemo:
             if np.any(externalTriggerStatus):
                 if self.running.get().startswith('idle'):
                     self.start(self.command.split(' '))
-                    line = 'EXTERNAL TRIGGER START: %s \n' % list(map(list, externalTriggerStatus))
+                    line = 'EXTERNAL TRIGGER START: %s \n' % list(
+                        map(list, externalTriggerStatus))
                     self.text.insert(tk.END, line)
                 else:
                     pass
             elif (~np.any(externalTriggerStatus)):
                 if self.running.get().startswith('running'):
                     self.quit()
-                    line = 'EXTERNAL TRIGGER STOP: %s \n' % list(map(list, externalTriggerStatus))
+                    line = 'EXTERNAL TRIGGER STOP: %s \n' % list(
+                        map(list, externalTriggerStatus))
                     self.text.insert(tk.END, line)
                     self.text.see("end")
                 else:
                     pass
             else:
-                raise ValueError('do not understand %s' % list(map(list, externalTriggerStatus)))
+                raise ValueError('do not understand %s' %
+                                 list(map(list, externalTriggerStatus)))
             self.startStopButton.state(["disabled"])
         else:
             self.startStopButton.state(["!disabled"])
@@ -248,8 +249,8 @@ class DisplaySubprocessOutputDemo:
     def update(self, q):
         """Update GUI with items from the queue."""
 
-        #cut very long text
-        text = self.text.get("1.0",tk.END)
+        # cut very long text
+        text = self.text.get("1.0", tk.END)
         if len(text) > 50000:
             self.text.delete("1.0", tk.END)
             self.text.insert(tk.END, text[-5000:])
@@ -397,11 +398,11 @@ def queryExternalTrigger(
         nBuffer,
     ))  # schedule next update
 
-    #default values
+    # default values
     data = {
-        'unit' : '',
-        'measurement' : np.nan,
-        'timestamp':np.datetime64('now'),
+        'unit': '',
+        'measurement': np.nan,
+        'timestamp': np.datetime64('now'),
     }
 
     if minMax == 'min':
