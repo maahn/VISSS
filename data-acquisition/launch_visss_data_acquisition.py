@@ -107,7 +107,6 @@ DEFAULTSETTINGS = {
 }
 triggerIntervalFactor = 2  # data can be factor 2 older than interval
 
-
 class DisplaySubprocessOutputDemo:
     def __init__(self, root, mainframe, cameraConfig, configuration):
         self.root = root
@@ -397,6 +396,13 @@ def queryExternalTrigger(
         stopOnTimeout,
         nBuffer,
     ))  # schedule next update
+
+    #default values
+    data = {
+        'unit' : '',
+        'measurement' : np.nan,
+        'timestamp':np.datetime64('now'),
+    }
 
     if minMax == 'min':
         oper = operator.ge
