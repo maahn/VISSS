@@ -1,5 +1,5 @@
 
-CC= gcc
+CC= g++
 # IROOT directory based on installed distribution tree (not archive/development tree). 
 # IROOT=../..
 IROOT=/usr/dalsa/GigeV
@@ -39,7 +39,7 @@ DEBUGFLAGS = -O2
 #
 include src/commondefs.mk
 
-CXX_COMPILE_OPTIONS = -c $(DEBUGFLAGS) -std=c++11 -DPOSIX_HOSTPC -D_REENTRANT -fno-for-scope \
+CXX_COMPILE_OPTIONS = -c $(DEBUGFLAGS) -std=c++2a -DPOSIX_HOSTPC -D_REENTRANT -fno-for-scope \
 			-Wall -Wno-parentheses -Wno-missing-braces -Wno-unused-but-set-variable \
 			-Wno-unknown-pragmas -Wno-cast-qual -Wno-unused-function -Wno-unused-label -DGIT_BRANCH=$(gitBranch) \
 			-DGIT_TAG=$(gitTag) #-Og -g
@@ -77,14 +77,14 @@ install:
 
 
 $(EXE): $(OBJ_DIR)/visss-data-acquisition.o
-	$(CC) -g  $^ $(LCLLIBS) -L/usr/local/lib -lGevApi  -lCorW32  -lavcodec -lavutil $(openCV)  $(GENICAM_LIBS) -L$(ARCHLIBDIR) -lstdc++ -o $@
+	$(CC) -g $^ $(LCLLIBS) -L/usr/local/lib -lGevApi  -lCorW32  -lavcodec -lavutil $(openCV)  $(GENICAM_LIBS) -L$(ARCHLIBDIR) -lstdc++ -o $@
 	/usr/bin/sudo /sbin/setcap cap_sys_nice,cap_net_raw+ep $(EXE)
 
 $(OBJ_DIR)/visss-data-acquisition.o: $(SRC_DIR)/visss-data-acquisition.cpp
 	$(CC) -I. $(INC_PATH) $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -c $< -o $@
 
 $(EXE2): $(OBJ_DIR)/visss-data-acquisition-dryrun.o
-	$(CC) -g  $^ $(LCLLIBS) $(openCV) -lavcodec -lavutil  -lstdc++ -o $@
+	$(CC) -g $^ $(LCLLIBS) $(openCV) -lavcodec -lavutil  -lstdc++ -o $@
 
 $(OBJ_DIR)/visss-data-acquisition-dryrun.o: $(SRC_DIR)/visss-data-acquisition-dryrun.cpp
 	$(CC) -I. $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -c $< -o $@

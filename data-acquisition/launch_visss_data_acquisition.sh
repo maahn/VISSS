@@ -70,10 +70,10 @@ done
 if [ ! -z "$SETTINGS" ]; then   
   SETTINGS=$"$(dirname "$0")/$SETTINGS"
   if [ -f $SETTINGS ]; then
-    echo "Reading SETTINGS"
+    echo "BASH Reading SETTINGS"
     source "$SETTINGS"
   else
-    echo "SETTINGS $SETTINGS does not exist."
+    echo "BASH SETTINGS $SETTINGS does not exist."
     exit 1
   fi
 fi
@@ -86,7 +86,7 @@ if [ -z "$NAME" ]; then
   NAME="${CAMERACONFIG%.*}"
 fi
 if [ -z "$IP" ]
-	then echo "variable IP not set. EXIT"
+	then echo "BASH variable IP not set. EXIT"
 	exit
 fi
 
@@ -103,15 +103,15 @@ MTU=$(/bin/cat /sys/class/net/$INTERFACE/mtu)
 if [[ "$MTU" != "$MAXMTU" ]]
 then
 	/usr/bin/sudo /home/visss/DALSA/GigeV/bin/gev_nettweak $INTERFACE
-	/bin/echo "It takes some time for the camera to come online... Sleep 25"
+	/bin/echo "BASH It takes some time for the camera to come online... Sleep 25"
 	/bin/sleep 25
 fi
 
 if ping -c 1 $IP > /dev/null
 	then
-	echo 'camera repsonding'
+	echo 'BASH camera repsonding'
 else
-	/bin/echo "Set camera IP address (just to be sure)"
+	/bin/echo "BASH Set camera IP address (just to be sure)"
 	/usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0
 fi
 
@@ -123,13 +123,13 @@ do
 
 	timestamp=$(/bin/date +%FT%T)
 	COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -s=$SITE -w=$STOREALLFRAMES $CAMERACONFIG $IP| /usr/bin/tee $OUTDIR/logs/$NAME-$timestamp.txt"
-	echo $COMMAND
+	/bin/echo "BASH $COMMAND"
 	if $COMMAND
 			then
-				/bin/echo "worked"
+				/bin/echo "BASH worked"
 				exit
 	else
-		/bin/echo "Didn't work, trying again in 5s"
+		/bin/echo "BASH Didn't work, trying again in 5s"
 		/usr/bin/paplay /usr/share/sounds/ubuntu/stereo/dialog-question.ogg
 		/bin/sleep 5
 	fi

@@ -81,7 +81,7 @@ storage_worker_cv::storage_worker_cv(frame_queue& queue
 //    , preset_(preset)
     , live_window_frame_ratio_(live_window_frame_ratio)
 {
-     std::cout << "INFO-"<< id_ << " | " << get_timestamp() << " | Thread storage_worker_cv created!" << std::endl;
+     PrintThread{} << "INFO-"<< id_ << " | " << get_timestamp() << " | Thread storage_worker_cv created" << std::endl;
 
 }
 // // ----------------------------------------------------------------------------
@@ -100,10 +100,11 @@ void storage_worker_cv::add_meta_data()
 
     //0.2 with mean and standard deviation
     //0.3 with number of changing pixels
-    //0.4 with queue length and thread number
+
+//TODO 0.4: thread number, all settings??
 
 
-    fMeta_ << "# VISSS file format version: 0.4"<< "\n";
+    fMeta_ << "# VISSS file format version: 0.3"<< "\n";
     fMeta_ << "# VISSS git tag: " << GIT_TAG
           <<  "\n";
     fMeta_ << "# VISSS git branch: " << GIT_BRANCH
@@ -118,10 +119,9 @@ void storage_worker_cv::add_meta_data()
           <<  name<< "\n";
     fMeta_ << "# Hostname: "
           <<  hostname<< "\n";
-    fMeta_ << "# Storage Thread: "
-          <<  std::to_string(id_)<< "\n";
-    
-    fMeta_ << "# Capture time, Record time, Frame id, Queue length";
+     
+    fMeta_ << "# Capture time, Record time, Frame id";
+
 
     for(int ll = 0; ll < histSize; ll++) 
     {
@@ -137,10 +137,9 @@ void storage_worker_cv::open_files()
 {
     create_filename();
 
-    std::cout << std::flush;
     if (storeVideo) {
         writer_.open(filename_ + ".mov", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
-        std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
+        PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
     }
     //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=veryfast mb-tree=true me=dia analyse=i8x8 rc-lookahead=20 subme=1 ! queue ! qtmux !  filesink location=video-h264_lookahead20.mov",
     //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=superfast rc-lookahead=80 subme=2 ! queue ! qtmux !  filesink location=video-h264_lookahead80a_subme2.mov",
@@ -152,7 +151,7 @@ void storage_worker_cv::open_files()
         // Open the text file.
         fMeta_.open(filename_+".txt");
         add_meta_data();
-        std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | Opened "<< filename_+".txt"<< std::endl;
+        PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Opened "<< filename_+".txt"<< std::endl;
     }
 
     return;
@@ -164,13 +163,14 @@ void storage_worker_cv::close_files() {
         fMeta_.close();
         writer_.release();
         if (fileUsed) {
+            PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Written "<< filename_+".mov"<< std::endl;
             create_symlink(filename_+".mov",  filename_latest_+".mov");
         } else if (storeVideo) {
             std::remove((filename_+".mov").c_str());
-            std::cout << std::endl << "INFO-" << id_ << " | " << get_timestamp() << " | Empty file removed: " << filename_<<".mov" <<std::endl;
+            PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Empty file removed: " << filename_<<".mov" <<std::endl;
         }
     }
-    //std::cout << std::endl << "STATUS | " << get_timestamp() << " | All files closed. "<<std::endl;
+    //PrintThread{} << std::endl << "STATUS | " << get_timestamp() << " | All files closed. "<<std::endl;
 
     return;
 
@@ -180,23 +180,14 @@ void storage_worker_cv::close_files() {
 void storage_worker_cv::create_filename() {
 
     std::string full_path;
-    int res = 0;
-
-    // time_t t = time(0);   // get time now
-    // struct tm * now = localtime( & t );
-    // char timestamp1 [80];
-    // strftime (timestamp1,80,"%Y/%m/%d",now);
-    // char timestamp2 [80];
-    // strftime (timestamp2,80,"%Y%m%d-%H%M%S",now);
-
-    std::chrono::milliseconds ms = duration_cast<std::chrono::milliseconds>(t_reset.time_since_epoch());
-    std::chrono::seconds s = duration_cast<std::chrono::seconds>(ms);
-    std::time_t t = s.count();
+    time_t t = time(0);   // get time now
     struct tm * now = localtime( & t );
+    int res = 0;
     char timestamp1 [80];
     strftime (timestamp1,80,"%Y/%m/%d",now);
     char timestamp2 [80];
     strftime (timestamp2,80,"%Y%m%d-%H%M%S",now);
+
 
 
     if (name != "DRYRUN") {
@@ -264,38 +255,27 @@ void storage_worker_cv::run()
     int tt = 0;
     cv::Scalar borderColor;
     
-        // std::cout << "INFO-"<< id_ << " | " << get_timestamp() << " | Thread Running!" << std::endl;
-        // std::cout << "INFO-"<< id_ << " path " << path_ << std::endl;
-        // std::cout << "INFO-"<< id_ << " fourcc " << fourcc_ << std::endl;
-        // std::cout << "INFO-"<< id_ << " fps " << fps_ << std::endl;
-        // std::cout << "INFO-"<< id_ << " frame_size " << frame_size_ << std::endl;
-        // std::cout << "INFO-"<< id_ << " is_color " << is_color_ << std::endl;
-        // std::cout << "INFO-"<< id_ << " live_window_frame_ratio " << live_window_frame_ratio_ << std::endl;
+    PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | Thread Running!" << std::endl;
+    PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | path " << path_ << std::endl;
+    PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | fourcc " << fourcc_ << std::endl;
+    PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | fps " << fps_ << std::endl;
+    PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | frame_size " << frame_size_ << std::endl;
+    PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | is_color " << is_color_ << std::endl;
+    PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | live_window_frame_ratio " << live_window_frame_ratio_ << std::endl;
 
-
-    // std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | A" << std::endl;
     if ((id_ == 0) && showPreview) {
         cv::namedWindow( "VISSS Live Image | "+ name +" | "+std::to_string(id_), cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
     }
-    // std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | B" << std::endl;
 
     try {
         int32_t frame_count(0);
         for (;;) {
-            // std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | Waiting to pop" << std::endl;
 
             MatMeta image(queue_.pop());
-            // std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | popped" << std::endl;
             if (!image.MatImage.empty()) {
                 high_resolution_clock::time_point t1(high_resolution_clock::now());
                 
                 t_record = t1.time_since_epoch().count()/1000;
-
-
-                // std::string ty =  type2str( image.MatImage.type() );
-                // printf("image.MatImage: %s %dx%d \n", ty.c_str(), image.MatImage.cols, image.MatImage.rows );
-
-
 
                 if (firstImage)  { 
                     imgOld = image.MatImage * 0;
@@ -313,14 +293,13 @@ void storage_worker_cv::run()
                 nPixelA.assign((float*)nPixel.data, (float*)nPixel.data + nPixel.total()*nPixel.channels());
 
 
-                //std::cout <<  "M1 = " << std::endl << " "  << nPixelA[0]<< " "<< nPixelA[1]<< " "<< nPixelA[2]<< " "<< nPixelA[3]<< " "<< nPixelA[4]<< " "<< nPixelA[5] << " "<< nPixelA[6]<< std::endl << std::endl;
+                //PrintThread{} <<  "M1 = " << std::endl << " "  << nPixelA[0]<< " "<< nPixelA[1]<< " "<< nPixelA[2]<< " "<< nPixelA[3]<< " "<< nPixelA[4]<< " "<< nPixelA[5] << " "<< nPixelA[6]<< std::endl << std::endl;
                     //cumsum
                 for (int ii = histSize-1; ii --> 0; )
                 {
                      nPixelA[ii] = nPixelA[ii] + nPixelA[ii+1];
                 }
 
-//std::cout << "TEST | " ;
                 movingPixel = false;
                 tt = 1;
                 for (uint ll = 0; ll < nPixelA.size(); ll++) {
@@ -333,15 +312,15 @@ void storage_worker_cv::run()
                             movingPixels[ll] = true;
                             movingPixel = true;
                     }
-//std::cout << "ll "<< ll << " |tt "<< tt << " |movingPixelThreshold "<< movingPixelThreshold << " |nPixelA "<< nPixelA[ll] << " |movingPixels " << movingPixels[ll] ;
+//PrintThread{} << "ll "<< ll << " |tt "<< tt << " |movingPixelThreshold "<< movingPixelThreshold << " |nPixelA "<< nPixelA[ll] << " |movingPixels " << movingPixels[ll] ;
 
 
                     tt = tt*2;
 
                 }
-//std::cout << std::endl;
+//PrintThread{} << std::endl;
 
-                //std::cout <<  "M2 = " << std::endl << " "  << nPixelA[0]<< " "<< nPixelA[1]<< " "<< nPixelA[2]<< " "<< nPixelA[3]<< " "<< nPixelA[4]<< " "<< nPixelA[5] << " "<< nPixelA[6]<< std::endl << std::endl;
+                //PrintThread{} <<  "M2 = " << std::endl << " "  << nPixelA[0]<< " "<< nPixelA[1]<< " "<< nPixelA[2]<< " "<< nPixelA[3]<< " "<< nPixelA[4]<< " "<< nPixelA[5] << " "<< nPixelA[6]<< std::endl << std::endl;
 
 
 
@@ -413,8 +392,8 @@ void storage_worker_cv::run()
                     if (storeVideo) {
                         cv::imwrite(filename_+".jpg", imgWithMeta );
                         create_symlink(filename_+".jpg",  filename_latest_+".jpg");
-                        std::cout ;
-                        std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
+                        PrintThread{} ;
+                        PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
                         }
 
                     frame_count_new_file = frame_count;
@@ -432,8 +411,8 @@ void storage_worker_cv::run()
                         if (storeMeta) {
                             message = std::to_string(image.timestamp +t_reset_uint_)
                                 + ", " + std::to_string(t_record)
-                                + ", " + std::to_string(image.id) 
-                                + ", " + std::to_string(queue_.size()) ;
+                                + ", " + std::to_string(image.id) ;
+
                             for(int kk = 0; kk < histSize; kk++) 
                             {
                                 message = message + ", " + std::to_string((int)nPixelA[kk]);
@@ -457,7 +436,7 @@ void storage_worker_cv::run()
                             break;
                          }
                     }
-                    std::cout << message<<std::endl;
+                    PrintThread{} << message<<std::endl;
 
                 }    
                 if ( (id_ == 0) && showPreview && (frame_count % (live_window_frame_ratio_ / nStorageThreads) == 0))
@@ -482,7 +461,7 @@ void storage_worker_cv::run()
                 
 
 
-                // std::cout << "Worker " << id_ << " stored imgWithMeta #" << frame_count
+                // PrintThread{} << "Worker " << id_ << " stored imgWithMeta #" << frame_count
                 //     << " in " << (dt_us / 1000.0) << " ms" << std::endl;
             }
 
@@ -491,7 +470,7 @@ void storage_worker_cv::run()
         }
     } catch (frame_queue::cancelled& /*e*/) {
         // Nothing more to process, we're done
-        std::cout << "INFO-" << id_ << " | " << get_timestamp() << " | Storage queue " << id_ << " cancelled, storage worker finished. Closing files." << std::endl;
+        PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Storage queue " << id_ << " cancelled, storage worker finished. Closing files." << std::endl;
         close_files();
     }
 }
@@ -506,7 +485,7 @@ void storage_worker_cv::run()
 //         printf("Fifo mkfifo error: %s\n", strerror(errno)); 
 //         exit(EXIT_FAILURE);
 //     } else {
-//         std::cout << "Made a named pipe at: " << myFIFO << std::endl;
+//         PrintThread{} << "Made a named pipe at: " << myFIFO << std::endl;
 //     }
 
 //     // ffplay raw video
@@ -552,14 +531,14 @@ void storage_worker_cv::run()
 //                 double dt_us(static_cast<double>(duration_cast<microseconds>(t2 - t1).count()));
 //                 total_time_ += dt_us;
 
-//                 // std::cout << "Worker " << id_ << " stored image #" << frame_count
+//                 // PrintThread{} << "Worker " << id_ << " stored image #" << frame_count
 //                 //     << " in " << (dt_us / 1000.0) << " ms" << std::endl;
 //             }
 //         }
 //     } catch (frame_queue::cancelled& /*e*/) {
 //         // Nothing more to process, we're done
 //         close(fd);
-//         std::cout << "Queue " << id_ << " cancelled, worker finished." << std::endl;
+//         PrintThread{} << "Queue " << id_ << " cancelled, worker finished." << std::endl;
 //     }
 // }
 

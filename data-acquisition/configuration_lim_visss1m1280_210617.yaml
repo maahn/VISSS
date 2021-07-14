@@ -3,7 +3,7 @@ outdir: /data/lim
 preset: ultrafast
 quality: 17
 site: LIM
-storagethreads: 2
+storagethreads: 1
 fps: 140
 storeallframes: False
 camera:

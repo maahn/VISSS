@@ -252,3 +252,26 @@ tmp=strtok(NULL,".");
 }
 return(val);
 }
+
+
+// https://stackoverflow.com/questions/14718124/how-to-easily-make-stdcout-thread-safe/47480827#47480827
+/** Thread safe cout class
+  * Exemple of use:
+  *    PrintThread{} << "Hello world!" << std::endl;
+  */
+class PrintThread: public std::ostringstream
+{
+public:
+    PrintThread() = default;
+
+    ~PrintThread()
+    {
+        std::lock_guard<std::mutex> guard(_mutexPrint);
+        std::cout << this->str();
+    }
+
+private:
+    static std::mutex _mutexPrint;
+};
+
+std::mutex PrintThread::_mutexPrint{};

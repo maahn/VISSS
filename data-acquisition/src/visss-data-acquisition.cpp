@@ -203,7 +203,7 @@ char GetKey()
 void PrintMenu()
 {
     std::cout << "**************************************************************************" << std::endl;
-    std::cout << "press [Q] or [ESC] to end" << std::endl;
+    std::cout << "*** press [Q] or [ESC] to end" << std::endl;
     std::cout << "**************************************************************************" << std::endl;
 }
 
@@ -267,7 +267,8 @@ void *ImageCaptureThread( void *context)
                 t_reset = std::chrono::system_clock::now();
                 statusF = GevSetFeatureValueAsString(captureContext->camHandle, "timestampControlReset", "1");
                 if (statusF == GEVLIB_OK) {
-                    std::cout << std::endl << "INFO | " << get_timestamp() << " | Did reset clock" << std::endl;
+                    std::cout << std::endl << "INFO | " << get_timestamp() << " | Did reset clock to " << 
+                    t_reset.time_since_epoch().count()/1000 << std::endl;
                 } else {
                     std::cout << std::endl << "ERROR | " << get_timestamp() << " | Unable to reset clock" << std::endl;
                 }
@@ -385,7 +386,7 @@ void *ImageCaptureThread( void *context)
                         // std::cout << "Captured image #" << frame_count << " in "
                         //     << (dt_us / 1000.0) << " ms" << std::endl;
 
-                        fflush(stdout);
+                        // fflush(stdout);
 
 
                         ++frame_count;
@@ -481,11 +482,6 @@ void *ImageCaptureThread( void *context)
                 q.cancel();
             }
 
-            std::cout << "INFO"  << " | " << get_timestamp() 
-                << " | Completed storage " << frame_count << " image, "
-                << "  average capture time = " << (total_read_time / frame_count) << " ms\n";
-
-
             // And join all the worker threads, waiting for them to finish
             for (int ss=0; ss<nStorageThreads; ++ss) {
                 storage_thread[ss].join();
@@ -499,9 +495,10 @@ void *ImageCaptureThread( void *context)
                 //double total_write_time_a(storage[0].storage[0].total_time_ms());
                 // double total_write_time_b(storage[1].total_time_ms());
 
-                std::cout << "INFO" << ss << " | " << get_timestamp() 
-                    << " | Completed thread " << frame_count/nStorageThreads << " images:\n"
-                    << "  average storage time = " << (total_storage_time / frame_count) << " ms\n"
+                std::cout << "INFO-" << ss << " | " << get_timestamp() 
+                    << " | Completed storage " << frame_count << " images,"
+                    << " average capture time = " << (total_read_time / frame_count) << " ms,"
+                    << " average storage time = " << (total_storage_time / frame_count) << " ms\n"
                     //<< "  average write time A = " << (total_write_time_a / frame_count) << " ms\n"
                     ;
                 }
@@ -575,7 +572,7 @@ int main(int argc, char *argv[])
 
     //============================================================================
     // Greetings
-    std::cout << "VISSS data acquisition (" << __DATE__ << ")" << std::endl;
+    std::cout << "VISSS data acquisition (" << __DATE__ << ", "<< GIT_TAG << ", "<< GIT_BRANCH << ")" << std::endl;
     std::cout << "**************************************************************************" << std::endl;
 
     cv :: CommandLineParser parser(argc, argv, params);
@@ -587,43 +584,43 @@ int main(int argc, char *argv[])
     }
 
     cv::String output = parser.get<cv::String>("output");
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: Output path "<< output << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Output path "<< output << std::endl;
 
     configFile = parser.get<cv::String>(0);
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: Configuration file "<< configFile << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Configuration file "<< configFile << std::endl;
 
     std::string camIP = parser.get<cv::String>(1);
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: Camera IP "<< camIP << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Camera IP "<< camIP << std::endl;
     uint long camIPl = iptoul(camIP);
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: Camera IP long "<< camIPl << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Camera IP long "<< camIPl << std::endl;
     int camIndex = 0;
 
     context.quality = parser.get<cv::String>("quality");
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: FFMPEG Quality "<< context.quality << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: FFMPEG Quality "<< context.quality << std::endl;
 
     context.preset = parser.get<cv::String>("preset");
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: FFMPEG preset "<< context.preset << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: FFMPEG preset "<< context.preset << std::endl;
 
     site = parser.get<cv::String>("site");
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: site "<< site << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: site "<< site << std::endl;
 
     name = parser.get<cv::String>("name");
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: name "<< name << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: name "<< name << std::endl;
 
     nStorageThreads = parser.get<int>("threads");
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: threads "<< nStorageThreads << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: threads "<< nStorageThreads << std::endl;
 
     context.live_window_frame_ratio = parser.get<int>("liveratio");
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: liveratio "<< context.live_window_frame_ratio << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: liveratio "<< context.live_window_frame_ratio << std::endl;
 
     new_file_interval = parser.get<int>("newfileinterval");
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: newfileinterval "<< new_file_interval << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: newfileinterval "<< new_file_interval << std::endl;
 
     context.fps = parser.get<double>("fps");
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: fps "<< context.fps << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: fps "<< context.fps << std::endl;
 
     maxframes = parser.get<int>("maxframes");
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: maxframes "<< maxframes << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: maxframes "<< maxframes << std::endl;
 
     writeallframes1 = parser.get<int>("writeallframes");
     if (writeallframes1 == 0) {
@@ -634,13 +631,13 @@ int main(int argc, char *argv[])
         std::cerr << "FATAL ERROR | " << get_timestamp() << "| writeallframes must be 0 or 1 " << context.preset<< std::endl;
         global_error = true;
     }
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: writeallframes "<< writeallframes << " " << writeallframes1 << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: writeallframes "<< writeallframes << " " << writeallframes1 << std::endl;
     showPreview = !parser.has("nopreview");
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: showPreview "<< showPreview << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: showPreview "<< showPreview << std::endl;
     storeVideo = !parser.has("novideo");
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: storeVideo "<< storeVideo << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: storeVideo "<< storeVideo << std::endl;
     storeMeta = !parser.has("nometadata");
-    std::cout << "INFO | " << get_timestamp() << " | PARSER: storeMeta "<< storeMeta << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: storeMeta "<< storeMeta << std::endl;
 
     std::set<std::string> presets = {
         "ultrafast",
@@ -817,9 +814,8 @@ int main(int argc, char *argv[])
         }
               
 
-        std::cout << "INFO | " << get_timestamp() << " | Loading settings"<< std::endl;
+        std::cout << "DEBUG | " << get_timestamp() << " | Loading settings"<< std::endl;
         std::cout << "**************************************************************************" << std::endl;
-
 
 
         // Read the file as { feature value } pairs and write them to the camera.
@@ -831,7 +827,7 @@ int main(int argc, char *argv[])
             while ( 2 == fscanf(fp, "%s %s", feature_name, value_str) )
             {
                 status = 0;
-                printf("%s %s\n", feature_name, value_str);
+                std::cout << "INFO | " << get_timestamp() << " | Set feature "  << feature_name <<" : "<< value_str<< std::endl;
                 // Find node and write the feature string (without validation).
                 GenApi::CNodePtr pNode = Camera._GetNode(feature_name);
                 if (pNode)
@@ -845,7 +841,7 @@ int main(int argc, char *argv[])
                     if (status != 0)
                     {
                         error_count++;
-                        printf("Error restoring feature %s : with value %s\n", feature_name, value_str); 
+                        std::cout << "ERROR | " << get_timestamp() << " | Error restoring feature "  << feature_name <<" : with value "<< value_str<< std::endl;
                     }
                     else
                     {
@@ -855,7 +851,7 @@ int main(int argc, char *argv[])
                 else
                 {
                     error_count++;
-                    printf("Error restoring feature %s : with value %s\n", feature_name, value_str);
+                    std::cout << "ERROR | " << get_timestamp() << " | Error restoring feature "  << feature_name <<" : with value "<< value_str<< std::endl;
                 }
             }
             std::cout << "**************************************************************************" << std::endl;
@@ -931,7 +927,7 @@ int main(int argc, char *argv[])
 
         if (error_count == 0)
         {
-            std::cout << "INFO | " << get_timestamp() << "| " << feature_count << " Features loaded successfully" << std::endl;
+            std::cout << "DEBUG | " << get_timestamp() << "| " << feature_count << " Features loaded successfully" << std::endl;
         }
         else
         {
