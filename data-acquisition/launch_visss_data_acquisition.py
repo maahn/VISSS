@@ -480,18 +480,18 @@ class runCpp:
 
     def display(self, record):
 
+
+        msg = self.queue_handler.format(record)
+
         # cut very long text
         text = self.scrolled_text.get("1.0", tk.END)
-        if len(text) > 50:
+        if len(text) > 50000:
             self.scrolled_text.delete("1.0", tk.END)
             self.scrolled_text.insert(tk.END, text[-5000:])
             self.scrolled_text.see("end")
 
 
-        msg = self.queue_handler.format(record)
-        self.scrolled_text.configure(state='normal')
         self.scrolled_text.insert(tk.END, msg + '\n', record.levelname)
-        self.scrolled_text.configure(state='disabled')
         # Autoscroll to the bottom
         self.scrolled_text.yview(tk.END)
 

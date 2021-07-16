@@ -424,6 +424,7 @@ void storage_worker_cv::run()
                         }
 
                 }
+
                 if (frame_count % (int)fps_ == 0) {
 
                     message =  "STATUS" + std::to_string(id_) +" | " + get_timestamp() + 
@@ -438,6 +439,8 @@ void storage_worker_cv::run()
                          }
                     }
                     PrintThread{} << message<<std::endl;
+                    std::cout << std::flush;
+
 
                 }    
                 if ( (id_ == 0) && showPreview && (frame_count % (live_window_frame_ratio_ / nStorageThreads) == 0))
