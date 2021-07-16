@@ -572,7 +572,7 @@ int main(int argc, char *argv[])
 
     //============================================================================
     // Greetings
-    std::cout << "VISSS data acquisition (" << __DATE__ << ", "<< GIT_TAG << ", "<< GIT_BRANCH << ")" << std::endl;
+    std::cout << "VISSS data acquisition (" << __DATE__ << ")" << std::endl;
     std::cout << "**************************************************************************" << std::endl;
 
     cv :: CommandLineParser parser(argc, argv, params);
@@ -942,21 +942,22 @@ int main(int argc, char *argv[])
         struct tm * now = localtime( & t );
         char timestamp3[80];
         strftime (timestamp3,80,"%Y%m%d-%H%M%S",now);
-        std::string full_path = output + "/" + hostname + "_" + name + "_" + DeviceID + "/applied_config/" ;
-        std::string config_out = full_path + hostname + "_" + DeviceID + "_" + timestamp3 + ".config" ;
+        
+        // std::string full_path = output + "/" + hostname + "_" + name + "_" + DeviceID + "/applied_config/" ;
+        // std::string config_out = full_path + hostname + "_" + DeviceID + "_" + timestamp3 + ".config" ;
 
-        res = mkdir_p(full_path.c_str());
-        if (res != 0) {
-            std::cerr << "FATAL ERROR | " << get_timestamp() << " | Cannot create path "<< full_path <<std::endl;
-            global_error = true;
-        }
-        // Open the file to dump the configuration
-        fp2 = fopen(config_out.c_str(), "w");
-        if (fp2 == NULL)
-        {
-            std::cerr << "FATAL ERROR | " << get_timestamp() << " | Error opening configuration file "<< config_out <<std::endl;
-            global_error = true;
-        }   
+        // res = mkdir_p(full_path.c_str());
+        // if (res != 0) {
+        //     std::cerr << "FATAL ERROR | " << get_timestamp() << " | Cannot create path "<< full_path <<std::endl;
+        //     global_error = true;
+        // }
+        // // Open the file to dump the configuration
+        // fp2 = fopen(config_out.c_str(), "w");
+        // if (fp2 == NULL)
+        // {
+        //     std::cerr << "FATAL ERROR | " << get_timestamp() << " | Error opening configuration file "<< config_out <<std::endl;
+        //     global_error = true;
+        // }   
 
         // Put the camera in "streaming feature mode".
         GenApi::CCommandPtr start1 = Camera._GetNode("Std::DeviceFeaturePersistenceStart");
@@ -981,7 +982,7 @@ int main(int argc, char *argv[])
         {
             // Find the standard "Root" node and dump the features.
             GenApi::CNodePtr pRoot = Camera._GetNode("Root");
-            OutputFeatureValues( pRoot, fp2);
+            // OutputFeatureValues( pRoot, fp2);
         }
 
         // End the "streaming feature mode".
@@ -1002,8 +1003,8 @@ int main(int argc, char *argv[])
             CATCH_GENAPI_ERROR(status);
         }
 
-        fclose(fp2);
-        std::cout << "INFO | " << get_timestamp() << "| applied configuration written to: " << config_out << std::endl;
+        // fclose(fp2);
+        // std::cout << "INFO | " << get_timestamp() << "| applied configuration written to: " << config_out << std::endl;
 
 
         if((not global_error) && (error_count == 0))

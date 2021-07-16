@@ -100,8 +100,8 @@ void storage_worker_cv::add_meta_data()
 
     //0.2 with mean and standard deviation
     //0.3 with number of changing pixels
+    //0.4 with queue length
 
-//TODO 0.4: thread number, all settings??
 
 
     fMeta_ << "# VISSS file format version: 0.3"<< "\n";
@@ -120,7 +120,7 @@ void storage_worker_cv::add_meta_data()
     fMeta_ << "# Hostname: "
           <<  hostname<< "\n";
      
-    fMeta_ << "# Capture time, Record time, Frame id";
+    fMeta_ << "# Capture time, Record time, Frame id, Queue Length";
 
 
     for(int ll = 0; ll < histSize; ll++) 
@@ -411,7 +411,8 @@ void storage_worker_cv::run()
                         if (storeMeta) {
                             message = std::to_string(image.timestamp +t_reset_uint_)
                                 + ", " + std::to_string(t_record)
-                                + ", " + std::to_string(image.id) ;
+                                + ", " + std::to_string(image.id)
+                                + ", " + std::to_string(queue_.size()) ;
 
                             for(int kk = 0; kk < histSize; kk++) 
                             {
