@@ -25,7 +25,7 @@
 #define MAX_CHUNK_BYTES 256
 
 // Enable/disable transfer tuning (buffering, timeouts, thread affinity).
-#define TUNE_STREAMING_THREADS 1
+#define TUNE_STREAMING_THREADS 0
 
 #define NUM_BUF 8
 
@@ -253,6 +253,9 @@ void *ImageCaptureThread( void *context)
         int32_t frame_count(0);
 
         uint last_id = 0;
+
+        std::cout << "DEBUG | " << get_timestamp() << "| " << "Capture Loop ready" << std::endl;
+
         // While we are still running.
         while(!captureContext->exit)
         {
@@ -986,6 +989,7 @@ int main(int argc, char *argv[])
         }
 
         // End the "streaming feature mode".
+        std::cout << "DEBUG | " << get_timestamp() << "| " << "Ending streaming feature mode" << std::endl;
         GenApi::CCommandPtr end1 = Camera._GetNode("Std::DeviceFeaturePersistenceEnd");
         if ( end1  )
         {
@@ -1055,6 +1059,7 @@ int main(int argc, char *argv[])
                 }
             }
 #endif
+            std::cout << "DEBUG | " << get_timestamp() << "| " << "Configuring Camera " << std::endl;
             // Write the adjusted interface options back.
             GevSetCameraInterfaceOptions( handle, &camOptions);
 
@@ -1083,10 +1088,10 @@ int main(int argc, char *argv[])
                         std::cerr << "FATAL ERROR | " << get_timestamp() << "| Turbodrive off" << std::endl;
                         global_error = true;
                     }
-                    //else
-                    //{
-                    //    std::cout << "STATUS | " << get_timestamp() << "| Turbodrive on" << std::endl;
-                    //}
+                    else
+                    {
+                       std::cout << "DEBUG | " << get_timestamp() << "| Turbodrive on" << std::endl;
+                    }
                 }
             }
             else
@@ -1135,13 +1140,14 @@ int main(int argc, char *argv[])
 
                 // Initialize a transfer with synchronous buffer handling.
                 // (To avoid overwriting data buffer while saving to disk).
+                std::cout << "DEBUG | " << get_timestamp() << "| " << "Inititalizing Transfer" << std::endl;
 #if USE_SYNCHRONOUS_BUFFER_CYCLING
                 // Initialize a transfer with synchronous buffer handling.
                 status = GevInitializeTransfer( handle, SynchronousNextEmpty, size, numBuffers, bufAddress);
 #else
                 // Initialize a transfer with asynchronous buffer handling.
                 status = GevInitializeTransfer( handle, Asynchronous, size, numBuffers, bufAddress);
-#endif
+#endif 
                 // Create a thread to receive images from the API and save them
                 context.camHandle = handle;
                 context.base_name = output;
@@ -1157,6 +1163,7 @@ int main(int argc, char *argv[])
                 }
                 //std::cout << "STATUS | " << get_timestamp() <<" | STARTING GevStartTransfer" <<std::endl;
 
+                std::cout << "DEBUG | " << get_timestamp() << "| " << "Starting Transfer" << std::endl;
                 status = GevStartTransfer( handle, -1);
                 if (status != 0) {
                     std::cerr << "FATAL ERROR | " << get_timestamp() <<" | Error starting grab" <<std::endl;

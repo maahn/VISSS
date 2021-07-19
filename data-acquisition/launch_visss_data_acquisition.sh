@@ -109,13 +109,24 @@ fi
 
 if ping -c 1 $IP > /dev/null
 	then
-	echo 'BASH camera repsonding'
+	:
 else
 	/bin/echo "BASH Set camera IP address (just to be sure)"
 	/usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0
 fi
 
-/usr/bin/sudo /sbin/setcap cap_sys_nice+ep $EXE
+if  /usr/bin/sudo /sbin/setcap cap_sys_nice+ep $EXE 
+then
+  :
+else
+  echo 'BASH /usr/bin/sudo /sbin/setcap cap_sys_nice+ep $EXE ERROR'
+fi
+if  /usr/bin/sudo /sbin/setcap cap_net_raw+eip $EXE 
+then
+  :
+else
+  echo 'BASH /usr/bin/sudo /sbin/setcap cap_net_raw+eip $EXE ERROR'
+fi
 
 
 for (( ; ; ))

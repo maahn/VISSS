@@ -50,7 +50,7 @@ camera:
 externalTrigger:
 - name: MiRAC
   address: http://localhost:8123/
-  interval: 10
+  interval: 60
   threshold: 0
   minMax: min
   stopOnTimeout: True
