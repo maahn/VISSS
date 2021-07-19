@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 """
-- read output from a subprocess in a background thread
-- show the output in the GUI
+VISSS GUI
 
-
-todo: https://pypi.org/project/CppPythonSocket/ (named pipe faster!9)
-https://github.com/goldsborough/ipc-bench
-https://stackoverflow.com/questions/1268252/possible-to-share-in-memory-data-between-2-separate-processes
-https://stackoverflow.com/questions/60949451/how-to-send-a-cvmat-to-python-over-shared-memory/60959732#60959732
-https://stackoverflow.com/questions/60966568/example-of-ipc-between-two-process-with-opencv-cvmat-object-c-as-server-an
 
 """
 import collections
+import datetime
 import json
 import logging
 import logging.handlers
@@ -55,6 +49,7 @@ DEFAULTSETTINGS = {
 LOGFORMAT = '%(asctime)s: %(levelname)s: %(name)s:%(message)s'
 TRIGGERINTERVALLFACTOR = 2  # data can be factor 2 older than interval
 
+
 def add_bool(self, node):
     return self.construct_scalar(node)
 
@@ -82,9 +77,18 @@ def getSerialNumbers():
     loggerRoot.info('got serial numbers: %s' % serialNumbers)
     return serialNumbers
 
+
 def click_autopilot():
+    global externalTriggerStatus
+
     save_settings(None)
     loggerRoot.info('Autopilot set to %s' % bool(autopilot.get()))
+    for app in apps:
+        if autopilot.get():
+            app.startStopButton.state(["disabled"])
+        else:
+            app.startStopButton.state(["!disabled"])
+            externalTriggerStatus = [[True]]
 
 
 def save_settings(event):
@@ -132,6 +136,7 @@ def read_settings(fname):
 def killall():
     loggerRoot.info('Closing GUI')
     for app in apps:
+        app.writeToStatusFile('terminate, user')
         app.quit()
     root.destroy()
 
@@ -162,6 +167,23 @@ def queryExternalTrigger(
 
     global externalTriggerStatus
 
+    if not bool(autopilot.get()):
+        triggerWidget.config(background="gray")
+        trigger.set('external trigger disabled')
+        root.after(100, lambda: queryExternalTrigger(
+            nn,
+            triggerWidget,
+            root,
+            name,
+            address,
+            interval,
+            threshold,
+            minMax,
+            stopOnTimeout,
+            nBuffer,
+        ))  # schedule next update
+        return
+
     root.after(interval*1000, lambda: queryExternalTrigger(
         nn,
         triggerWidget,
@@ -174,11 +196,6 @@ def queryExternalTrigger(
         stopOnTimeout,
         nBuffer,
     ))  # schedule next update
-
-    if not bool(autopilot.get()):
-        triggerWidget.config(background="gray")
-        trigger.set('external trigger disabled')
-        return
 
     # default values
     data = {
@@ -207,7 +224,8 @@ def queryExternalTrigger(
         ).decode('utf-8')
     except (HTTPError, URLError) as error:
         loggerRoot.error(
-            'queryExternalTrigger: Data not retrieved because %s URL: %s', error, address)
+            'queryExternalTrigger: Data not retrieved because %s URL: %s',
+            error, address)
         if stopOnTimeout:
             continueMeasurement = False
         else:
@@ -219,7 +237,8 @@ def queryExternalTrigger(
         loggerRoot.info('queryExternalTrigger: response %s' % str(data))
 
         timeCond = (now - np.datetime64(data['timestamp']) <
-                    np.timedelta64(TRIGGERINTERVALLFACTOR * int(interval), 's'))
+                    np.timedelta64(TRIGGERINTERVALLFACTOR * int(
+                        interval), 's'))
         if timeCond:
             continueMeasurement = oper(float(data['measurement']), threshold)
         else:
@@ -230,7 +249,8 @@ def queryExternalTrigger(
             else:
                 continueMeasurement = True
 
-    loggerRoot.info('queryExternalTrigger: continue Measurement %r' % continueMeasurement)
+    loggerRoot.info('queryExternalTrigger: continue Measurement %r' %
+                    continueMeasurement)
 
     measurement = '%g' % data['measurement']
     unit = data['unit']
@@ -244,6 +264,10 @@ def queryExternalTrigger(
     trigger.set('%s: %s %s %i/%i at %s' %
                 (name, measurement, unit, np.sum(externalTriggerStatus[nn]),
                     nBuffer, data['timestamp']))
+
+    for app in apps:
+        app.statusWatcher()
+
     return
 
 
@@ -273,18 +297,28 @@ class runCpp:
         self.logger = logging.getLogger('Python:runCpp:%s' % self.name)
         self.loggerCpp = logging.getLogger('C++:%s' % self.name)
 
-        logDir =  f"{configuration['outdir']}/{hostname}_{cameraConfig['name']}_{cameraConfig['serialnumber']}/logs"
+        self.logDir = (f"{configuration['outdir']}/{hostname}_"
+                       f"{self.cameraConfig['name']}_"
+                       f"{self.cameraConfig['serialnumber']}/logs")
         try:
-            os.mkdir(logDir)
-        except  FileExistsError:
+            os.mkdir(self.logDir)
+        except FileExistsError:
             pass
+        self.statusDir = (f"{configuration['outdir']}/{hostname}_"
+                          f"{self.cameraConfig['name']}_"
+                          f"{self.cameraConfig['serialnumber']}"
+                          "/data")
 
         # Create a logging handler using a queue
         self.log_queue = queue.Queue()
         self.queue_handler = QueueHandler(self.log_queue)
         formatter = logging.Formatter(LOGFORMAT)
         self.queue_handler.setFormatter(formatter)
-        self.log_handler = logging.handlers.TimedRotatingFileHandler('%s/log_%s_%s'%(logDir, self.name, self.cameraConfig['serialnumber']), when='D', interval=1, backupCount=0)
+        self.log_handler = logging.handlers.TimedRotatingFileHandler(
+            '%s/log_%s_%s' % (self.logDir, self.name,
+                              self.cameraConfig['serialnumber']),
+            when='D', interval=1,
+            backupCount=0)
         self.log_handler.setFormatter(formatter)
 
         self.logger.addHandler(self.queue_handler)
@@ -298,14 +332,27 @@ class runCpp:
         self.status = tk.StringVar()
         self.status.set('-')
 
-        self.configFName = '/tmp/%s.config' % self.name 
+        self.configFName = '/tmp/%s.config' % self.name
 
-        self.command = (f"/usr/bin/env bash {ROOTPATH}/launch_visss_data_acquisition.sh "
-                        f"--IP={cameraConfig['ip']} --MAC={cameraConfig['mac']} --INTERFACE={cameraConfig['interface']} --MAXMTU={configuration['maxmtu']} "
-                        f"--PRESET={configuration['preset']} --QUALITY={configuration['quality']} --CAMERACONFIG={self.configFName} "
-                        f"--ROOTPATH={ROOTPATH} --OUTDIR={configuration['outdir']} --SITE={configuration['site']} --NAME={self.name} "
-                        f"--FPS={configuration['fps']} --NTHREADS={configuration['storagethreads']} --NEWFILEINTERVAL={int(configuration['newfileinterval'])} --STOREALLFRAMES={int(configuration['storeallframes'])}"
-                        )
+        self.command = (
+            f"/usr/bin/env bash"
+            f" {ROOTPATH}/launch_visss_data_acquisition.sh"
+            f" --IP={cameraConfig['ip']}"
+            f" --MAC={cameraConfig['mac']}"
+            f" --INTERFACE={cameraConfig['interface']}"
+            f" --MAXMTU={configuration['maxmtu']}"
+            f" --PRESET={configuration['preset']}"
+            f" --QUALITY={configuration['quality']}"
+            f" --CAMERACONFIG={self.configFName}"
+            f" --ROOTPATH={ROOTPATH}"
+            f" --OUTDIR={configuration['outdir']}"
+            f" --SITE={configuration['site']}"
+            f" --NAME={self.name}"
+            f" --FPS={configuration['fps']}"
+            f" --NTHREADS={configuration['storagethreads']}"
+            f" --NEWFILEINTERVAL={configuration['newfileinterval']}"
+            f" --STOREALLFRAMES={int(configuration['storeallframes'])}"
+        )
 
         frame1 = ttk.Frame(mainframe)
         frame1.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -323,36 +370,57 @@ class runCpp:
         self.runningWidget.pack(
             side=tk.LEFT, anchor=tk.NW, fill=tk.Y, expand=True)
 
-
         # show subprocess' stdout in GUI
         self.scrolled_text = tk.Text(frame1, height=4, width=30)
         self.scrolled_text.pack(side=tk.LEFT, fill=tk.BOTH,
-                       expand=True, pady=6, padx=(6, 0))
+                                expand=True, pady=6, padx=(6, 0))
 
-        s = ttk.Scrollbar(frame1, orient=tk.VERTICAL, command=self.scrolled_text.yview)
+        s = ttk.Scrollbar(frame1, orient=tk.VERTICAL,
+                          command=self.scrolled_text.yview)
         s.pack(side=tk.RIGHT, fill=tk.Y, pady=6, padx=(0, 6))
         self.scrolled_text['yscrollcommand'] = s.set
         self.scrolled_text.bind("<Key>", lambda e: "break")
 
-
-        # Create a ScrolledText wdiget
-        # F_font =  ('bold', 30)
-        # self.scrolled_text = ScrolledText(frame1, state='disabled', height=12, font=F_font)
-        # self.scrolled_text.pack(side=tk.LEFT, fill=tk.BOTH,
-        #                expand=True, pady=6, padx=(6, 0))
         self.scrolled_text.configure(font=('TkFixedFont', 8))
         self.scrolled_text.tag_config('INFO', foreground='black')
         self.scrolled_text.tag_config('DEBUG', foreground='gray')
         self.scrolled_text.tag_config('WARNING', foreground='orange')
         self.scrolled_text.tag_config('ERROR', foreground='red')
-        self.scrolled_text.tag_config('CRITICAL', foreground='red', underline=1)
+        self.scrolled_text.tag_config(
+            'CRITICAL', foreground='red', underline=1)
         # Start polling messages from the queue
         self.mainframe.after(100, self.poll_log_queue)
 
-
         if settings['autopilot'] in [True, 'true', 'True', 1]:
             self.clickStartStop(autopilot=True)
-        self.statusWatcher()
+            self.startStopButton.state(["disabled"])
+
+    def writeToStatusFile(self, status):
+        now = time.time()
+        nowD = datetime.datetime.utcfromtimestamp(now)
+        statusDir = (f'{self.statusDir}/{nowD.year}/'
+                     f'{nowD.month:02}/{nowD.day:02}/')
+
+        statusFile = f'{statusDir}/{hostname}_{self.cameraConfig["name"]}_'
+        statusFile += f'{self.cameraConfig["serialnumber"]}_{nowD.year}'
+        statusFile += f'{nowD.month:02}{nowD.day:02}_status.txt'
+
+        try:
+            os.mkdir(statusDir)
+        except FileExistsError:
+            pass
+
+        if not os.path.isfile(statusFile):
+            self.logger.info('Creating status file %s' % statusFile)
+
+        status = f'{nowD}, {int(now*1000)}, {status}\n'
+        self.logger.info(status)
+        try:
+            with open(statusFile, 'a') as sf:
+                sf.write(status)
+        except Exception as e:
+            self.logger.error(e, exc_info=True)
+        return
 
     def witeParamFile(self):
 
@@ -360,8 +428,10 @@ class runCpp:
         self.logger.debug("witeParamFile: opening %s" % self.configFName)
         for k, v in self.cameraConfig['teledyneparameters'].items():
             if k == 'IO':
-                for ii in range(len(self.cameraConfig['teledyneparameters'][k])):
-                    for k1, v1 in self.cameraConfig['teledyneparameters'][k][ii].items():
+                for ii in range(len(
+                        self.cameraConfig['teledyneparameters'][k])):
+                    for k1, v1 in self.cameraConfig[
+                            'teledyneparameters'][k][ii].items():
                         self.logger.debug(
                             "witeParamFile: writing: %s %s" % (k1, v1))
                         file.write("%s %s\n" % (k1, v1))
@@ -374,46 +444,46 @@ class runCpp:
         if self.running.get().startswith('Idle'):
             if autopilot:
                 self.logger.info('Autopilot starts camera')
+                self.writeToStatusFile('launch, autopilot')
             else:
                 self.logger.info('User starts camera')
+                self.writeToStatusFile('start, user')
             self.start(self.command.split(' '))
         elif self.running.get().startswith('Running'):
             self.logger.info('User stops camera')
+            self.writeToStatusFile('stop, user')
             self.quit()
         else:
             pass
 
     def statusWatcher(self):
+        global externalTriggerStatus
 
-        if autopilot.get():
-
-            if np.any(externalTriggerStatus):
-                if self.running.get().startswith('Idle'):
-                    self.logger.info('External trigger starts camera')
-                    self.start(self.command.split(' '))
-                    # line = 'EXTERNAL TRIGGER START: %s \n' % list(
-                        # map(list, externalTriggerStatus))
-                    # self.text.insert(tk.END, line)
-                else:
-                    pass
-            elif (~np.any(externalTriggerStatus)):
-                if self.running.get().startswith('Running'):
-                    self.logger.info('External trigger stops camera')
-                    self.quit()
-                    # line = 'EXTERNAL TRIGGER STOP: %s \n' % list(
-                        # map(list, externalTriggerStatus))
-                    # self.text.insert(tk.END, line)
-                    # self.text.see("end")
-                else:
-                    pass
+        if np.any(externalTriggerStatus):
+            if self.running.get().startswith('Idle'):
+                self.logger.info('External trigger starts camera')
+                self.writeToStatusFile('start, trigger')
+                self.start(self.command.split(' '))
+                # line = 'EXTERNAL TRIGGER START: %s \n' % list(
+                # map(list, externalTriggerStatus))
+                # self.text.insert(tk.END, line)
             else:
-                raise ValueError('do not understand %s' %
-                                 list(map(list, externalTriggerStatus)))
-            self.startStopButton.state(["disabled"])
+                self.writeToStatusFile('continue, trigger')
+        elif (~np.any(externalTriggerStatus)):
+            if self.running.get().startswith('Running'):
+                self.logger.info('External trigger stops camera')
+                self.writeToStatusFile('stop, trigger')
+                self.quit()
+                # line = 'EXTERNAL TRIGGER STOP: %s \n' % list(
+                # map(list, externalTriggerStatus))
+                # self.text.insert(tk.END, line)
+                # self.text.see("end")
+            else:
+                self.writeToStatusFile('sleep, trigger')
         else:
-            self.startStopButton.state(["!disabled"])
-
-        self.mainframe.after(100, self.statusWatcher)  # schedule next update
+            raise ValueError('do not understand %s' %
+                             list(map(list, externalTriggerStatus)))
+            self.startStopButton.state(["disabled"])
 
     def start(self, command):
         self.running.set('Running: %s' % self.name)
@@ -474,17 +544,19 @@ class runCpp:
                         thisLogger = self.loggerCpp.error
                         # self.text.insert(tk.END, line)
                         # self.text.see("end")
-                    elif (line.startswith(b'DEBUG') or line.startswith(b'OPENCV')):
+                    elif ((line.startswith(b'DEBUG') or
+                           line.startswith(b'OPENCV'))):
                         thisLogger = self.loggerCpp.debug
                         # if logging.root.level <= logging.DEBUG:
-                            # self.text.insert(tk.END, line)
-                            # self.text.see("end")
+                        # self.text.insert(tk.END, line)
+                        # self.text.see("end")
                     else:
                         thisLogger = self.loggerCpp.info
                         # self.text.insert(tk.END, line)
                         # self.text.see("end")
                     line4Logger = line.decode().rstrip()
-                    if not (line4Logger.startswith('***') or (line4Logger == "")):
+                    if not ((line4Logger.startswith('***') or
+                             (line4Logger == ""))):
                         threadN = line4Logger.split('|')[0]
                         if line4Logger.startswith('BASH'):
                             pass
@@ -505,7 +577,6 @@ class runCpp:
 
     def display(self, record):
 
-
         msg = self.queue_handler.format(record)
 
         # cut very long text
@@ -514,7 +585,6 @@ class runCpp:
             self.scrolled_text.delete("1.0", tk.END)
             self.scrolled_text.insert(tk.END, text[-50000:])
             self.scrolled_text.see("end")
-
 
         self.scrolled_text.insert(tk.END, msg + '\n', record.levelname)
         # Autoscroll to the bottom
@@ -555,13 +625,15 @@ class runCpp:
         self.status.set('NOT RUNNING (YET)')
         self.statusWidget.config(background="yellow")
 
+
 SafeConstructor.add_constructor(u'tag:yaml.org,2002:bool', add_bool)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-log',
                     '--loglevel',
                     default='info',
-                    help='Provide logging level. Example --loglevel debug, default=info')
+                    help=('Provide logging level. Example --loglevel '
+                          'debug, default=info'))
 
 args = parser.parse_args()
 
@@ -574,7 +646,7 @@ loggerRoot.debug('Rootpath %s' % ROOTPATH)
 
 hostname = gethostname()
 serialNumbers = getSerialNumbers()
-
+externalTriggerStatus = [[]]
 
 
 settings = deepcopy(DEFAULTSETTINGS)
@@ -628,6 +700,20 @@ if settings['autopilot']:
     ChkBttn.invoke()
 
 
+apps = []
+if 'camera' in configuration.keys():
+    for cameraConfig in configuration['camera']:
+
+        cameraConfig['serialnumber'] = serialNumbers[cameraConfig['ip']]
+        thisCamera = runCpp(
+            mainframe, cameraConfig, configuration)
+        apps.append(thisCamera)
+
+        # add loggers
+        loggerRoot.addHandler(thisCamera.queue_handler)
+        loggerRoot.addHandler(thisCamera.log_handler)
+        loggerRoot.debug('Adding %s camera ' % cameraConfig)
+
 if (('externalTrigger' in configuration.keys()) and
         (configuration['externalTrigger'] is not None)):
     externalTriggerStatus = []
@@ -648,24 +734,7 @@ if (('externalTrigger' in configuration.keys()) and
         x = Thread(target=queryExternalTrigger, args=(
             ee, triggerWidget, root,), kwargs=externalTrigger, daemon=True)
         x.start()
-else:
-    externalTriggerStatus = [[True]]
-
-apps = []
-if 'camera' in configuration.keys():
-    for cameraConfig in configuration['camera']:
-
-        cameraConfig['serialnumber'] = serialNumbers[cameraConfig['ip']]
-        thisCamera = runCpp(
-            mainframe, cameraConfig, configuration)
-        apps.append(thisCamera)
-
-        #add loggers
-        loggerRoot.addHandler(thisCamera.queue_handler)
-        loggerRoot.addHandler(thisCamera.log_handler)
-        loggerRoot.debug('Adding %s camera ' % cameraConfig)
 
 
 root.protocol("WM_DELETE_WINDOW", killall)
-
 root.mainloop()
