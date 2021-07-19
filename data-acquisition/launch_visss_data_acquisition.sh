@@ -133,7 +133,7 @@ for (( ; ; ))
 do
 
 	timestamp=$(/bin/date +%FT%T)
-	COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -s=$SITE -w=$STOREALLFRAMES $CAMERACONFIG $IP| /usr/bin/tee $OUTDIR/logs/$NAME-$timestamp.txt"
+	COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -s=$SITE -w=$STOREALLFRAMES $CAMERACONFIG $IP"
 	/bin/echo "BASH $COMMAND"
 	if $COMMAND
 			then

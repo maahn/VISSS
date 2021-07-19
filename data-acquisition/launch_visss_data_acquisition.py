@@ -28,7 +28,7 @@ from copy import deepcopy
 from itertools import islice
 from pathlib import Path
 from queue import Empty, Queue
-from socket import timeout
+from socket import timeout, gethostname
 from subprocess import PIPE, STDOUT, Popen
 from textwrap import dedent
 from threading import Thread
@@ -53,6 +53,7 @@ DEFAULTSETTINGS = {
     'autopilot': False,
 }
 LOGFORMAT = '%(asctime)s: %(levelname)s: %(name)s:%(message)s'
+TRIGGERINTERVALLFACTOR = 2  # data can be factor 2 older than interval
 
 def add_bool(self, node):
     return self.construct_scalar(node)
@@ -65,6 +66,25 @@ def iter_except(function, exception):
             yield function()
     except exception:
         return
+
+
+def getSerialNumbers():
+    loggerRoot.debug('getting serial numbers')
+
+    serialNumbers = {}
+    p = Popen('lsgev -v', shell=True, stdout=PIPE, stderr=STDOUT)
+    for line in p.stdout.readlines():
+        line = line.decode()
+        ip = line.split(']')[1].split('[')[1]
+        serial = line.split(']')[-2].split(':')[-1]
+        serialNumbers[ip] = serial
+    retval = p.wait()
+    loggerRoot.info('got serial numbers: %s' % serialNumbers)
+    return serialNumbers
+
+def click_autopilot():
+    save_settings(None)
+    loggerRoot.info('Autopilot set to %s' % bool(autopilot.get()))
 
 
 def save_settings(event):
@@ -155,6 +175,11 @@ def queryExternalTrigger(
         nBuffer,
     ))  # schedule next update
 
+    if not bool(autopilot.get()):
+        triggerWidget.config(background="gray")
+        trigger.set('external trigger disabled')
+        return
+
     # default values
     data = {
         'unit': '',
@@ -194,7 +219,7 @@ def queryExternalTrigger(
         loggerRoot.info('queryExternalTrigger: response %s' % str(data))
 
         timeCond = (now - np.datetime64(data['timestamp']) <
-                    np.timedelta64(triggerIntervalFactor * int(interval), 's'))
+                    np.timedelta64(TRIGGERINTERVALLFACTOR * int(interval), 's'))
         if timeCond:
             continueMeasurement = oper(float(data['measurement']), threshold)
         else:
@@ -248,7 +273,7 @@ class runCpp:
         self.logger = logging.getLogger('Python:runCpp:%s' % self.name)
         self.loggerCpp = logging.getLogger('C++:%s' % self.name)
 
-        logDir = '%s/logs/%s/'%(configuration['outdir'], cameraConfig['name'])
+        logDir =  f"{configuration['outdir']}/{hostname}_{cameraConfig['name']}_{cameraConfig['serialnumber']}/logs"
         try:
             os.mkdir(logDir)
         except  FileExistsError:
@@ -259,7 +284,7 @@ class runCpp:
         self.queue_handler = QueueHandler(self.log_queue)
         formatter = logging.Formatter(LOGFORMAT)
         self.queue_handler.setFormatter(formatter)
-        self.log_handler = logging.handlers.TimedRotatingFileHandler('%s/log_%s'%(logDir, self.name), when='D', interval=1, backupCount=0)
+        self.log_handler = logging.handlers.TimedRotatingFileHandler('%s/log_%s_%s'%(logDir, self.name, self.cameraConfig['serialnumber']), when='D', interval=1, backupCount=0)
         self.log_handler.setFormatter(formatter)
 
         self.logger.addHandler(self.queue_handler)
@@ -440,11 +465,11 @@ class runCpp:
                 #     self.carReturn = False
 
                 if line.startswith(b'STATUS'):
-                    self.status.set(line[:-2])
+                    self.status.set(line.decode().rstrip())
                     self.statusWidget.config(background="green")
                 else:
                     if line.startswith(b'ERROR') or line.startswith(b'FATAL'):
-                        self.status.set
+                        self.status.set(line.decode().rstrip())
                         self.statusWidget.config(background="red")
                         thisLogger = self.loggerCpp.error
                         # self.text.insert(tk.END, line)
@@ -485,9 +510,9 @@ class runCpp:
 
         # cut very long text
         text = self.scrolled_text.get("1.0", tk.END)
-        if len(text) > 50000:
+        if len(text) > 500000:
             self.scrolled_text.delete("1.0", tk.END)
-            self.scrolled_text.insert(tk.END, text[-5000:])
+            self.scrolled_text.insert(tk.END, text[-50000:])
             self.scrolled_text.see("end")
 
 
@@ -547,7 +572,9 @@ loggerRoot = logging.getLogger('Python')
 loggerRoot.info('Launching GUI')
 loggerRoot.debug('Rootpath %s' % ROOTPATH)
 
-triggerIntervalFactor = 2  # data can be factor 2 older than interval
+hostname = gethostname()
+serialNumbers = getSerialNumbers()
+
 
 
 settings = deepcopy(DEFAULTSETTINGS)
@@ -594,7 +621,7 @@ autopilot = tk.IntVar()
 ChkBttn = ttk.Checkbutton(
     config,
     text='Autopilot',
-    command=lambda: save_settings(None),
+    command=click_autopilot,
     variable=autopilot)
 ChkBttn.pack(side=tk.LEFT, pady=6, padx=6)
 if settings['autopilot']:
@@ -624,11 +651,11 @@ if (('externalTrigger' in configuration.keys()) and
 else:
     externalTriggerStatus = [[True]]
 
-
 apps = []
 if 'camera' in configuration.keys():
     for cameraConfig in configuration['camera']:
 
+        cameraConfig['serialnumber'] = serialNumbers[cameraConfig['ip']]
         thisCamera = runCpp(
             mainframe, cameraConfig, configuration)
         apps.append(thisCamera)
