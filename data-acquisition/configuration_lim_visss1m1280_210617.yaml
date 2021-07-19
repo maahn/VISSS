@@ -6,6 +6,7 @@ site: LIM
 storagethreads: 1
 fps: 140
 storeallframes: False
+newfileinterval: 600
 camera:
 - name: visss_trigger
   interface: enp35s0f0

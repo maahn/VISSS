@@ -304,7 +304,7 @@ class runCpp:
                         f"--IP={cameraConfig['ip']} --MAC={cameraConfig['mac']} --INTERFACE={cameraConfig['interface']} --MAXMTU={configuration['maxmtu']} "
                         f"--PRESET={configuration['preset']} --QUALITY={configuration['quality']} --CAMERACONFIG={self.configFName} "
                         f"--ROOTPATH={ROOTPATH} --OUTDIR={configuration['outdir']} --SITE={configuration['site']} --NAME={self.name} "
-                        f"--FPS={configuration['fps']} --NTHREADS={configuration['storagethreads']} --STOREALLFRAMES={int(configuration['storeallframes'])}"
+                        f"--FPS={configuration['fps']} --NTHREADS={configuration['storagethreads']} --NEWFILEINTERVAL={int(configuration['newfileinterval'])} --STOREALLFRAMES={int(configuration['storeallframes'])}"
                         )
 
         frame1 = ttk.Frame(mainframe)

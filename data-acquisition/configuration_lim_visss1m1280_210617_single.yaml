@@ -31,6 +31,7 @@ site: LIM
 storagethreads: 1
 fps: 140
 storeallframes: False
+newfileinterval: 600
 externalTrigger:
 - name: MiRAC
   address: http://localhost:8123/
