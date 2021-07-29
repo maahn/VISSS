@@ -39,7 +39,6 @@ import argparse
 import logging
 
 
-ROOTPATH = os.path.dirname(os.path.abspath(__file__))
 SETTINGSFILE = "%s/.visss.yaml" % str(Path.home())
 DEFAULTSETTINGS = {
     'geometry': "%dx%d" % (300, 300),
@@ -52,6 +51,7 @@ TRIGGERINTERVALLFACTOR = 2  # data can be factor 2 older than interval
 
 def add_bool(self, node):
     return self.construct_scalar(node)
+SafeConstructor.add_constructor(u'tag:yaml.org,2002:bool', add_bool)
 
 
 def iter_except(function, exception):
@@ -61,215 +61,6 @@ def iter_except(function, exception):
             yield function()
     except exception:
         return
-
-
-def getSerialNumbers():
-    loggerRoot.debug('getting serial numbers')
-
-    serialNumbers = {}
-    p = Popen('lsgev -v', shell=True, stdout=PIPE, stderr=STDOUT)
-    for line in p.stdout.readlines():
-        line = line.decode()
-        ip = line.split(']')[1].split('[')[1]
-        serial = line.split(']')[-2].split(':')[-1]
-        serialNumbers[ip] = serial
-    retval = p.wait()
-    loggerRoot.info('got serial numbers: %s' % serialNumbers)
-    return serialNumbers
-
-
-def click_autopilot():
-    global externalTriggerStatus
-
-    save_settings(None)
-    loggerRoot.info('Autopilot set to %s' % bool(autopilot.get()))
-    for app in apps:
-        if autopilot.get():
-            app.startStopButton.state(["disabled"])
-        else:
-            app.startStopButton.state(["!disabled"])
-            externalTriggerStatus = [[True]]
-
-
-def save_settings(event):
-    # it is called to often event hough window size is not changing
-    if event is not None:
-        if settings['geometry'] == root.geometry():
-            return
-    # gather setings
-    settings['geometry'] = root.geometry()
-    settings['autopilot'] = bool(autopilot.get())
-
-    # write settings
-    with open(SETTINGSFILE, "w+") as stream:
-        yaml.dump(settings, stream, default_flow_style=False,
-                  allow_unicode=True)
-    loggerRoot.debug('save_settings: %s' % settings)
-    return
-
-
-def read_settings(fname):
-    loggerRoot.info('read_settings: %s' % fname)
-    if fname is None:
-        return {}
-
-    try:
-        with open(fname, 'r') as stream:
-            settings = yaml.safe_load(stream)
-    except (FileNotFoundError, yaml.YAMLError) as e:
-        loggerRoot.error(e, exc_info=True)
-        settings = {}
-    else:
-        for k in ['storeallframes', 'autopilot']:
-            if k in settings.keys():
-                if settings[k] in ['true', 'True', 1]:
-                    settings[k] = True
-                elif settings[k] in ['false', 'False', 0]:
-                    settings[k] = False
-                else:
-                    raise ValueError('%s: %s' % (k, settings[k]))
-
-    loggerRoot.info('read_settings: %s' % settings)
-    return settings
-
-
-def killall():
-    loggerRoot.info('Closing GUI')
-    for app in apps:
-        app.writeToStatusFile('terminate, user')
-        app.quit()
-    root.destroy()
-
-
-def askopenfile():
-    file = filedialog.askopenfilename(filetypes=[("YAML files", ".yaml")])
-    if file is not None:
-        settings['configFile'] = file
-        configuration = read_settings(file)
-        save_settings(None)
-        messagebox.showwarning(title=None, message='Restart to apply settings')
-    else:
-        messagebox.showerror(title=None, message='File not found')
-
-
-def queryExternalTrigger(
-    nn,
-    triggerWidget,
-    root,
-    name,
-    address,
-    interval,
-    threshold,
-    minMax,
-    stopOnTimeout,
-    nBuffer,
-):
-
-    global externalTriggerStatus
-
-    if not bool(autopilot.get()):
-        triggerWidget.config(background="gray")
-        trigger.set('external trigger disabled')
-        root.after(100, lambda: queryExternalTrigger(
-            nn,
-            triggerWidget,
-            root,
-            name,
-            address,
-            interval,
-            threshold,
-            minMax,
-            stopOnTimeout,
-            nBuffer,
-        ))  # schedule next update
-        return
-
-    root.after(interval*1000, lambda: queryExternalTrigger(
-        nn,
-        triggerWidget,
-        root,
-        name,
-        address,
-        interval,
-        threshold,
-        minMax,
-        stopOnTimeout,
-        nBuffer,
-    ))  # schedule next update
-
-    # default values
-    data = {
-        'unit': '',
-        'measurement': np.nan,
-        'timestamp': np.datetime64('now'),
-    }
-
-    if minMax == 'min':
-        oper = operator.ge
-    elif minMax == 'min':
-        oper = operator.le
-    else:
-        raise ValueError('minMax must be min or max')
-
-    if stopOnTimeout in ['true', 'True', 1]:
-        stopOnTimeout = True
-    elif stopOnTimeout in ['false', 'False', 0]:
-        stopOnTimeout = False
-    else:
-        raise ValueError('stopOnTimeout: %s' % stopOnTimeout)
-
-    now = np.datetime64('now')
-    try:
-        response = urllib.request.urlopen(address, timeout=10).read(
-        ).decode('utf-8')
-    except (HTTPError, URLError) as error:
-        loggerRoot.error(
-            'queryExternalTrigger: Data not retrieved because %s URL: %s',
-            error, address)
-        if stopOnTimeout:
-            continueMeasurement = False
-        else:
-            continueMeasurement = True
-        measurement = '-'
-        unit = ''
-    else:
-        data = json.loads(response)[name]
-        loggerRoot.info('queryExternalTrigger: response %s' % str(data))
-
-        timeCond = (now - np.datetime64(data['timestamp']) <
-                    np.timedelta64(TRIGGERINTERVALLFACTOR * int(
-                        interval), 's'))
-        if timeCond:
-            continueMeasurement = oper(float(data['measurement']), threshold)
-        else:
-            loggerRoot.error('queryExternalTrigger: Data too old %s' %
-                             (np.datetime64(data['timestamp'])))
-            if stopOnTimeout:
-                continueMeasurement = False
-            else:
-                continueMeasurement = True
-
-    loggerRoot.info('queryExternalTrigger: continue Measurement %r' %
-                    continueMeasurement)
-
-    measurement = '%g' % data['measurement']
-    unit = data['unit']
-
-    externalTriggerStatus[nn].append(continueMeasurement)
-
-    if np.any(externalTriggerStatus[nn]):
-        triggerWidget.config(background="green")
-    else:
-        triggerWidget.config(background="red")
-    trigger.set('%s: %s %s %i/%i at %s' %
-                (name, measurement, unit, np.sum(externalTriggerStatus[nn]),
-                    nBuffer, data['timestamp']))
-
-    for app in apps:
-        app.statusWatcher()
-
-    return
-
 
 class QueueHandler(logging.Handler):
     """Class to send logging records to a queue
@@ -288,23 +79,28 @@ class QueueHandler(logging.Handler):
 
 
 class runCpp:
-    def __init__(self, mainframe, cameraConfig, configuration):
+    def __init__(self, parent, cameraConfig):
 
-        self.mainframe = mainframe
+        self.parent = parent
         self.cameraConfig = cameraConfig
-        self.configuration = configuration
+
+        self.configuration = parent.configuration
+        self.settings = parent.settings
+        self.hostname = parent.hostname
+        self.rootpath = parent.rootpath
+        
         self.name = cameraConfig['name']
         self.logger = logging.getLogger('Python:runCpp:%s' % self.name)
         self.loggerCpp = logging.getLogger('C++:%s' % self.name)
 
-        self.logDir = (f"{configuration['outdir']}/{hostname}_"
+        self.logDir = (f"{self.configuration['outdir']}/{self.hostname}_"
                        f"{self.cameraConfig['name']}_"
                        f"{self.cameraConfig['serialnumber']}/logs")
         try:
             os.mkdir(self.logDir)
         except FileExistsError:
             pass
-        self.statusDir = (f"{configuration['outdir']}/{hostname}_"
+        self.statusDir = (f"{self.configuration['outdir']}/{self.hostname}_"
                           f"{self.cameraConfig['name']}_"
                           f"{self.cameraConfig['serialnumber']}"
                           "/data")
@@ -334,27 +130,36 @@ class runCpp:
 
         self.configFName = '/tmp/%s.config' % self.name
 
+        if self.cameraConfig['follower'] in [True, 'true', 'True', 1]:
+            self.cameraConfig['follower'] = 1
+        elif self.cameraConfig['follower'] in [False, 'false', 'False', 0]:
+            self.cameraConfig['follower'] = 0
+        else:
+            raise ValueError("cameraConfig['follower'] must be True or False,"
+                " got %s"%cameraConfig['follower'])
+
         self.command = (
             f"/usr/bin/env bash"
-            f" {ROOTPATH}/launch_visss_data_acquisition.sh"
-            f" --IP={cameraConfig['ip']}"
-            f" --MAC={cameraConfig['mac']}"
-            f" --INTERFACE={cameraConfig['interface']}"
-            f" --MAXMTU={configuration['maxmtu']}"
-            f" --PRESET={configuration['preset']}"
-            f" --QUALITY={configuration['quality']}"
+            f" {self.rootpath}/launch_visss_data_acquisition.sh"
+            f" --IP={self.cameraConfig['ip']}"
+            f" --MAC={self.cameraConfig['mac']}"
+            f" --FOLLOWERMODE={self.cameraConfig['follower']}"
+            f" --INTERFACE={self.cameraConfig['interface']}"
+            f" --MAXMTU={self.configuration['maxmtu']}"
+            f" --PRESET={self.configuration['preset']}"
+            f" --QUALITY={self.configuration['quality']}"
             f" --CAMERACONFIG={self.configFName}"
-            f" --ROOTPATH={ROOTPATH}"
-            f" --OUTDIR={configuration['outdir']}"
-            f" --SITE={configuration['site']}"
+            f" --ROOTPATH={self.rootpath}"
+            f" --OUTDIR={self.configuration['outdir']}"
+            f" --SITE={self.configuration['site']}"
             f" --NAME={self.name}"
-            f" --FPS={configuration['fps']}"
-            f" --NTHREADS={configuration['storagethreads']}"
-            f" --NEWFILEINTERVAL={configuration['newfileinterval']}"
-            f" --STOREALLFRAMES={int(configuration['storeallframes'])}"
+            f" --FPS={self.configuration['fps']}"
+            f" --NTHREADS={self.configuration['storagethreads']}"
+            f" --NEWFILEINTERVAL={self.configuration['newfileinterval']}"
+            f" --STOREALLFRAMES={int(self.configuration['storeallframes'])}"
         )
 
-        frame1 = ttk.Frame(mainframe)
+        frame1 = ttk.Frame(self.parent.mainframe)
         frame1.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.statusWidget = ttk.Label(frame1, textvariable=self.status)
@@ -389,9 +194,9 @@ class runCpp:
         self.scrolled_text.tag_config(
             'CRITICAL', foreground='red', underline=1)
         # Start polling messages from the queue
-        self.mainframe.after(100, self.poll_log_queue)
+        self.parent.mainframe.after(100, self.poll_log_queue)
 
-        if settings['autopilot'] in [True, 'true', 'True', 1]:
+        if self.settings['autopilot'] in [True, 'true', 'True', 1]:
             self.clickStartStop(autopilot=True)
             self.startStopButton.state(["disabled"])
 
@@ -401,7 +206,7 @@ class runCpp:
         statusDir = (f'{self.statusDir}/{nowD.year}/'
                      f'{nowD.month:02}/{nowD.day:02}/')
 
-        statusFile = f'{statusDir}/{hostname}_{self.cameraConfig["name"]}_'
+        statusFile = f'{statusDir}/{self.hostname}_{self.cameraConfig["name"]}_'
         statusFile += f'{self.cameraConfig["serialnumber"]}_{nowD.year}'
         statusFile += f'{nowD.month:02}{nowD.day:02}_status.txt'
 
@@ -457,32 +262,31 @@ class runCpp:
             pass
 
     def statusWatcher(self):
-        global externalTriggerStatus
 
-        if np.any(externalTriggerStatus):
+        if np.any(self.parent.externalTriggerStatus):
             if self.running.get().startswith('Idle'):
                 self.logger.info('External trigger starts camera')
                 self.writeToStatusFile('start, trigger')
                 self.start(self.command.split(' '))
                 # line = 'EXTERNAL TRIGGER START: %s \n' % list(
-                # map(list, externalTriggerStatus))
+                # map(list, self.parent.externalTriggerStatus))
                 # self.text.insert(tk.END, line)
             else:
                 self.writeToStatusFile('continue, trigger')
-        elif (~np.any(externalTriggerStatus)):
+        elif (~np.any(self.parent.externalTriggerStatus)):
             if self.running.get().startswith('Running'):
                 self.logger.info('External trigger stops camera')
                 self.writeToStatusFile('stop, trigger')
                 self.quit()
                 # line = 'EXTERNAL TRIGGER STOP: %s \n' % list(
-                # map(list, externalTriggerStatus))
+                # map(list, self.parent.externalTriggerStatus))
                 # self.text.insert(tk.END, line)
                 # self.text.see("end")
             else:
                 self.writeToStatusFile('sleep, trigger')
         else:
             raise ValueError('do not understand %s' %
-                             list(map(list, externalTriggerStatus)))
+                             list(map(list, self.parent.externalTriggerStatus)))
             self.startStopButton.state(["disabled"])
 
     def start(self, command):
@@ -573,7 +377,7 @@ class runCpp:
                         # print(line4Logger)
                 # break # display no more than one line per 40 milliseconds
 
-        self.mainframe.after(100, self.update, q)  # schedule next update
+        self.parent.mainframe.after(100, self.update, q)  # schedule next update
 
     def display(self, record):
 
@@ -599,7 +403,7 @@ class runCpp:
                 break
             else:
                 self.display(record)
-        self.mainframe.after(100, self.poll_log_queue)
+        self.parent.mainframe.after(100, self.poll_log_queue)
 
     def quit(self):
         try:
@@ -626,115 +430,326 @@ class runCpp:
         self.statusWidget.config(background="yellow")
 
 
-SafeConstructor.add_constructor(u'tag:yaml.org,2002:bool', add_bool)
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-log',
-                    '--loglevel',
-                    default='info',
-                    help=('Provide logging level. Example --loglevel '
-                          'debug, default=info'))
-
-args = parser.parse_args()
+class GUI(object):
+    def __init__(self, loglevel):
+            
+        self.rootpath  = os.path.dirname(os.path.abspath(__file__))
 
 
-logging.basicConfig(level=args.loglevel.upper(),
-                    format=LOGFORMAT)
-loggerRoot = logging.getLogger('Python')
-loggerRoot.info('Launching GUI')
-loggerRoot.debug('Rootpath %s' % ROOTPATH)
+        logging.basicConfig(level=loglevel,
+                            format=LOGFORMAT)
+        self.loggerRoot = logging.getLogger('Python')
+        self.loggerRoot.info('Launching GUI')
+        self.loggerRoot.debug('Rootpath %s' % self.rootpath)
 
-hostname = gethostname()
-serialNumbers = getSerialNumbers()
-externalTriggerStatus = [[]]
+        self.hostname = gethostname()
+        self.getSerialNumbers()
+        self.externalTriggerStatus = [[]]
 
+        self.settings = deepcopy(DEFAULTSETTINGS)
+        self.settings.update(self.read_settings(SETTINGSFILE))
+        # reset geometery if broken
+        if self.settings['geometry'].startswith('1x1'):
+            self.settings['geometry'] = DEFAULTSETTINGS['geometry']
 
-settings = deepcopy(DEFAULTSETTINGS)
-settings.update(read_settings(SETTINGSFILE))
+        self.root = tk.Tk()
 
-# reset geometery if broken
-if settings['geometry'].startswith('1x1'):
-    settings['geometry'] = DEFAULTSETTINGS['geometry']
+        self.root.title("VISSS data acquisition")
+        self.root.bind("<Configure>", self.save_settings)
+        self.root.geometry(self.settings['geometry'])
 
-
-root = tk.Tk()
-
-root.title("VISSS data acquisition")
-root.bind("<Configure>", save_settings)
-root.geometry(settings['geometry'])
-
-# mainframe = tttk.Frame(root, padding="3 3 12 12")
-# mainframe.grid(column=0, row=0, sticky=(tk.N, tk.W, tk.E, tk.S))
+        # mainframe = tttk.Frame(self.root, padding="3 3 12 12")
+        # mainframe.grid(column=0, row=0, sticky=(tk.N, tk.W, tk.E, tk.S))
 
 
-mainframe = ttk.Frame(root)
-mainframe.pack(fill=tk.BOTH, expand=1)
+        self.mainframe = ttk.Frame(self.root)
+        self.mainframe.pack(fill=tk.BOTH, expand=1)
 
-root.columnconfigure(0, weight=1)
-root.rowconfigure(0, weight=1)
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
 
-config = ttk.Frame(mainframe)
-config.pack(side=tk.TOP, fill=tk.X)
-button = ttk.Button(config, text="Configuration File",
-                    command=lambda: askopenfile())
+        config = ttk.Frame(self.mainframe)
+        config.pack(side=tk.TOP, fill=tk.X)
+        button = ttk.Button(config, text="Configuration File",
+                            command=lambda: askopenfile())
 
-button.pack(side=tk.LEFT, anchor=tk.NW, pady=6, padx=(6, 0))
-try:
-    statusStr = settings['configFile'].split('/')[-1]
-except AttributeError:
-    statusStr = 'None'
-status = ttk.Label(config, text=statusStr)
-status.pack(side=tk.LEFT, pady=6, padx=(6, 0))
+        button.pack(side=tk.LEFT, anchor=tk.NW, pady=6, padx=(6, 0))
+        try:
+            statusStr = self.settings['configFile'].split('/')[-1]
+        except AttributeError:
+            statusStr = 'None'
+        status = ttk.Label(config, text=statusStr)
+        status.pack(side=tk.LEFT, pady=6, padx=(6, 0))
 
-configuration = read_settings(settings['configFile'])
-
-
-autopilot = tk.IntVar()
-ChkBttn = ttk.Checkbutton(
-    config,
-    text='Autopilot',
-    command=click_autopilot,
-    variable=autopilot)
-ChkBttn.pack(side=tk.LEFT, pady=6, padx=6)
-if settings['autopilot']:
-    ChkBttn.invoke()
+        self.configuration = self.read_settings(self.settings['configFile'])
 
 
-apps = []
-if 'camera' in configuration.keys():
-    for cameraConfig in configuration['camera']:
 
-        cameraConfig['serialnumber'] = serialNumbers[cameraConfig['ip']]
-        thisCamera = runCpp(
-            mainframe, cameraConfig, configuration)
-        apps.append(thisCamera)
-
-        # add loggers
-        loggerRoot.addHandler(thisCamera.queue_handler)
-        loggerRoot.addHandler(thisCamera.log_handler)
-        loggerRoot.debug('Adding %s camera ' % cameraConfig)
-
-if (('externalTrigger' in configuration.keys()) and
-        (configuration['externalTrigger'] is not None)):
-    externalTriggerStatus = []
-    for ee, externalTrigger in enumerate(configuration['externalTrigger']):
-
-        externalTriggerStatus.append(
-            collections.deque(maxlen=externalTrigger['nBuffer']))
-
-        trigger = tk.StringVar()
-        trigger.set('%s: -' % externalTrigger['name'])
-
-        triggerWidget = ttk.Label(config, textvariable=trigger, width=40)
-        triggerWidget.pack(side=tk.RIGHT, pady=6, padx=6)
-        triggerWidget.config(background="yellow")
-
-        loggerRoot.info('STARTING thread for %s trigger' % externalTrigger)
-
-        x = Thread(target=queryExternalTrigger, args=(
-            ee, triggerWidget, root,), kwargs=externalTrigger, daemon=True)
-        x.start()
+        self.autopilot = tk.IntVar()
 
 
-root.protocol("WM_DELETE_WINDOW", killall)
-root.mainloop()
+        self.apps = []
+        if 'camera' in self.configuration.keys():
+            for cameraConfig in self.configuration['camera']:
+
+                cameraConfig['serialnumber'] = self.serialNumbers[cameraConfig['ip']]
+                
+                thisCamera = runCpp(self, cameraConfig)
+                self.apps.append(thisCamera)
+
+                # add loggers
+                self.loggerRoot.addHandler(thisCamera.queue_handler)
+                self.loggerRoot.addHandler(thisCamera.log_handler)
+                self.loggerRoot.debug('Adding %s camera ' % cameraConfig)
+
+        ChkBttn = ttk.Checkbutton(
+            config,
+            text='Autopilot',
+            command=self.click_autopilot,
+            variable=self.autopilot)
+        ChkBttn.pack(side=tk.LEFT, pady=6, padx=6)
+        if self.settings['autopilot']:
+            ChkBttn.invoke()
+
+
+        if (('externalTrigger' in self.configuration.keys()) and
+                (self.configuration['externalTrigger'] is not None)):
+            self.externalTriggerStatus = []
+            for ee, externalTrigger in enumerate(self.configuration['externalTrigger']):
+
+                self.externalTriggerStatus.append(
+                    collections.deque(maxlen=externalTrigger['nBuffer']))
+
+                trigger = tk.StringVar()
+                trigger.set('%s: -' % externalTrigger['name'])
+
+                triggerWidget = ttk.Label(config, textvariable=trigger, width=40)
+                triggerWidget.pack(side=tk.RIGHT, pady=6, padx=6)
+                triggerWidget.config(background="yellow")
+
+                self.loggerRoot.info('STARTING thread for %s trigger' % externalTrigger)
+
+                x = Thread(target=self.queryExternalTrigger, args=(
+                    ee, trigger, triggerWidget,), kwargs=externalTrigger, daemon=True)
+                x.start()
+
+        return
+
+
+    def getSerialNumbers(self):
+        self.loggerRoot.debug('getting serial numbers')
+
+        self.serialNumbers = {}
+        p = Popen('lsgev -v', shell=True, stdout=PIPE, stderr=STDOUT)
+        for line in p.stdout.readlines():
+            line = line.decode()
+            ip = line.split(']')[1].split('[')[1]
+            serial = line.split(']')[-2].split(':')[-1]
+            self.serialNumbers[ip] = serial
+        retval = p.wait()
+        self.loggerRoot.info('got serial numbers: %s' % self.serialNumbers)
+
+    def click_autopilot(self):
+
+        self.save_settings(None)
+        self.loggerRoot.info('Autopilot set to %s' % bool(self.autopilot.get()))
+        for app in self.apps:
+            if self.autopilot.get():
+                app.startStopButton.state(["disabled"])
+            else:
+                app.startStopButton.state(["!disabled"])
+                self.externalTriggerStatus = [[True]]
+
+    def askopenfile(self):
+        file = filedialog.askopenfilename(filetypes=[("YAML files", ".yaml")])
+        if file is not None:
+            settings['configFile'] = file
+            self.configuration = self.read_settings(file)
+            save_settings(None)
+            messagebox.showwarning(title=None, message='Restart to apply settings')
+        else:
+            messagebox.showerror(title=None, message='File not found')
+
+    def read_settings(self, fname):
+        self.loggerRoot.info('read_settings: %s' % fname)
+        if fname is None:
+            return {}
+
+        try:
+            with open(fname, 'r') as stream:
+                settings = yaml.safe_load(stream)
+        except (FileNotFoundError, yaml.YAMLError) as e:
+            self.loggerRoot.error(e, exc_info=True)
+            settings = {}
+        else:
+            for k in ['storeallframes', 'autopilot']:
+                if k in settings.keys():
+                    if settings[k] in ['true', 'True', 1]:
+                        settings[k] = True
+                    elif settings[k] in ['false', 'False', 0]:
+                        settings[k] = False
+                    else:
+                        raise ValueError('%s: %s' % (k, settings[k]))
+
+        self.loggerRoot.info('read_settings: %s' % settings)
+        return settings
+
+    def save_settings(self, event):
+        # it is called to often event hough window size is not changing
+        if event is not None:
+            if self.settings['geometry'] == self.root.geometry():
+                return
+        # gather setings
+        self.settings['geometry'] = self.root.geometry()
+        self.settings['autopilot'] = bool(self.autopilot.get())
+
+        # write settings
+        with open(SETTINGSFILE, "w+") as stream:
+            yaml.dump(self.settings, stream, default_flow_style=False,
+                      allow_unicode=True)
+        self.loggerRoot.debug('save_settings: %s' % self.settings)
+        return
+
+    def killall(self):
+        self.loggerRoot.info('Closing GUI')
+        for app in self.apps:
+            app.writeToStatusFile('terminate, user')
+            app.quit()
+        self.root.destroy()
+
+
+
+
+    def queryExternalTrigger(
+        self,
+        nn,
+        trigger,
+        triggerWidget,
+        name,
+        address,
+        interval,
+        threshold,
+        minMax,
+        stopOnTimeout,
+        nBuffer,
+    ):
+
+
+        if not bool(self.autopilot.get()):
+            triggerWidget.config(background="gray")
+            trigger.set('external trigger disabled')
+            self.root.after(100, lambda: self.queryExternalTrigger(
+                nn,
+                trigger,
+                triggerWidget,
+                name,
+                address,
+                interval,
+                threshold,
+                minMax,
+                stopOnTimeout,
+                nBuffer,
+            ))  # schedule next update
+            return
+
+        self.root.after(interval*1000, lambda: self.queryExternalTrigger(
+            nn,
+            trigger,
+            triggerWidget,
+            name,
+            address,
+            interval,
+            threshold,
+            minMax,
+            stopOnTimeout,
+            nBuffer,
+        ))  # schedule next update
+
+        # default values
+        data = {
+            'unit': '',
+            'measurement': np.nan,
+            'timestamp': np.datetime64('now'),
+        }
+
+        if minMax == 'min':
+            oper = operator.ge
+        elif minMax == 'min':
+            oper = operator.le
+        else:
+            raise ValueError('minMax must be min or max')
+
+        if stopOnTimeout in ['true', 'True', 1]:
+            stopOnTimeout = True
+        elif stopOnTimeout in ['false', 'False', 0]:
+            stopOnTimeout = False
+        else:
+            raise ValueError('stopOnTimeout: %s' % stopOnTimeout)
+
+        now = np.datetime64('now')
+        try:
+            response = urllib.request.urlopen(address, timeout=10).read(
+            ).decode('utf-8')
+        except (HTTPError, URLError) as error:
+            self.loggerRoot.error(
+                'queryExternalTrigger: Data not retrieved because %s URL: %s',
+                error, address)
+            if stopOnTimeout:
+                continueMeasurement = False
+            else:
+                continueMeasurement = True
+            measurement = '-'
+            unit = ''
+        else:
+            data = json.loads(response)[name]
+            self.loggerRoot.info('queryExternalTrigger: response %s' % str(data))
+
+            timeCond = (now - np.datetime64(data['timestamp']) <
+                        np.timedelta64(TRIGGERINTERVALLFACTOR * int(
+                            interval), 's'))
+            if timeCond:
+                continueMeasurement = oper(float(data['measurement']), threshold)
+            else:
+                self.loggerRoot.error('queryExternalTrigger: Data too old %s' %
+                                 (np.datetime64(data['timestamp'])))
+                if stopOnTimeout:
+                    continueMeasurement = False
+                else:
+                    continueMeasurement = True
+
+        self.loggerRoot.info('queryExternalTrigger: continue Measurement %r' %
+                        continueMeasurement)
+
+        measurement = '%g' % data['measurement']
+        unit = data['unit']
+
+        self.externalTriggerStatus[nn].append(continueMeasurement)
+
+        if np.any(self.externalTriggerStatus[nn]):
+            triggerWidget.config(background="green")
+        else:
+            triggerWidget.config(background="red")
+        trigger.set('%s: %s %s %i/%i at %s' %
+                    (name, measurement, unit, np.sum(self.externalTriggerStatus[nn]),
+                        nBuffer, data['timestamp']))
+
+        for app in self.apps:
+            app.statusWatcher()
+
+        return
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-log',
+                        '--loglevel',
+                        default='info',
+                        help=('Provide logging level. Example --loglevel '
+                              'debug, default=info'))
+
+    args = parser.parse_args()
+    visssgui = GUI(args.loglevel.upper())
+    visssgui.root.protocol("WM_DELETE_WINDOW", visssgui.killall)
+    visssgui.root.mainloop()
+

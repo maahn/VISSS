@@ -47,6 +47,7 @@ const char* params
       "{ newfileinterval i | 300               | write new file very ?s. Set to 0 to deactivate}"
       "{ maxframes m       | -1                | stop after this many frames (for debugging) }"
       "{ writeallframes w  | 0                 | write all frames whether sth is moving or not (for debugging) }"
+      "{ followermode d    | 0                 | do not complain about camera timeouts }"
       "{ nopreview         |                   | no preview window }"
       "{ novideo           |                   | do not store video data }"
       "{ nometadata        |                   | do not store meta data }"
@@ -215,6 +216,7 @@ void *ImageCaptureThread( void *context)
     bool reset_clock = true;
     bool first_image = true;
     long int timeNow = 0;
+    long int timeStart = 0;
     long int framesInFile = 0;
    GEV_STATUS status = 0;
     GEV_STATUS statusF = 0;
@@ -255,6 +257,7 @@ void *ImageCaptureThread( void *context)
         uint last_id = 0;
 
         std::cout << "DEBUG | " << get_timestamp() << "| " << "Capture Loop ready" << std::endl;
+        timeStart = static_cast<long int> (time(NULL));
 
         // While we are still running.
         while(!captureContext->exit)
@@ -263,27 +266,28 @@ void *ImageCaptureThread( void *context)
             reset_clock  = (
                 (new_file_interval > 0) && 
                 (timeNow % new_file_interval == 0) && 
-                (framesInFile > (captureContext->fps * 2))
+                ((timeNow - timeStart) > 10)
                 ) ;
 
             if (reset_clock || first_image) { 
                 t_reset = std::chrono::system_clock::now();
                 statusF = GevSetFeatureValueAsString(captureContext->camHandle, "timestampControlReset", "1");
                 if (statusF == GEVLIB_OK) {
-                    std::cout << std::endl << "INFO | " << get_timestamp() << " | Did reset clock to " << 
+                    std::cout << std::endl << "INFO | " << get_timestamp() << " | Reset clock to " << 
                     t_reset.time_since_epoch().count()/1000 << std::endl;
                 } else {
                     std::cout << std::endl << "ERROR | " << get_timestamp() << " | Unable to reset clock" << std::endl;
                 }
                 first_image = false;
                 framesInFile = 0;
+                timeStart = static_cast<long int> (time(NULL));
             }
 
 
             GEV_BUFFER_OBJECT *img = NULL;
             GEV_STATUS status = 0;
             // Wait for images to be received
-            status = GevWaitForNextImage(captureContext->camHandle, &img, 2000);
+            status = GevWaitForNextImage(captureContext->camHandle, &img, 1000);
 
             if ((img != NULL) && (status == GEVLIB_OK))
             {
@@ -433,9 +437,20 @@ void *ImageCaptureThread( void *context)
             else if (status  == GEVLIB_ERROR_TIME_OUT)
             {
                 if (captureContext->enable_sequence) {
-                    n_timeouts += 1;
-                    std::cerr << "ERROR | " << get_timestamp() <<" | Camera time out"
-                    << " #" << n_timeouts << std::endl;
+                    if (followermode) {
+                        if (timeNow % new_file_interval == 0) {
+                            std::cerr << "INFO | " << get_timestamp() <<" | Waiting for trigger camera"
+                            << std::endl;
+                        } else {
+                            std::cerr << "STATUS | " << get_timestamp() <<" | Waiting for trigger camera"
+                            << std::endl;
+                        }
+                    }
+                    else {
+                        n_timeouts += 1;
+                        std::cerr << "ERROR | " << get_timestamp() <<" | Camera time out"
+                        << " #" << n_timeouts << std::endl;
+                    }
                 }
             }
             else {
@@ -563,6 +578,7 @@ int main(int argc, char *argv[])
     char c;
     int res = 0;
     int writeallframes1;
+    int followermode1;
     FILE *fp = NULL;
     FILE *fp2 = NULL;
     // char uniqueName[FILENAME_MAX];
@@ -634,6 +650,16 @@ int main(int argc, char *argv[])
         std::cerr << "FATAL ERROR | " << get_timestamp() << "| writeallframes must be 0 or 1 " << context.preset<< std::endl;
         global_error = true;
     }
+    followermode1 = parser.get<int>("followermode");
+    if (followermode1 == 0) {
+        followermode = false;
+    } else if (followermode1 == 1) {
+        followermode = true;
+    } else {
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| followermode must be 0 or 1 " << context.preset<< std::endl;
+        global_error = true;
+    }
+
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: writeallframes "<< writeallframes << " " << writeallframes1 << std::endl;
     showPreview = !parser.has("nopreview");
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: showPreview "<< showPreview << std::endl;
@@ -1038,6 +1064,12 @@ int main(int argc, char *argv[])
             //camOptions.heartbeat_timeout_ms = 60000;      // For debugging (delay camera timeout while in debugger)
             camOptions.heartbeat_timeout_ms = 5000;     // Disconnect detection (5 seconds)
             camOptions.enable_passthru_mode = false;
+
+
+            camOptions.streamNumFramesBuffered = 20;             // Buffer frames internally.
+
+
+
 #if TUNE_STREAMING_THREADS
             // Some tuning can be done here. (see the manual)
             camOptions.streamFrame_timeout_ms = 2001;               // Internal timeout for frame reception.

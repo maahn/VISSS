@@ -1,5 +1,6 @@
 camera:
 - name: visss_trigger
+  follower: False
   interface: enp35s0f0
   ip: 192.168.100.2
   mac: 00:01:0D:C3:0F:34
@@ -33,7 +34,7 @@ fps: 140
 storeallframes: False
 newfileinterval: 600
 externalTrigger:
-- name: MiRAC
+- name: random
   address: http://localhost:8123/
   interval: 60
   threshold: 0

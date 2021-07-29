@@ -62,6 +62,7 @@ int maxframes = -1;
 int frameborder = 64;
 int new_file_interval = 300;
 bool writeallframes = false;
+bool followermode = false;
 bool storeVideo = true;
 bool storeMeta = true;
 bool showPreview = true;

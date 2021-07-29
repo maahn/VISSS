@@ -1,0 +1,6 @@
+ERROR no files /data/lim/visss_visss_slave_S1143155/data/2021/02/*.mov 
+ERROR no files /data/lim/visss_visss_slave_S1143155/data/2021/03/*.mov 
+ERROR no files /data/lim/visss_visss_slave_S1143155/data/2021/06/*.mov 
+ERROR no files /data/lim/visss_visss_slave_S1143155/data/2021/05/*.mov 
+ERROR no files /data/lim/visss_visss_slave_S1143155/data/2021/04/*.mov 
+ERROR no files /data/lim/visss_visss_slave_S1143155/data/2021/01/*.mov 
