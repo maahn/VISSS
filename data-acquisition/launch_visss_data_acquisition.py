@@ -11,6 +11,7 @@ import logging
 import logging.handlers
 import operator
 import os
+import pathlib
 import queue
 import signal
 import string
@@ -97,7 +98,7 @@ class runCpp:
                        f"{self.cameraConfig['name']}_"
                        f"{self.cameraConfig['serialnumber']}/logs")
         try:
-            os.mkdir(self.logDir)
+            pathlib.Path(self.logDir).mkdir( parents=True, exist_ok=True )
         except FileExistsError:
             pass
         self.statusDir = (f"{self.configuration['outdir']}/{self.hostname}_"
@@ -146,6 +147,7 @@ class runCpp:
             f" --FOLLOWERMODE={self.cameraConfig['follower']}"
             f" --INTERFACE={self.cameraConfig['interface']}"
             f" --MAXMTU={self.configuration['maxmtu']}"
+            f" --LIVERATIO={self.configuration['liveratio']}"
             f" --PRESET={self.configuration['preset']}"
             f" --QUALITY={self.configuration['quality']}"
             f" --CAMERACONFIG={self.configFName}"
@@ -211,7 +213,7 @@ class runCpp:
         statusFile += f'{nowD.month:02}{nowD.day:02}_status.txt'
 
         try:
-            os.mkdir(statusDir)
+            pathlib.Path(statusDir).mkdir( parents=True, exist_ok=True )
         except FileExistsError:
             pass
 
@@ -472,7 +474,7 @@ class GUI(object):
         config = ttk.Frame(self.mainframe)
         config.pack(side=tk.TOP, fill=tk.X)
         button = ttk.Button(config, text="Configuration File",
-                            command=lambda: askopenfile())
+                            command=lambda: self.askopenfile())
 
         button.pack(side=tk.LEFT, anchor=tk.NW, pady=6, padx=(6, 0))
         try:
@@ -564,9 +566,9 @@ class GUI(object):
     def askopenfile(self):
         file = filedialog.askopenfilename(filetypes=[("YAML files", ".yaml")])
         if file is not None:
-            settings['configFile'] = file
+            self.settings['configFile'] = file
             self.configuration = self.read_settings(file)
-            save_settings(None)
+            self.save_settings(None)
             messagebox.showwarning(title=None, message='Restart to apply settings')
         else:
             messagebox.showerror(title=None, message='File not found')

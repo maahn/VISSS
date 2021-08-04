@@ -438,7 +438,7 @@ void *ImageCaptureThread( void *context)
             {
                 if (captureContext->enable_sequence) {
                     if (followermode) {
-                        if (timeNow % new_file_interval == 0) {
+                        if ((new_file_interval == 0) || (timeNow % new_file_interval == 0)) {
                             std::cerr << "INFO | " << get_timestamp() <<" | Waiting for trigger camera"
                             << std::endl;
                         } else {

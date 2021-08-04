@@ -59,6 +59,9 @@ while [ $# -gt 0 ]; do
     --FOLLOWERMODE=*)
       FOLLOWERMODE="${1#*=}"
       ;;
+    --LIVERATIO=*)
+      LIVERATIO="${1#*=}"
+      ;;
     --SETTINGS=*)
       SETTINGS="${1#*=}"
       ;;
@@ -99,8 +102,6 @@ fi
 
 df -H | grep /data | awk '{ print "STORAGE USED " $5 " " $6 }'
 
-/bin/mkdir -p $OUTDIR/logs
-
 set -o pipefail
 
 cd $ROOTPATH
@@ -139,7 +140,7 @@ for (( ; ; ))
 do
 
 	timestamp=$(/bin/date +%FT%T)
-	COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -d=$FOLLOWERMODE $CAMERACONFIG $IP"
+	COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -d=$FOLLOWERMODE $CAMERACONFIG $IP"
 	/bin/echo "BASH $COMMAND"
 	if $COMMAND
 			then
