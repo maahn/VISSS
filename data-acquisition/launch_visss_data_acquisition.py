@@ -489,21 +489,23 @@ class GUI(object):
 
 
         self.autopilot = tk.IntVar()
-
-
         self.apps = []
-        if 'camera' in self.configuration.keys():
-            for cameraConfig in self.configuration['camera']:
 
-                cameraConfig['serialnumber'] = self.serialNumbers[cameraConfig['ip']]
-                
-                thisCamera = runCpp(self, cameraConfig)
-                self.apps.append(thisCamera)
+        if self.serialNumbers is None:
+            messagebox.showerror(title=None, message='No cameras found')
+        else:
+            if 'camera' in self.configuration.keys():
+                for cameraConfig in self.configuration['camera']:
 
-                # add loggers
-                self.loggerRoot.addHandler(thisCamera.queue_handler)
-                self.loggerRoot.addHandler(thisCamera.log_handler)
-                self.loggerRoot.debug('Adding %s camera ' % cameraConfig)
+                    cameraConfig['serialnumber'] = self.serialNumbers[cameraConfig['ip']]
+                    
+                    thisCamera = runCpp(self, cameraConfig)
+                    self.apps.append(thisCamera)
+
+                    # add loggers
+                    self.loggerRoot.addHandler(thisCamera.queue_handler)
+                    self.loggerRoot.addHandler(thisCamera.log_handler)
+                    self.loggerRoot.debug('Adding %s camera ' % cameraConfig)
 
         ChkBttn = ttk.Checkbutton(
             config,
@@ -546,6 +548,9 @@ class GUI(object):
         p = Popen('lsgev -v', shell=True, stdout=PIPE, stderr=STDOUT)
         for line in p.stdout.readlines():
             line = line.decode()
+            if line.startswith('0 cameras detected'):
+                self.serialNumbers = None
+                return
             ip = line.split(']')[1].split('[')[1]
             serial = line.split(']')[-2].split(':')[-1]
             self.serialNumbers[ip] = serial
