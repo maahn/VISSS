@@ -10,6 +10,7 @@ newfileinterval: 600
 liveratio: 70
 camera:
 - name: visss_trigger
+  serialnumber: S1145792
   follower: False
   interface: enp35s0f0
   ip: 192.168.100.2
@@ -35,6 +36,7 @@ camera:
       outputLinePulseDelay: 0
     sensorFpnCorrectionMode: Off
 - name: visss_follower
+  serialnumber: S1143155
   follower: True
   interface: enp35s0f1
   ip: 192.168.200.2

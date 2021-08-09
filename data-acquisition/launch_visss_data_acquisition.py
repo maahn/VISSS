@@ -446,7 +446,7 @@ class GUI(object):
         self.loggerRoot.debug('Rootpath %s' % self.rootpath)
 
         self.hostname = gethostname()
-        self.getSerialNumbers()
+        #self.getSerialNumbers()
         self.externalTriggerStatus = [[]]
 
         self.settings = deepcopy(DEFAULTSETTINGS)
@@ -494,9 +494,7 @@ class GUI(object):
         self.apps = []
         if 'camera' in self.configuration.keys():
             for cameraConfig in self.configuration['camera']:
-
-                cameraConfig['serialnumber'] = self.serialNumbers[cameraConfig['ip']]
-                
+              
                 thisCamera = runCpp(self, cameraConfig)
                 self.apps.append(thisCamera)
 
@@ -551,6 +549,7 @@ class GUI(object):
             self.serialNumbers[ip] = serial
         retval = p.wait()
         self.loggerRoot.info('got serial numbers: %s' % self.serialNumbers)
+
 
     def click_autopilot(self):
 

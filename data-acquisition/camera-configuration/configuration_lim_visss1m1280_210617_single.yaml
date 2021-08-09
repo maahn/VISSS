@@ -1,5 +1,6 @@
 camera:
 - name: visss_trigger
+  serialnumber: S1145792
   follower: False
   interface: enp35s0f0
   ip: 192.168.100.2
