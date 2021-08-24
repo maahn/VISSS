@@ -1,0 +1,25 @@
+maxmtu: '9216'
+outdir: /home/visss/data_test
+preset: ultrafast
+quality: 17
+site: IGM
+storagethreads: 4
+fps: 200
+storeallframes: False
+newfileinterval: 600
+liveratio: 100
+camera:
+- name: visss2_follower
+  serialnumber: S1242357
+  follower: True
+  interface: enp4s0
+  ip: 192.168.200.2
+  mac: 00:01:0D:C5:57:55
+  teledyneparameters:
+    TestImageSelector: Off
+    ExposureMode: Timed
+    ExposureTime: 200
+    TriggerSelector: FrameStart
+    TriggerMode: On
+    TriggerSource: Line1
+externalTrigger: []
