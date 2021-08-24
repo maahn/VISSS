@@ -119,6 +119,7 @@ if ping -c 1 $IP > /dev/null
 	:
 else
 	/bin/echo "BASH Set camera IP address (just to be sure)"
+  /bin/echo "BASH /usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0"
 	/usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0
 fi
 
