@@ -101,6 +101,9 @@ class runCpp:
             pathlib.Path(self.logDir).mkdir( parents=True, exist_ok=True )
         except FileExistsError:
             pass
+        except PermissionError:
+            messagebox.showerror(title=None, message='Cannot create %s'%self.logDir)
+            raise PermissionError
         self.statusDir = (f"{self.configuration['outdir']}/{self.hostname}_"
                           f"{self.cameraConfig['name']}_"
                           f"{self.cameraConfig['serialnumber']}"
