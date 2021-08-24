@@ -583,6 +583,7 @@ class GUI(object):
                 settings = yaml.safe_load(stream)
         except (FileNotFoundError, yaml.YAMLError) as e:
             self.loggerRoot.error(e, exc_info=True)
+            messagebox.showerror(title=None, message='File %s not found'%fname)
             settings = {}
         else:
             for k in ['storeallframes', 'autopilot']:
