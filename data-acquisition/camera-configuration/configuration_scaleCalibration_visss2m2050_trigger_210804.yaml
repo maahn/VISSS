@@ -1,0 +1,29 @@
+maxmtu: '9216'
+outdir: /data/scaleCalibration
+preset: ultrafast
+quality: 17
+site: SCALECALIB
+storagethreads: 4
+fps: 10
+storeallframes: False
+newfileinterval: 0
+liveratio: 10
+camera:
+- name: visss2_trigger
+  serialnumber: S1242799
+  follower: False
+  interface: enp4s0
+  ip: 192.168.100.2
+  mac: 00:01:0D:C5:59:C6
+  teledyneparameters:
+    TestImageSelector: Off
+    ExposureMode: Timed
+    ExposureTime: 50000
+    TriggerMode: Off
+    AcquisitionFrameRate: 10
+    IO:
+    - LineSelector: Line3
+      outputLineSource: Off
+    - LineSelector: Line4
+      outputLineSource: Off
+externalTrigger: []
