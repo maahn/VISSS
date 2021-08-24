@@ -446,7 +446,7 @@ class GUI(object):
         self.loggerRoot.debug('Rootpath %s' % self.rootpath)
 
         self.hostname = gethostname()
-        self.getSerialNumbers()
+        #self.getSerialNumbers()
         self.externalTriggerStatus = [[]]
 
         self.settings = deepcopy(DEFAULTSETTINGS)
@@ -490,22 +490,16 @@ class GUI(object):
 
         self.autopilot = tk.IntVar()
         self.apps = []
+        if 'camera' in self.configuration.keys():
+            for cameraConfig in self.configuration['camera']:
+              
+                thisCamera = runCpp(self, cameraConfig)
+                self.apps.append(thisCamera)
 
-        if self.serialNumbers is None:
-            messagebox.showerror(title=None, message='No cameras found')
-        else:
-            if 'camera' in self.configuration.keys():
-                for cameraConfig in self.configuration['camera']:
-
-                    cameraConfig['serialnumber'] = self.serialNumbers[cameraConfig['ip']]
-                    
-                    thisCamera = runCpp(self, cameraConfig)
-                    self.apps.append(thisCamera)
-
-                    # add loggers
-                    self.loggerRoot.addHandler(thisCamera.queue_handler)
-                    self.loggerRoot.addHandler(thisCamera.log_handler)
-                    self.loggerRoot.debug('Adding %s camera ' % cameraConfig)
+                # add loggers
+                self.loggerRoot.addHandler(thisCamera.queue_handler)
+                self.loggerRoot.addHandler(thisCamera.log_handler)
+                self.loggerRoot.debug('Adding %s camera ' % cameraConfig)
 
         ChkBttn = ttk.Checkbutton(
             config,
@@ -556,6 +550,7 @@ class GUI(object):
             self.serialNumbers[ip] = serial
         retval = p.wait()
         self.loggerRoot.info('got serial numbers: %s' % self.serialNumbers)
+
 
     def click_autopilot(self):
 
