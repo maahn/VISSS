@@ -4,10 +4,10 @@ preset: faster
 quality: 17
 site: SCALECALIB
 storagethreads: 1
-fps: 10
+fps: 140
 storeallframes: False
 newfileinterval: 0
-liveratio: 2
+liveratio: 10
 camera:
 - name: visss_trigger
   serialnumber: S1145792
@@ -19,17 +19,21 @@ camera:
     TestImageSelector: Off
     fastReadoutMode: Off
     ExposureMode: Timed
-    ExposureTime: 400
+    ExposureTime: 200
     GainSelector: SensorAnalog
     Gain: 1
     BlackLevelRaw: 1
     TriggerMode: Off
-    AcquisitionFrameRate: 10
+    AcquisitionFrameRate: 140
     IO:
     - LineSelector: Line3
-      outputLineSource: Off
+      outputLineSource: PulseOnStartofExposure
+      outputLinePulseDuration: 60
+      outputLinePulseDelay: 40
     - LineSelector: Line4
-      outputLineSource: Off
+      outputLineSource: PulseOnStartofExposure
+      outputLinePulseDuration: 30
+      outputLinePulseDelay: 0
     sensorFpnCorrectionMode: Off
 - name: visss_follower
   serialnumber: S1143155
@@ -41,16 +45,12 @@ camera:
     TestImageSelector: Off
     fastReadoutMode: Off
     ExposureMode: Timed
-    ExposureTime: 400
+    ExposureTime: 200
     GainSelector: SensorAnalog
     Gain: 1
     BlackLevelRaw: 1
-    TriggerMode: Off
-    AcquisitionFrameRate: 10
-    IO:
-    - LineSelector: Line3
-      outputLineSource: Off
-    - LineSelector: Line4
-      outputLineSource: Off
+    TriggerSelector: FrameStart
+    TriggerMode: On
+    TriggerSource: Line1
     sensorFpnCorrectionMode: Off
 externalTrigger: []
