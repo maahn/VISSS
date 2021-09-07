@@ -2,7 +2,7 @@
 Version=1.0
 Name=Visss GUI       
 Comment=Launch VISSS GUI
-Exec=/usr/bin/python3 /home/visss/Desktop/VISSS/data-acquisition/launch_visss_data_acquisition.py
+Exec=/usr/bin/python3 /home/visss/VISSS/data-acquisition/launch_visss_data_acquisition.py
 Icon=applets-screenshooter
 Terminal=false
 Type=Application

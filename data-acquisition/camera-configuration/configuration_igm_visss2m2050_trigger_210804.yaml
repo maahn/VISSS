@@ -1,0 +1,40 @@
+maxmtu: '9216'
+outdir: /home/visss/test_data
+preset: ultrafast
+quality: 17
+site: IGM
+storagethreads: 4
+fps: 200
+storeallframes: False
+newfileinterval: 600
+liveratio: 100
+camera:
+- name: visss2_trigger
+  serialnumber: S1242799
+  follower: False
+  interface: enp4s0
+  ip: 192.168.100.2
+  mac: 00:01:0D:C5:59:C6
+  teledyneparameters:
+    TestImageSelector: Off
+    ExposureMode: Timed
+    ExposureTime: 200
+    TriggerMode: Off
+    AcquisitionFrameRate: 100
+    IO:
+    - LineSelector: Line3
+      outputLineSource: PulseOnStartofExposure
+      outputLinePulseDuration: 60
+      outputLinePulseDelay: 40
+    - LineSelector: Line4
+      outputLineSource: PulseOnStartofExposure
+      outputLinePulseDuration: 30
+      outputLinePulseDelay: 0
+externalTrigger:
+- name: random
+  address: http://localhost:8123/
+  interval: 60
+  threshold: 0
+  minMax: min
+  stopOnTimeout: True
+  nBuffer: 5

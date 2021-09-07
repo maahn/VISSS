@@ -101,6 +101,9 @@ class runCpp:
             pathlib.Path(self.logDir).mkdir( parents=True, exist_ok=True )
         except FileExistsError:
             pass
+        except PermissionError:
+            messagebox.showerror(title=None, message='Cannot create %s'%self.logDir)
+            raise PermissionError
         self.statusDir = (f"{self.configuration['outdir']}/{self.hostname}_"
                           f"{self.cameraConfig['name']}_"
                           f"{self.cameraConfig['serialnumber']}"
@@ -489,8 +492,6 @@ class GUI(object):
 
 
         self.autopilot = tk.IntVar()
-
-
         self.apps = []
         if 'camera' in self.configuration.keys():
             for cameraConfig in self.configuration['camera']:
@@ -544,6 +545,9 @@ class GUI(object):
         p = Popen('lsgev -v', shell=True, stdout=PIPE, stderr=STDOUT)
         for line in p.stdout.readlines():
             line = line.decode()
+            if line.startswith('0 cameras detected'):
+                self.serialNumbers = None
+                return
             ip = line.split(']')[1].split('[')[1]
             serial = line.split(']')[-2].split(':')[-1]
             self.serialNumbers[ip] = serial
@@ -582,6 +586,7 @@ class GUI(object):
                 settings = yaml.safe_load(stream)
         except (FileNotFoundError, yaml.YAMLError) as e:
             self.loggerRoot.error(e, exc_info=True)
+            messagebox.showerror(title=None, message='File %s not found'%fname)
             settings = {}
         else:
             for k in ['storeallframes', 'autopilot']:
