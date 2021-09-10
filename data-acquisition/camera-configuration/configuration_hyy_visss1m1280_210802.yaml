@@ -53,11 +53,4 @@ camera:
     TriggerMode: On
     TriggerSource: Line1
     sensorFpnCorrectionMode: Off
-externalTrigger:
-- name: random
-  address: http://localhost:8123/
-  interval: 60
-  threshold: 0
-  minMax: min
-  stopOnTimeout: True
-  nBuffer: 5
+externalTrigger: []

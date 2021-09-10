@@ -75,6 +75,29 @@ sudo nano /etc/apache2/apache2.conf
 
 sudo timedatectl set-timezone UTC
 
+###### VPN
+
+add file
+
+/etc/polkit-1/localauthority/10-vendor.d/org.freedesktop.NetworkManager.pkla
+
+with
+--
+[nm-applet]
+Identity=unix-user:visss
+Action=org.freedesktop.NetworkManager.*
+ResultAny=yes
+ResultInactive=no
+ResultActive=yes
+--
+VPN script  vpn_reconnect.sh:
+--
+CON="vpn.uni-leipzig.de"
+STATUS=`nmcli con show --active | grep $CON | cut -f1 -d " "`
+if [ -z "$STATUS" ]; then
+    nmcli con up $CON
+fi
+--
 
 
 ####create RAID
