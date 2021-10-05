@@ -77,11 +77,7 @@ sudo timedatectl set-timezone UTC
 
 ###### VPN
 
-add file
-
-/etc/polkit-1/localauthority/10-vendor.d/org.freedesktop.NetworkManager.pkla
-
-with
+add file "/etc/polkit-1/localauthority/10-vendor.d/org.freedesktop.NetworkManager.pkla" with:
 --
 [nm-applet]
 Identity=unix-user:visss
@@ -90,7 +86,8 @@ ResultAny=yes
 ResultInactive=no
 ResultActive=yes
 --
-VPN script  vpn_reconnect.sh:
+
+create VPN script  "vpn_reconnect.sh" with:
 --
 CON="vpn.uni-leipzig.de"
 STATUS=`nmcli con show --active | grep $CON | cut -f1 -d " "`
@@ -98,6 +95,12 @@ if [ -z "$STATUS" ]; then
     nmcli con up $CON
 fi
 --
+
+add to cron with "crontab -e" and add: 
+--
+* * * * * /home/visss/vpn_reconnect.sh  > /home/visss/vpn_reconnect.log 2>&1
+--
+
 
 
 ####create RAID
