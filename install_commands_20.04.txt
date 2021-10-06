@@ -87,8 +87,9 @@ ResultInactive=no
 ResultActive=yes
 --
 
-create VPN script  "vpn_reconnect.sh" with:
+create VPN script  "/home/visss/vpn_reconnect.sh" with:
 --
+#!/bin/bash
 CON="vpn.uni-leipzig.de"
 STATUS=`nmcli con show --active | grep $CON | cut -f1 -d " "`
 if [ -z "$STATUS" ]; then
@@ -96,7 +97,7 @@ if [ -z "$STATUS" ]; then
 fi
 --
 
-add to cron with "crontab -e" and add: 
+do "chmod +x /home/visss/vpn_reconnect.sh" and add to cron with "crontab -e" and add: 
 --
 * * * * * /home/visss/vpn_reconnect.sh  > /home/visss/vpn_reconnect.log 2>&1
 --
