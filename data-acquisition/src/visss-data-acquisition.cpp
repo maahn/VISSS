@@ -276,7 +276,7 @@ void *ImageCaptureThread( void *context)
                     std::cout << std::endl << "INFO | " << get_timestamp() << " | Reset clock to " << 
                     t_reset.time_since_epoch().count()/1000 << std::endl;
                 } else {
-                    std::cout << std::endl << "ERROR | " << get_timestamp() << " | Unable to reset clock" << std::endl;
+                    std::cout << std::endl << "ERROR | " << get_timestamp() << " | Unable to reset clock, error " << statusF << std::endl;
                 }
                 first_image = false;
                 framesInFile = 0;
