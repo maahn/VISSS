@@ -1,5 +1,5 @@
 maxmtu: '9216'
-outdir: /data
+outdir: /data/nyaalesund
 preset: ultrafast
 quality: 17
 site: NYA

@@ -1,5 +1,5 @@
 maxmtu: '9216'
-outdir: /data
+outdir: /data/nyaalesund
 preset: ultrafast
 quality: 17
 site: NYA
@@ -30,11 +30,4 @@ camera:
       outputLineSource: PulseOnStartofExposure
       outputLinePulseDuration: 30
       outputLinePulseDelay: 0
-externalTrigger:
-- name: random
-  address: http://localhost:8123/
-  interval: 60
-  threshold: 0
-  minMax: min
-  stopOnTimeout: True
-  nBuffer: 5
+externalTrigger: []
