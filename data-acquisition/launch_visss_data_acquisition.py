@@ -142,7 +142,12 @@ class runCpp:
             raise ValueError("cameraConfig['follower'] must be True or False,"
                 " got %s"%cameraConfig['follower'])
 
-        self.command = (
+        self.command = f""
+        if (('sshForwarding' in self.cameraConfig.keys()) and
+         (self.cameraConfig['sshForwarding'] != "None")):
+            self.command += f"{self.cameraConfig['sshForwarding']} "
+
+        self.command += (
             f"/usr/bin/env bash"
             f" {self.rootpath}/launch_visss_data_acquisition.sh"
             f" --IP={self.cameraConfig['ip']}"
