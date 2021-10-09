@@ -380,6 +380,15 @@ void *ImageCaptureThread( void *context)
                         // we need new files in every thread
                         if (framesInFile < nStorageThreads) {
                             exportImgMeta.newFile = true; 
+
+                val = 0;
+                GevGetFeatureValue( captureContext->camHandle, "maxSustainedFrameRate",  &type, sizeof(UINT32), &val);
+                std::cout << "INFO | " << get_timestamp() << " | maxSustainedFrameRate " << val << "fps";
+                val = 0;
+                GevGetFeatureValue( captureContext->camHandle, "transferMaxBlockSize",  &type, sizeof(UINT32), &val);
+                std::cout << " | transferMaxBlockSize " << val << "MB" << std::endl;
+
+                            
                         } else {
                             exportImgMeta.newFile = false; 
                         }
@@ -476,15 +485,6 @@ void *ImageCaptureThread( void *context)
                 std::cout << "INFO | " << get_timestamp() << " | Complete sequence has " << sequence_count << "frames" << std::endl;
                 sequence_count = 0;
                 sequence_init = 0;
-
-
-                val = 0;
-                GevGetFeatureValue( captureContext->camHandle, "maxSustainedFrameRate",  &type, sizeof(UINT32), &val);
-                std::cout << "INFO | " << get_timestamp() << " | maxSustainedFrameRate " << val << "fps";
-                val = 0;
-                GevGetFeatureValue( captureContext->camHandle, "transferMaxBlockSize",  &type, sizeof(UINT32), &val);
-                std::cout << " | transferMaxBlockSize " << val << "MB" << std::endl;
-
             }
 
 
