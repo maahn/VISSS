@@ -383,12 +383,12 @@ void *ImageCaptureThread( void *context)
 
                 val = 0;
                 GevGetFeatureValue( captureContext->camHandle, "maxSustainedFrameRate",  &type, sizeof(UINT32), &val);
-                std::cout << "INFO | " << get_timestamp() << " | maxSustainedFrameRate " << val << "fps";
+                std::cout << "INFO | " << get_timestamp() << " | maxSustainedFrameRate " << val << " fps";
                 val = 0;
                 GevGetFeatureValue( captureContext->camHandle, "transferMaxBlockSize",  &type, sizeof(UINT32), &val);
-                std::cout << " | transferMaxBlockSize " << val << "MB" << std::endl;
+                std::cout << " transferMaxBlockSize " << val << " MB" << std::endl;
 
-                            
+
                         } else {
                             exportImgMeta.newFile = false; 
                         }
