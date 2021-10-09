@@ -1066,7 +1066,7 @@ int main(int argc, char *argv[])
             camOptions.enable_passthru_mode = false;
 
 
-            camOptions.streamNumFramesBuffered = 40;             // Buffer frames internally.
+            camOptions.streamNumFramesBuffered = 200;             // Buffer frames internally.
 
 
 

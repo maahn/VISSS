@@ -123,19 +123,6 @@ else
 	/usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0
 fi
 
-if  /usr/bin/sudo /sbin/setcap cap_sys_nice+ep $EXE 
-then
-  :
-else
-  echo 'BASH /usr/bin/sudo /sbin/setcap cap_sys_nice+ep $EXE ERROR'
-fi
-if  /usr/bin/sudo /sbin/setcap cap_net_raw+eip $EXE 
-then
-  :
-else
-  echo 'BASH /usr/bin/sudo /sbin/setcap cap_net_raw+eip $EXE ERROR'
-fi
-
 
 for (( ; ; ))
 do
