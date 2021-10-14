@@ -263,7 +263,7 @@ class runCpp:
             else:
                 self.logger.info('User starts camera')
                 self.writeToStatusFile('start, user')
-            self.start(self.command.split(' '))
+            self.start(self.command)
         elif self.running.get().startswith('Running'):
             self.logger.info('User stops camera')
             self.writeToStatusFile('stop, user')
@@ -277,7 +277,7 @@ class runCpp:
             if self.running.get().startswith('Idle'):
                 self.logger.info('External trigger starts camera')
                 self.writeToStatusFile('start, trigger')
-                self.start(self.command.split(' '))
+                self.start(self.command)
                 # line = 'EXTERNAL TRIGGER START: %s \n' % list(
                 # map(list, self.parent.externalTriggerStatus))
                 # self.text.insert(tk.END, line)
@@ -301,13 +301,16 @@ class runCpp:
 
     def start(self, command):
         self.running.set('Running: %s' % self.name)
-        self.logger.info('Start camera with %s' % ' '.join(command))
+        self.logger.info('Start camera with %s' %command)
 
         self.witeParamFile()
 
+        # myEnv = os.environ.copy()
+        # myEnv["TERM"] = "xterm"
+
         # start dummy subprocess to generate some output
         self.process = Popen(command, stdout=PIPE,
-                             stderr=STDOUT, preexec_fn=os.setsid)
+                             stderr=STDOUT, preexec_fn=os.setsid, shell=True)
 
         # launch thread to read the subprocess output
         #   (put the subprocess output into the queue in a background thread,

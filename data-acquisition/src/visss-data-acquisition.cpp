@@ -218,6 +218,10 @@ void *ImageCaptureThread( void *context)
     long int timeNow = 0;
     long int timeStart = 0;
     long int framesInFile = 0;
+
+    int type;
+    UINT32 val = 0;
+
    GEV_STATUS status = 0;
     GEV_STATUS statusF = 0;
 
@@ -376,6 +380,15 @@ void *ImageCaptureThread( void *context)
                         // we need new files in every thread
                         if (framesInFile < nStorageThreads) {
                             exportImgMeta.newFile = true; 
+
+                // val = 0;
+                // GevGetFeatureValue( captureContext->camHandle, "maxSustainedFrameRate",  &type, sizeof(UINT32), &val);
+                // std::cout << "INFO | " << get_timestamp() << " | maxSustainedFrameRate " << val << " fps";
+                // val = 0;
+                // GevGetFeatureValue( captureContext->camHandle, "transferMaxBlockSize",  &type, sizeof(UINT32), &val);
+                // std::cout << " transferMaxBlockSize " << val << " MB" << std::endl;
+
+
                         } else {
                             exportImgMeta.newFile = false; 
                         }
@@ -587,7 +600,7 @@ int main(int argc, char *argv[])
     int error_count = 0;
     int feature_count = 0;
 
-    nice(-20);
+    nice(-15);
 
     //============================================================================
     // Greetings
@@ -1066,7 +1079,8 @@ int main(int argc, char *argv[])
             camOptions.enable_passthru_mode = false;
 
 
-            camOptions.streamNumFramesBuffered = 40;             // Buffer frames internally.
+            camOptions.streamNumFramesBuffered = 200;             // Buffer frames internally.
+            camOptions.streamMemoryLimitMax =  50 * 8 * 2064 * 1544;     // Adjust packet memory buffering limit.
 
 
 
