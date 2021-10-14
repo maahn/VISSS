@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-
-
-#echo $@
-
 set -u
 SETTINGS=""
 
