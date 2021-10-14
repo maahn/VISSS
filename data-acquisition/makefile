@@ -1,4 +1,3 @@
-
 CC= g++
 # IROOT directory based on installed distribution tree (not archive/development tree). 
 # IROOT=../..
