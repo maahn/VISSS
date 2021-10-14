@@ -1,0 +1,20 @@
+
+
+1) get driver at https://www.asix.com.tw/en/support/download
+2) compile
+tar -jxvf AX99100_SP_PP_SPI_Linux_Driver_v1.7.0_Source.tar.bz2 
+cd AX99100_SP_PP_SPI_Linux_Driver_v1.7.0_Source/
+make
+sudo insmod ax99100.ko
+
+3) check with:
+dmesg
+
+4) ignore the make install, install with
+sudo cp ax99100.ko /lib/modules/`uname -r`/kernel/drivers/tty/serial
+sudo depmod
+
+5) reboot 
+6) check 
+lsmod
+ls /dev/ttyF0
