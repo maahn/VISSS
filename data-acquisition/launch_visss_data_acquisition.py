@@ -63,6 +63,19 @@ def iter_except(function, exception):
     except exception:
         return
 
+def writeHTML(file, status, color):
+    html = f"""
+    <html>
+    <meta http-equiv='refresh' content='60' />
+    <body style='background-color:{color}'>
+    <pre>{status}</pre>
+    </body>
+    </html>
+    """
+    with open(file, 'w') as f:
+        f.write(html)
+    
+
 class QueueHandler(logging.Handler):
     """Class to send logging records to a queue
 
@@ -108,6 +121,10 @@ class runCpp:
                           f"{self.cameraConfig['name']}_"
                           f"{self.cameraConfig['serialnumber']}"
                           "/data")
+        self.statusHtmlFile = (f"{self.configuration['outdir']}/status_{self.hostname}_"
+                          f"{self.cameraConfig['name']}_"
+                          f"{self.cameraConfig['serialnumber']}"
+                          ".html")
 
         # Create a logging handler using a queue
         self.log_queue = queue.Queue()
@@ -350,14 +367,20 @@ class runCpp:
                 #     self.carReturn = True
                 # else:
                 #     self.carReturn = False
+                string = line.decode().rstrip()
 
                 if line.startswith(b'STATUS'):
-                    self.status.set(line.decode().rstrip())
+                    self.status.set(string)
                     self.statusWidget.config(background="green")
+                    writeHTML(self.statusHtmlFile, string, 'green')
                 else:
                     if line.startswith(b'ERROR') or line.startswith(b'FATAL'):
-                        self.status.set(line.decode().rstrip())
+                        
+                        
+                        self.status.set(string)
                         self.statusWidget.config(background="red")
+                        writeHTML(self.statusHtmlFile, string, 'red')
+
                         thisLogger = self.loggerCpp.error
                         # self.text.insert(tk.END, line)
                         # self.text.see("end")
@@ -427,8 +450,10 @@ class runCpp:
             self.logger.error('tried quitting')
             pass
         self.running.set('Idle: %s' % self.name)
-        self.status.set('NOT RUNNING (YET)')
+        string = 'NOT RUNNING (YET)'
+        self.status.set(string)
         self.statusWidget.config(background="yellow")
+        writeHTML(self.statusHtmlFile, string, 'yellow')
 
     def kill(self):
         try:
@@ -439,9 +464,10 @@ class runCpp:
             self.logger.error('tried killing')
             pass
         self.running.set('Idle: %s' % self.name)
-        self.status.set('NOT RUNNING (YET)')
+        string = 'NOT RUNNING (YET)'
+        self.status.set(string)
         self.statusWidget.config(background="yellow")
-
+        writeHTML(self.statusHtmlFile, string, 'yellow')
 
 
 class GUI(object):
@@ -521,6 +547,8 @@ class GUI(object):
         if self.settings['autopilot']:
             ChkBttn.invoke()
 
+        self.triggerHtmlFile = f"{self.configuration['outdir']}/externalTrigger.html"
+        
 
         if (('externalTrigger' in self.configuration.keys()) and
                 (self.configuration['externalTrigger'] is not None)):
@@ -531,19 +559,29 @@ class GUI(object):
                     collections.deque(maxlen=externalTrigger['nBuffer']))
 
                 trigger = tk.StringVar()
-                trigger.set('%s: -' % externalTrigger['name'])
+                string = '%s: -' % externalTrigger['name']
+                trigger.set(string)
 
                 triggerWidget = ttk.Label(config, textvariable=trigger, width=40)
                 triggerWidget.pack(side=tk.RIGHT, pady=6, padx=6)
                 triggerWidget.config(background="yellow")
 
+                writeHTML(self.triggerHtmlFile, string, 'yellow')
+
                 self.loggerRoot.info('STARTING thread for %s trigger' % externalTrigger)
+
+
 
                 x = Thread(target=self.queryExternalTrigger, args=(
                     ee, trigger, triggerWidget,), kwargs=externalTrigger, daemon=True)
                 x.start()
+        else:
+            writeHTML(self.triggerHtmlFile, 'no trigger', 'gray')
 
         return
+
+
+
 
 
     def getSerialNumbers(self):
@@ -653,6 +691,7 @@ class GUI(object):
         if not bool(self.autopilot.get()):
             triggerWidget.config(background="gray")
             trigger.set('external trigger disabled')
+            writeHTML(self.triggerHtmlFile, 'external trigger disabled', "gray")
             self.root.after(100, lambda: self.queryExternalTrigger(
                 nn,
                 trigger,
@@ -741,13 +780,16 @@ class GUI(object):
         self.externalTriggerStatus[nn].append(continueMeasurement)
 
         if np.any(self.externalTriggerStatus[nn]):
-            triggerWidget.config(background="green")
+            color = "green"
         else:
-            triggerWidget.config(background="red")
-        trigger.set('%s: %s %s %i/%i at %s' %
-                    (name, measurement, unit, np.sum(self.externalTriggerStatus[nn]),
-                        nBuffer, data['timestamp']))
+            color = "red"
 
+        string = '%s: %s %s %i/%i at %s' % (
+            name, measurement, unit, np.sum(self.externalTriggerStatus[nn]),
+            nBuffer, data['timestamp'])
+        triggerWidget.config(background=color)
+        trigger.set(string)
+        writeHTML(self.triggerHtmlFile, string, color)
         for app in self.apps:
             app.statusWatcher()
 
