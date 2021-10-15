@@ -549,7 +549,7 @@ class GUI(object):
 
         self.triggerHtmlFile = f"{self.configuration['outdir']}/externalTrigger.html"
         
-
+        writeHTML(self.triggerHtmlFile, 'no trigger', 'gray')
         if (('externalTrigger' in self.configuration.keys()) and
                 (self.configuration['externalTrigger'] is not None)):
             self.externalTriggerStatus = []
@@ -575,9 +575,6 @@ class GUI(object):
                 x = Thread(target=self.queryExternalTrigger, args=(
                     ee, trigger, triggerWidget,), kwargs=externalTrigger, daemon=True)
                 x.start()
-        else:
-            writeHTML(self.triggerHtmlFile, 'no trigger', 'gray')
-
         return
 
 
