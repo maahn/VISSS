@@ -138,4 +138,17 @@ sudo cp /home/visss/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
 mkdir -p ~/.config/autostart
 ln -s /home/visss/VISSS/scripts/visss_gui.desktop /home/visss/.config/autostart/
 
+#### Ethernet card #################
+Only required for 5000baseT interfaces and nano 5G cameras:
+
+sudo cp VISSS/scripts/advertise5000baseT.service /etc/systemd/system
+sudo systemctl enable advertise5000baseT.service
+
+Ethtools responds with 'Cannot advertise speed 5000 duplex full' but it works anyway?
+
+test with:
+sudo service advertise5000baseT start
+systemctl status advertise5000baseT.service
+
+sudo ethtool enp4s0
 
