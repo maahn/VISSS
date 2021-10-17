@@ -650,6 +650,8 @@ int main(int argc, char *argv[])
 
     context.fps = parser.get<double>("fps");
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: fps "<< context.fps << std::endl;
+    // if there is more than one thread, reduce frame rate of the output accordingly
+    context.fps = context.fps / nStorageThreads;
 
     maxframes = parser.get<int>("maxframes");
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: maxframes "<< maxframes << std::endl;
