@@ -13,6 +13,7 @@ import operator
 import os
 import pathlib
 import queue
+import shlex
 import signal
 import string
 import sys
@@ -149,7 +150,10 @@ class runCpp:
         self.status = tk.StringVar()
         self.status.set('-')
 
-        self.configFName = '/tmp/%s.config' % self.name
+        self.configFName = '/tmp/%s_%s.config' % (
+            os.path.basename(self.parent.settings['configFile']), 
+            str(datetime.date.today())
+            )
 
         if self.cameraConfig['follower'] in [True, 'true', 'True', 1]:
             self.cameraConfig['follower'] = 1
@@ -162,7 +166,10 @@ class runCpp:
         self.command = f""
         if (('sshForwarding' in self.cameraConfig.keys()) and
          (self.cameraConfig['sshForwarding'] != "None")):
-            self.command += f"{self.cameraConfig['sshForwarding']} "
+            self.command += (
+                f"ssh -o ServerAliveInterval=60 -tt"
+                f" {self.cameraConfig['sshForwarding']} DISPLAY=:0 "
+                )
 
         self.command += (
             f"/usr/bin/env bash"
@@ -256,8 +263,14 @@ class runCpp:
 
     def witeParamFile(self):
 
-        file = open(self.configFName, 'w')
-        self.logger.debug("witeParamFile: opening %s" % self.configFName)
+        if (('sshForwarding' in self.cameraConfig.keys()) and
+         (self.cameraConfig['sshForwarding'] != "None")):
+            fname = "%s4ssh"%self.configFName
+        else:
+            fname = self.configFName
+
+        file = open(fname, 'w')
+        self.logger.debug("witeParamFile: opening %s" % fname)
         for k, v in self.cameraConfig['teledyneparameters'].items():
             if k == 'IO':
                 for ii in range(len(
@@ -270,7 +283,18 @@ class runCpp:
             else:
                 self.logger.debug("witeParamFile: writing %s %s" % (k, v))
                 file.write("%s %s\n" % (k, v))
-        return
+
+
+        if fname.endswith("4ssh"):
+            scp =f"scp {fname} {self.cameraConfig['sshForwarding']}:{self.configFName}"
+            self.logger.info(f'SCP {scp}')
+            p = Popen(shlex.split(scp), stderr=STDOUT, stdout=PIPE)
+            p.wait()
+            self.logger.info(f'SCP {p.communicate()[0]}')
+            if p.returncode != 0:
+                self.logger.error(f"Cannot connect to {self.cameraConfig['sshForwarding']} to copy configuration, got {p.returncode}.")
+                return False
+        return True
 
     def clickStartStop(self, autopilot=False):
         if self.running.get().startswith('Idle'):
