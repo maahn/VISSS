@@ -283,14 +283,14 @@ class runCpp:
             else:
                 self.logger.debug("witeParamFile: writing %s %s" % (k, v))
                 file.write("%s %s\n" % (k, v))
-
+        file.close()
 
         if fname.endswith("4ssh"):
-            scp =f"scp {fname} {self.cameraConfig['sshForwarding']}:{self.configFName}"
+            scp =f"scp -q {fname} {self.cameraConfig['sshForwarding']}:{self.configFName}"
             self.logger.info(f'SCP {scp}')
             p = Popen(shlex.split(scp), stderr=STDOUT, stdout=PIPE)
             p.wait()
-            self.logger.info(f'SCP {p.communicate()[0]}')
+            self.logger.info(f'SCP {p.communicate()[0].decode()}')
             if p.returncode != 0:
                 self.logger.error(f"Cannot connect to {self.cameraConfig['sshForwarding']} to copy configuration, got {p.returncode}.")
                 return False
