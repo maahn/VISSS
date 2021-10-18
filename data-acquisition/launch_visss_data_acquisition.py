@@ -631,8 +631,11 @@ class GUI(object):
                 app.startStopButton.state(["disabled"])
             else:
                 app.startStopButton.state(["!disabled"])
-                self.externalTriggerStatus = [[True]]
-
+                try: 
+                    self.externalTriggerStatus[0][0] = True
+                except IndexError:
+                    self.externalTriggerStatus[0].append(True)
+                    
     def askopenfile(self):
         file = filedialog.askopenfilename(filetypes=[("YAML files", ".yaml")])
         if file is not None:
