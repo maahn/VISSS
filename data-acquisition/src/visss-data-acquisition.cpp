@@ -221,6 +221,8 @@ void *ImageCaptureThread( void *context)
 
     int type;
     UINT32 val = 0;
+    float valF = 0;
+    int valI = 0;
 
    GEV_STATUS status = 0;
     GEV_STATUS statusF = 0;
@@ -381,13 +383,9 @@ void *ImageCaptureThread( void *context)
                         if (framesInFile < nStorageThreads) {
                             exportImgMeta.newFile = true; 
 
-                // val = 0;
-                // GevGetFeatureValue( captureContext->camHandle, "maxSustainedFrameRate",  &type, sizeof(UINT32), &val);
-                // std::cout << "INFO | " << get_timestamp() << " | maxSustainedFrameRate " << val << " fps";
-                // val = 0;
-                // GevGetFeatureValue( captureContext->camHandle, "transferMaxBlockSize",  &type, sizeof(UINT32), &val);
-                // std::cout << " transferMaxBlockSize " << val << " MB" << std::endl;
-
+                            // GevGetFeatureValue( captureContext->camHandle, "transferQueueMemorySize",  &type, sizeof(valF), &valF);
+                            // std::cout << " transferQueueMemorySize " << valF << " MB" << type << " ";
+                            std::cout << std::endl;
 
                         } else {
                             exportImgMeta.newFile = false; 
@@ -407,7 +405,12 @@ void *ImageCaptureThread( void *context)
                         //     << (dt_us / 1000.0) << " ms" << std::endl;
 
                         // fflush(stdout);
-
+                        if (framesInFile == 0) {
+                            GevGetFeatureValue( captureContext->camHandle, "maxSustainedFrameRate",  &type, sizeof(valF), &valF);
+                            std::cout << "INFO | " << get_timestamp() << " | maxSustainedFrameRate " << valF << " fps"  << " ";
+                            GevGetFeatureValue( captureContext->camHandle, "transferQueueCurrentBlockCount",  &type, sizeof(valI), &valI);
+                            std::cout << " transferQueueCurrentBlockCount " << valI << " blocks"  << " ";
+                        }
 
                         ++frame_count;
                         sequence_count++;
