@@ -222,7 +222,7 @@ void *ImageCaptureThread( void *context)
     int type;
     UINT32 val = 0;
     float valF = 0;
-    int valI = 0;
+    UINT32 valI = 0;
 
    GEV_STATUS status = 0;
     GEV_STATUS statusF = 0;
@@ -405,12 +405,12 @@ void *ImageCaptureThread( void *context)
                         //     << (dt_us / 1000.0) << " ms" << std::endl;
 
                         // fflush(stdout);
-                        if (framesInFile == 0) {
-                            GevGetFeatureValue( captureContext->camHandle, "maxSustainedFrameRate",  &type, sizeof(valF), &valF);
-                            std::cout << "INFO | " << get_timestamp() << " | maxSustainedFrameRate " << valF << " fps"  << " ";
-                            GevGetFeatureValue( captureContext->camHandle, "transferQueueCurrentBlockCount",  &type, sizeof(valI), &valI);
-                            std::cout << " transferQueueCurrentBlockCount " << valI << " blocks"  << " ";
-                        }
+                        // if (framesInFile == 0) {
+                        //     GevGetFeatureValue( captureContext->camHandle, "maxSustainedFrameRate",  &type, sizeof(valF), &valF);
+                        //     std::cout << "INFO | " << get_timestamp() << " | maxSustainedFrameRate " << valF << " fps"  << " ";
+                        //     GevGetFeatureValue( captureContext->camHandle, "transferQueueCurrentBlockCount",  &type, sizeof(valI), &valI);
+                        //     std::cout << " transferQueueCurrentBlockCount " << valI << " blocks"  << " ";
+                        // }
 
                         ++frame_count;
                         sequence_count++;

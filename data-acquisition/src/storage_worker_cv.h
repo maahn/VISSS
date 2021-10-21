@@ -116,7 +116,7 @@ void storage_worker_cv::add_meta_data()
     fMeta_ << "# Camera serial number: "
           << DeviceIDMeta << "\n";
     fMeta_ << "# Camera configuration: "
-          <<  name<< "\n";
+          <<  configFile.substr(configFile.find_last_of("/\\") + 1)<< "\n";
     fMeta_ << "# Hostname: "
           <<  hostname<< "\n";
      
