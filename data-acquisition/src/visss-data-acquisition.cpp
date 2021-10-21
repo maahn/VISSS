@@ -404,7 +404,7 @@ void *ImageCaptureThread( void *context)
                         // std::cout << "Captured image #" << frame_count << " in "
                         //     << (dt_us / 1000.0) << " ms" << std::endl;
 
-                        // fflush(stdout);
+                        // // fflush(stdout);
                         // if (framesInFile == 0) {
                         //     GevGetFeatureValue( captureContext->camHandle, "maxSustainedFrameRate",  &type, sizeof(valF), &valF);
                         //     std::cout << "INFO | " << get_timestamp() << " | maxSustainedFrameRate " << valF << " fps"  << " ";

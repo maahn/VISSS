@@ -150,8 +150,8 @@ class runCpp:
         self.status = tk.StringVar()
         self.status.set('-')
 
-        self.configFName = '/tmp/%s_%s.config' % (
-            os.path.basename(self.parent.settings['configFile']), 
+        self.configFName = '/tmp/%s_%s_%s.config' % (
+            self.name, os.path.basename(self.parent.settings['configFile']), 
             str(datetime.date.today())
             )
 
