@@ -447,7 +447,7 @@ void *ImageCaptureThread( void *context)
                 {
                     // Image had an error (incomplete (timeout/overflow/lost)).
                     // Do any handling of this condition necessary.
-                    std::cerr << "ERROR | " << get_timestamp() <<" | Frame " << img->id << "Status = " <<  img->status << std::endl;
+                    std::cerr << "ERROR | " << get_timestamp() <<" | Frame " << img->id << " Status = " <<  img->status << std::endl;
                 }
             }
             else if (status  == GEVLIB_ERROR_TIME_OUT)
