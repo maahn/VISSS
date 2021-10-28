@@ -155,4 +155,17 @@ sudo ethtool enp4s0
 
 #### clock
 
-check clock status with "chronyc sources"
+
+add trigger as a clock for the follower, open "sudo nano /etc/chrony/chrony.conf"
+server ADD.TRIGGER.IP.ADDRESS iburst prefer
+
+on the trigger "sudo nano /etc/chrony/chrony.conf"
+# Allow NTP client access from local network.
+allow ADD.FOLLOWER.IP.ADDRESS
+
+on both "sudo systemctl restart chronyd"
+
+check clock status with "chronyc sources", ^* in the beginning means that clock is mainly used.
+
+
+
