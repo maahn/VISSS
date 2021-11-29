@@ -776,7 +776,7 @@ class GUI(object):
                 continueMeasurement = False
             else:
                 continueMeasurement = True
-            measurement = '-'
+            measurement = 'NO RESPONSE'
             unit = ''
         else:
             data = json.loads(response)[name]
@@ -795,18 +795,19 @@ class GUI(object):
                 else:
                     continueMeasurement = True
 
-        self.loggerRoot.info('queryExternalTrigger: continue Measurement %r' %
-                        continueMeasurement)
+            measurement = '%g' % data['measurement']
+            unit = data['unit']
 
-        measurement = '%g' % data['measurement']
-        unit = data['unit']
+        self.loggerRoot.info('queryExternalTrigger: continue Measurement %r %i/%i' %
+                        (continueMeasurement, np.sum(self.externalTriggerStatus[nn]),
+            nBuffer))
 
         self.externalTriggerStatus[nn].append(continueMeasurement)
 
         if np.any(self.externalTriggerStatus[nn]):
             color = "green"
         else:
-            color = "red"
+            color = "yellow"
 
         string = '%s: %s %s %i/%i at %s' % (
             name, measurement, unit, np.sum(self.externalTriggerStatus[nn]),
