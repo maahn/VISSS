@@ -122,10 +122,10 @@ class runCpp:
                           f"{self.cameraConfig['name']}_"
                           f"{self.cameraConfig['serialnumber']}"
                           "/data")
-        self.statusHtmlFile = (f"{self.configuration['outdir']}/status_{self.hostname}_"
+        self.statusHtmlFile = (f"{self.configuration['outdir']}/{self.hostname}_"
                           f"{self.cameraConfig['name']}_"
                           f"{self.cameraConfig['serialnumber']}"
-                          ".html")
+                          "/status.html")
 
         # Create a logging handler using a queue
         self.log_queue = queue.Queue()
