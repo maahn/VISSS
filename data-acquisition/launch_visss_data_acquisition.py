@@ -571,11 +571,14 @@ class GUI(object):
         if self.settings['autopilot']:
             ChkBttn.invoke()
 
-        self.triggerHtmlFile = f"{self.configuration['outdir']}/externalTrigger.html"
-        
-        writeHTML(self.triggerHtmlFile, 'no trigger', 'gray')
         if (('externalTrigger' in self.configuration.keys()) and
                 (self.configuration['externalTrigger'] is not None)):
+
+            self.triggerHtmlFile = f"{self.configuration['outdir']}/externalTrigger.html"
+            
+            writeHTML(self.triggerHtmlFile, 'no trigger', 'gray')
+
+
             self.externalTriggerStatus = []
             for ee, externalTrigger in enumerate(self.configuration['externalTrigger']):
 
