@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Sonic Logger
+Comment=Sonic Logger
+Exec=/usr/bin/python3 /home/visss/VISSS/sonic/sonic_serial_datalogger.py
+Icon=gtkterm
+Terminal=true
+Type=Application
+Categories=Application;
+
