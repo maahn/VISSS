@@ -4,6 +4,7 @@ import time
 import os
 from subprocess import Popen, PIPE
 import gzip
+from functools import reduce
 
 ###settings
 com_port ='/dev/ttyF0'
@@ -14,7 +15,7 @@ errorFname="/data/nyaalesund/sonic/sonic_errors.txt"
 
 # to do: update checksum for thies sonic
 def checksum(st):
-    return hex(reduce(lambda x,y:x^y, map(ord, st)))[2:]
+    return hex(reduce(lambda x,y:x^y, map(ord, st)))[2:].upper()
 
 #make sure the clock is already set!
 #time.sleep(10)
@@ -54,20 +55,19 @@ try:
     #no short lines
     if len(line) < 5:
       if len(line)>0: 
-        string =datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S ")+"BAD DATA (Line too short):"+ repr(line)
+        string =datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f")+"BAD DATA (Line too short):"+ repr(line)
         print(string)           
         errorFile.write(string+"\n")
       continue
+     
+    #check checksum
+    if str(checksum(line[:-3])) != str(line[-3:-1]):
+      string =datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f")+"BAD DATA (wrong checksum):"+ repr(line)
+      print(string)   
+      errorFile.write(string+"\n")
+      continue
     
-## to do: include checksum!     
-#    #check checksum
-#    if checksum(line[:-4]) != line[-4:-2]:
-#       string =datetime.datetime.utcnow().strftime("%y%m%d%H%M%S ")+"BAD DATA (wrong checksum):"+ repr(line)
-#       print(string)           
-#       errorFile.write(string+"\r\n")
-#       continue
-    
-    item = "%s;%s" % (datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f"), line)#[1:-5])
+    item = "%s;%s" % (datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f"), line)
 
     #if new day, first make new file! 
     if datetime.datetime.utcnow().strftime("%Y%m%d") != today:
