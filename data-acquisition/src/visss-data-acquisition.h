@@ -67,6 +67,7 @@ bool storeVideo = true;
 bool storeMeta = true;
 bool showPreview = true;
 int nStorageThreads = 1;
+std::string encoding;
 std::chrono::time_point<std::chrono::system_clock> t_reset;
 
 //histogram
