@@ -66,9 +66,10 @@ DokumentRoot=/data
 
 sudo nano /etc/apache2/apache2.conf 
 <Directory /data/>
-        Options Indexes FollowSymLinks
+        Options FollowSymLinks
         AllowOverride None
         Require all granted
+        EnableMMAP Off
 </Directory>
 
 
