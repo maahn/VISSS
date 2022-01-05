@@ -171,5 +171,18 @@ on both "sudo systemctl restart chronyd"
 
 check clock status with "chronyc sources", ^* in the beginning means that clock is mainly used.
 
+#### automatic updates
+
+automatic security updates can be enabled follow 
+https://help.ubuntu.com/community/AutomaticSecurityUpdates
+
+but make sure to exclude kernel upgrades becuase they mess with the serial card drivers:
+Unattended-Upgrade::Package-Blacklist {
+      "linux-headers*";
+      "linux-image*";
+      "linux-generic*";
+      "linux-modules*";
+}
+
 
 
