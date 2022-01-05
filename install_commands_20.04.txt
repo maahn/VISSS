@@ -59,6 +59,7 @@ sudo ldconfig
 
 ssh-keygen 
 configure autologin follwoing https://askubuntu.com/questions/1202230/auto-login-enable-on-turn-on-system
+or https://askubuntu.com/questions/819117/how-can-i-get-autologin-at-startup-working-on-ubuntu-server-16-04-1
 
 für webserver: 
 sudo nano /etc/apache2/sites-enabled/000-default.conf 
