@@ -5,8 +5,7 @@ import sys
 try:
   com_port =sys.argv[1]
 except: 
-  print("use: python com.py comPort [sendString]")
-  sys.exit()
+  sys.exit("use: python com.py comPort [sendString]")
 
 try:
   sendString=sys.argv[2]
@@ -19,7 +18,7 @@ try:
   serialPort = serial.Serial(com_port, 57600, timeout=0.5, rtscts=False, dsrdtr=False, xonxoff=True,bytesize=serial.EIGHTBITS,parity=serial.PARITY_NONE)
   #print(serialPort.name)
 except: 
-  raise IOError("Could not open port!")
+  sys.exit("Could not open port %s!"%com_port)
 
 try:
   if sendData:

@@ -21,21 +21,25 @@ def checksum(st):
 #time.sleep(10)
 
 #we need this wrapper here, otherwise cpu goes 100%
-p = Popen(['python3', '/home/visss/VISSS/sonic/comPortSniffer.py',com_port], stdin=PIPE, stdout=PIPE, stderr=PIPE,encoding='utf-8')
+command = ['python3', '/home/visss/VISSS/sonic/comPortSniffer.py',com_port]
+p = Popen(command, stdin=PIPE, stdout=PIPE, stderr=PIPE,encoding='utf-8')
 #p = Popen(['cat',com_port],stdin=PIPE, stdout=PIPE, stderr=PIPE)
 
 #save date variable
 today = datetime.datetime.utcnow().strftime("%Y%m%d")
 yearMonth = today[0:6]
 Day = today[6:]
-print(today)
 
 #create/open file
 try:
   os.makedirs(fpath+"/"+yearMonth+"/")
 except OSError:
   pass
-outFile = gzip.open(fpath+"/"+yearMonth+"/"+yearMonth+Day+"."+fsuffix,"at")
+fname = fpath+"/"+yearMonth+"/"+yearMonth+Day+"."+fsuffix
+outFile = gzip.open(fname,"at")
+
+print("Sonic serial data logger")
+print(today, fname)
 
 #just in case we open a file which was already created but recording was interupted:
 outFile.write(" \n")
@@ -50,6 +54,10 @@ try:
     #item = "%s\r\n" % (p.stdout.readline()[1:-5],)
     line = p.stdout.readline()
 
+    if p.poll() is not None:
+      print(p.stderr.readline())
+      raise SystemError("%s stopped"%" ".join(command))
+      break
     #print(line)
     
     #no short lines
@@ -75,13 +83,16 @@ try:
       today = datetime.datetime.utcnow().strftime("%Y%m%d")
       yearMonth = today[:6]
       Day = today[6:]
-    try:
-      os.mkdir(fpath+"/"+yearMonth+"/")
-    except OSError:
-      pass
-    outFile = gzip.open(fpath+"/"+yearMonth+"/"+yearMonth+Day+"."+fsuffix,"at")
-    string ="sonic %s UTC %s" % (datetime.datetime.utcnow().strftime("%y%m%d%H%M%S%f"), item,)
-    #print(string), 
+      try:
+        os.mkdir(fpath+"/"+yearMonth+"/")
+      except OSError:
+        pass
+
+      fname = fpath+"/"+yearMonth+"/"+yearMonth+Day+"."+fsuffix
+      outFile = gzip.open(fname,"at")
+      print(today, fname)
+
+    #write data
     outFile.write(item)
 
 except KeyboardInterrupt:
