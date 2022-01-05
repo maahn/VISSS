@@ -1,4 +1,5 @@
-
+0) make sure kernel headers of current version are installed: e.g.
+sudo apt install linux-headers-5.11.0-44-generic
 
 1) get driver at https://www.asix.com.tw/en/support/download
 2) compile
