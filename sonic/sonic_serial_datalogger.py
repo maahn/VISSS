@@ -35,7 +35,14 @@ try:
   os.makedirs(fpath+"/"+yearMonth+"/")
 except OSError:
   pass
-fname = fpath+"/"+yearMonth+"/"+yearMonth+Day+"."+fsuffix
+
+count = 0  
+fname = fpath+"/"+yearMonth+"/"+yearMonth+Day+"_"+str(count)+"."+fsuffix
+
+while os.path.exists(fname):
+  count = count + 1 
+  fname = fpath+"/"+yearMonth+"/"+yearMonth+Day+"_"+str(count)+"."+fsuffix
+
 outFile = gzip.open(fname,"at")
 
 print("Sonic serial data logger")
@@ -88,7 +95,7 @@ try:
       except OSError:
         pass
 
-      fname = fpath+"/"+yearMonth+"/"+yearMonth+Day+"."+fsuffix
+      fname = fpath+"/"+yearMonth+"/"+yearMonth+Day+"_0"+"."+fsuffix
       outFile = gzip.open(fname,"at")
       print(today, fname)
 
@@ -97,6 +104,7 @@ try:
 
 except KeyboardInterrupt:
    print("stopping...")
+
 finally:
    #p.terminate()
    outFile.close()

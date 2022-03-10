@@ -15,7 +15,7 @@ except IndexError:
 
   
 try:
-  serialPort = serial.Serial(com_port, 57600, timeout=0.5, rtscts=False, dsrdtr=False, xonxoff=True,bytesize=serial.EIGHTBITS,parity=serial.PARITY_NONE)
+  serialPort = serial.Serial(com_port, 57600, timeout=10800, rtscts=False, dsrdtr=False, xonxoff=True,bytesize=serial.EIGHTBITS,parity=serial.PARITY_NONE)
   #print(serialPort.name)
 except: 
   sys.exit("Could not open port %s!"%com_port)
