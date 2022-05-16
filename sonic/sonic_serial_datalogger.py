@@ -2,7 +2,7 @@
 import datetime
 import time
 import os
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, STDOUT
 import gzip
 from functools import reduce
 
@@ -22,7 +22,7 @@ def checksum(st):
 
 #we need this wrapper here, otherwise cpu goes 100%
 command = ['python3', '/home/visss/VISSS/sonic/comPortSniffer.py',com_port]
-p = Popen(command, stdin=PIPE, stdout=PIPE, stderr=PIPE,encoding='utf-8')
+p = Popen(command, stdin=PIPE, stdout=PIPE, stderr=STDOUT, encoding='utf-8')
 #p = Popen(['cat',com_port],stdin=PIPE, stdout=PIPE, stderr=PIPE)
 
 #save date variable
@@ -53,6 +53,7 @@ outFile.write(" \n")
 
 errorFile=open(errorFname,"a",1)
 
+line = ""
 
 ##read data
 try:         
@@ -62,7 +63,8 @@ try:
     line = p.stdout.readline()
 
     if p.poll() is not None:
-      print(p.stderr.readline())
+      #print(p.stderr.readline())
+      print(line)
       raise SystemError("%s stopped"%" ".join(command))
       break
     #print(line)
@@ -75,12 +77,12 @@ try:
         errorFile.write(string+"\n")
       continue
      
-    #check checksum
-    if str(checksum(line[:-3])) != str(line[-3:-1]):
-      string =datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f")+"BAD DATA (wrong checksum):"+ repr(line)
-      print(string)   
-      errorFile.write(string+"\n")
-      continue
+    # #check checksum
+    # if str(checksum(line[:-3])) != str(line[-3:-1]):
+    #   string =datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f")+"BAD DATA (wrong checksum):"+ repr(line)
+    #   print(string)   
+    #   errorFile.write(string+"\n")
+    #   continue
     
     item = "%s;%s" % (datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f"), line)
 
