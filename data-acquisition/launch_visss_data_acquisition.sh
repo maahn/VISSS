@@ -19,11 +19,8 @@ while [ $# -gt 0 ]; do
     --MAXMTU=*)
       MAXMTU="${1#*=}"
       ;;
-    --PRESET=*)
-      PRESET="${1#*=}"
-      ;;
-    --QUALITY=*)
-      QUALITY="${1#*=}"
+    --ENCODING=*)
+      ENCODING="${1#*=}"
       ;;
     --CAMERACONFIG=*)
       CAMERACONFIG="${1#*=}"
@@ -124,8 +121,8 @@ for (( ; ; ))
 do
 
 	timestamp=$(/bin/date +%FT%T)
-	COMMAND="$EXE -p=$PRESET -q=$QUALITY -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -d=$FOLLOWERMODE $CAMERACONFIG $IP"
-	/bin/echo "BASH $COMMAND"
+	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -d=$FOLLOWERMODE $CAMERACONFIG $IP"
+	/bin/echo "BASH2 $COMMAND"
 	if $COMMAND
 			then
 				/bin/echo "BASH worked"

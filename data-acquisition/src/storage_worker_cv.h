@@ -49,7 +49,9 @@ private:
     bool fileUsed;
 
 
-    cv::VideoWriter writer_;
+    // cv::VideoWriter writer_;
+    FILE *pipeout;
+
 
     void add_meta_data();
     void close_files();
@@ -138,7 +140,19 @@ void storage_worker_cv::open_files()
     create_filename();
 
     if (storeVideo) {
-        writer_.open(filename_ + ".mov", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
+        std::string ffmpegCommand = "ffmpeg -loglevel warning -y -f rawvideo ";
+        ffmpegCommand += "-vcodec rawvideo -framerate ";
+        ffmpegCommand += std::to_string(fps_);
+        ffmpegCommand += " -pix_fmt gray -s ";
+        ffmpegCommand += std::to_string(frame_size_.width) + "x" + std::to_string(frame_size_.height);
+        ffmpegCommand += " -i - ";
+        ffmpegCommand += encoding;
+        ffmpegCommand += " -r "+ std::to_string(fps_);
+        ffmpegCommand += " " +filename_ + ".mov";
+        
+        pipeout = popen(ffmpegCommand.data(), "w");
+        // writer_.open(filename_ + ".mov", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
+        PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Started "<< ffmpegCommand<< std::endl;
         PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
     }
     //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=veryfast mb-tree=true me=dia analyse=i8x8 rc-lookahead=20 subme=1 ! queue ! qtmux !  filesink location=video-h264_lookahead20.mov",
@@ -161,7 +175,8 @@ void storage_worker_cv::close_files() {
 
     if (!firstImage) {
         fMeta_.close();
-        writer_.release();
+        fflush(pipeout);
+        pclose(pipeout);
         if (fileUsed) {
             PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Written "<< filename_+".mov"<< std::endl;
             create_symlink(filename_+".mov",  filename_latest_+".mov");
@@ -405,7 +420,9 @@ void storage_worker_cv::run()
                      {
 
                         if (storeVideo) { 
-                            writer_.write(imgWithMeta);
+                            // writer_.write(imgWithMeta);
+                            size_t sizeInBytes = imgWithMeta.step[0] * imgWithMeta.rows;
+                            fwrite(imgWithMeta.data, 1, sizeInBytes, pipeout);
                             fileUsed = true;
                             }
                         if (storeMeta) {
@@ -478,6 +495,11 @@ void storage_worker_cv::run()
         close_files();
     }
 }
+
+
+// https://superuser.com/questions/1296374/best-settings-for-ffmpeg-with-nvenc
+// https://stackoverflow.com/questions/65342914/why-opencv-videowriter-is-so-slow
+
 
 // void storage_worker_cv::run()
 // {

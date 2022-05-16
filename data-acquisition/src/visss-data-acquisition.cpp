@@ -40,8 +40,7 @@ const char* params
     = "{ help h            |                   | Print usage }"
       "{ output o          | ./                | Output Path }"
       "{ site s            | none              | site string }"
-      "{ quality q         | 16                | quality  0-51 }"
-      "{ preset p          | veryfast          | preset (ultrafast - placebo) }"
+      "{ encoding e        | -c:v libx264      | ffmpeg encoding options }"
       "{ liveratio l       | 70                | every Xth frame will be displayed in the live window }"
       "{ fps f             | 140               | frames per seconds of output }"
       "{ newfileinterval i | 300               | write new file very ?s. Set to 0 to deactivate}"
@@ -71,8 +70,6 @@ typedef struct tagMY_CONTEXT
     int                     enable_save;
     int                     live_window_frame_ratio;
     double                     fps;
-    std::string                  quality;
-    std::string                  preset;
     bool              exit;
 } MY_CONTEXT, *PMY_CONTEXT;
 
@@ -630,11 +627,10 @@ int main(int argc, char *argv[])
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Camera IP long "<< camIPl << std::endl;
     int camIndex = 0;
 
-    context.quality = parser.get<cv::String>("quality");
-    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: FFMPEG Quality "<< context.quality << std::endl;
-
-    context.preset = parser.get<cv::String>("preset");
-    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: FFMPEG preset "<< context.preset << std::endl;
+    encoding = parser.get<cv::String>("encoding");
+    // std::cout << "DEBUG | " << get_timestamp() << " | PARSER: FFMPEG encoding "<< encoding << std::endl;
+    replace(encoding.begin(), encoding.end(), '@', ' ');
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: FFMPEG encoding "<< encoding << std::endl;
 
     site = parser.get<cv::String>("site");
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: site "<< site << std::endl;
@@ -665,7 +661,7 @@ int main(int argc, char *argv[])
     } else if (writeallframes1 == 1) {
         writeallframes = true;
     } else {
-        std::cerr << "FATAL ERROR | " << get_timestamp() << "| writeallframes must be 0 or 1 " << context.preset<< std::endl;
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| writeallframes must be 0 or 1 " << writeallframes1<< std::endl;
         global_error = true;
     }
     followermode1 = parser.get<int>("followermode");
@@ -674,7 +670,7 @@ int main(int argc, char *argv[])
     } else if (followermode1 == 1) {
         followermode = true;
     } else {
-        std::cerr << "FATAL ERROR | " << get_timestamp() << "| followermode must be 0 or 1 " << context.preset<< std::endl;
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| followermode must be 0 or 1 " << followermode1<< std::endl;
         global_error = true;
     }
 
@@ -685,51 +681,6 @@ int main(int argc, char *argv[])
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: storeVideo "<< storeVideo << std::endl;
     storeMeta = !parser.has("nometadata");
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: storeMeta "<< storeMeta << std::endl;
-
-    std::set<std::string> presets = {
-        "ultrafast",
-        "superfast",
-        "veryfast",
-        "faster",
-        "fast",
-        "medium",
-        "slow",
-        "slower",
-        "placebo",
-    };
-
-    if (presets.find(context.preset) == presets.end()){
-        std::cerr << "FATAL ERROR | " << get_timestamp() << "| Do not know preset " << context.preset<< std::endl;
-        global_error = true;
-    }
-
-    char OPENCV_FFMPEG_PRESET[100];
-    strcpy(OPENCV_FFMPEG_PRESET,"OPENCV_FFMPEG_PRESET=");
-    strcat(OPENCV_FFMPEG_PRESET,context.preset.c_str());
-    char OPENCV_FFMPEG_CRF[100];
-    strcpy(OPENCV_FFMPEG_CRF,"OPENCV_FFMPEG_CRF=");
-    strcat(OPENCV_FFMPEG_CRF,context.quality.c_str());
-    char OPENCV_FFMPEG_THREADCOUNT[100];
-    strcpy(OPENCV_FFMPEG_THREADCOUNT,"OPENCV_FFMPEG_THREADCOUNT=24"); // don't ask me why overloading the CPUs works better...
-    //strcat(OPENCV_FFMPEG_THREADCOUNT,context.quality.c_str());
-
-
-    if(putenv(OPENCV_FFMPEG_PRESET)!=0)
-    {
-        std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_FFMPEG_PRESET<< std::endl;
-        exit(1);
-    }
-    if(putenv(OPENCV_FFMPEG_CRF)!=0)
-    {
-        std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_FFMPEG_CRF<< std::endl;
-        global_error = true;
-    }
-
-    //if(putenv(OPENCV_FFMPEG_THREADCOUNT)!=0)
-    //{
-    //    std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_FFMPEG_THREADCOUNT<< std::endl;
-    //    global_error = true;
-    //}
 
     gethostname(hostname, HOST_NAME_MAX);
 

@@ -1,9 +1,0 @@
-ERROR no files /data/lim/visss_visss_master_S1145792/data/2021/05/*.mov 
-ERROR no files /data/lim/visss_visss_master_S1145792/data/2021/05/*.mov 
-ERROR no files /data/lim/visss_visss_master_S1145792/data/2021/06/*.mov 
-ERROR no files /data/lim/visss_visss_master_S1145792/data/2021/02/*.mov 
-ERROR no files /data/lim/visss_visss_master_S1145792/data/2021/04/*.mov 
-ERROR no files /data/lim/visss_visss_master_S1145792/data/2021/03/*.mov 
-ERROR no files /data/lim/visss_visss_master_S1145792/data/2021/01/*.mov 
-ERROR number of frames do not match 0 287 /data/lim/visss_visss_master_S1145792/data/2021/02/19/visss_visss_master_S1145792_20210219-092940.mov 
-ERROR number of frames do not match 0 287 /data/lim/visss_visss_master_S1145792/data/2021/02/19/visss_visss_master_S1145792_20210219-092940.mov 
