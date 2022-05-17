@@ -36,6 +36,8 @@ Video In Situ Snowfall Sensor data acquisition software
 * file_starttime: obtained from record_time, so problems with record_time apply 
 * record_time is assigned in the processing queue, can be a couple of seconds 
   off if queue is long
+* camera time request takes a couple of frames to become active, but is applied
+  in data acquisition immediately 
 
 #### 0.2.1
 * Using ffmpeg pipe instead of opencv videowriter. Gives better thread control 
@@ -48,5 +50,6 @@ Video In Situ Snowfall Sensor data acquisition software
 #### planed changes
  * change from mov to mkv files to handle crashes better
  * assign record_time as early as possible
+ * apply camera time request when it is reset in camera
 
 
