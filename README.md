@@ -51,5 +51,6 @@ Video In Situ Snowfall Sensor data acquisition software
  * change from mov to mkv files to handle crashes better
  * assign record_time as early as possible
  * apply camera time request when it is reset in camera
-
+ * fix cature_id overflow
+ * crate timestamp in filename smarter - from record_time for consistency? 
 
