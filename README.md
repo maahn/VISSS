@@ -53,4 +53,5 @@ Video In Situ Snowfall Sensor data acquisition software
  * apply camera time request when it is reset in camera
  * fix cature_id overflow
  * crate timestamp in filename smarter - from record_time for consistency? 
+ * restart data acqusition when reset clock fails
 
