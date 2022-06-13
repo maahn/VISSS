@@ -54,4 +54,4 @@ Video In Situ Snowfall Sensor data acquisition software
  * fix cature_id overflow
  * crate timestamp in filename smarter - from record_time for consistency? 
  * restart data acqusition when reset clock fails
-
+ * write last timestamp to ascii fuile when closing
