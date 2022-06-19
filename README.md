@@ -38,6 +38,7 @@ Video In Situ Snowfall Sensor data acquisition software
   off if queue is long
 * camera time request takes a couple of frames to become active, but is applied
   in data acquisition immediately 
+* .mov file sometimes broken if it contains only a single frame
 
 #### 0.2.1
 * Using ffmpeg pipe instead of opencv videowriter. Gives better thread control 
