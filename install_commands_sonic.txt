@@ -1,10 +1,10 @@
 0) make sure kernel headers of current version are installed: e.g.
-sudo apt install linux-headers-5.11.0-44-generic
+sudo apt install linux-headers-5.13.0-51-generic
 
 1) get driver at https://www.asix.com.tw/en/support/download
 2) compile
-tar -jxvf AX99100_SP_PP_SPI_Linux_Driver_v1.7.0_Source.tar.bz2 
-cd AX99100_SP_PP_SPI_Linux_Driver_v1.7.0_Source/
+tar -jxvf AX99100_SP_PP_SPI_Linux_Driver_v1.8.0_Source.tar.bz2 
+cd AX99100_SP_PP_SPI_Linux_Driver_v1.8.0_Source/
 make
 sudo insmod ax99100.ko
 
