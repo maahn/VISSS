@@ -18,6 +18,10 @@ sudo ./corinstall
 reboot!
 
 *****************OPENCV
+
+**** custom repository not needed any more with newest VISSS osftware software, try sudo apt install libopencv-dev instead ****
+
+
 cd
 mkdir opencv_source
 cd opencv_source
@@ -158,7 +162,7 @@ sudo ethtool enp4s0
 
 
 #### clock
-
+ *** only needed when two computers record data of cameras **
 
 add trigger as a clock for the follower, open "sudo nano /etc/chrony/chrony.conf"
 server ADD.TRIGGER.IP.ADDRESS iburst prefer
