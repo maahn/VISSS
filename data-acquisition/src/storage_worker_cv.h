@@ -54,7 +54,7 @@ private:
 
 
     void add_meta_data();
-    void close_files();
+    void close_files(unsigned long timestamp);
     void open_files();
     void create_filename();
 
@@ -148,7 +148,7 @@ void storage_worker_cv::open_files()
         ffmpegCommand += " -i - ";
         ffmpegCommand += encoding;
         ffmpegCommand += " -r "+ std::to_string(fps_);
-        ffmpegCommand += " " +filename_ + ".mov";
+        ffmpegCommand += " " +filename_ + ".mkv";
         
         pipeout = popen(ffmpegCommand.data(), "w");
         // writer_.open(filename_ + ".mov", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
@@ -171,9 +171,11 @@ void storage_worker_cv::open_files()
     return;
 }
 
-void storage_worker_cv::close_files() {
+void storage_worker_cv::close_files(unsigned long timestamp) {
 
     if (!firstImage) {
+        fMeta_ << "# Last capture time: "
+          << std::to_string(timestamp) << "\n";
         fMeta_.close();
         fflush(pipeout);
         pclose(pipeout);
@@ -250,7 +252,7 @@ void storage_worker_cv::run()
     int result;
     result = nice(-25);
 
-
+    unsigned long  last_timestamp;
     long int frame_count_new_file = 0;
     firstImage = true;
     std::string message;
@@ -290,6 +292,8 @@ void storage_worker_cv::run()
             if (!image.MatImage.empty()) {
                 high_resolution_clock::time_point t1(high_resolution_clock::now());
                 
+                last_timestamp = image.timestamp +t_reset_uint_; 
+
                 t_record = t1.time_since_epoch().count()/1000;
 
                 if (firstImage)  { 
@@ -402,7 +406,7 @@ void storage_worker_cv::run()
                     }
 
 
-                    close_files();
+                    close_files(last_timestamp);
                     open_files();
 
                     if (storeVideo) {
@@ -497,7 +501,7 @@ void storage_worker_cv::run()
     } catch (frame_queue::cancelled& /*e*/) {
         // Nothing more to process, we're done
         PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Storage queue " << id_ << " cancelled, storage worker finished. Closing files." << std::endl;
-        close_files();
+        close_files(last_timestamp);
     }
 }
 
