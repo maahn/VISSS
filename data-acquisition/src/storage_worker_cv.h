@@ -298,7 +298,7 @@ void storage_worker_cv::run()
                 cv::absdiff(image.MatImage, imgOld, imgDiff);
 
 
-                // get histogramm
+                // get cummulative histogramm of differenc ebetween images
                 bool uniform = false;
                 bool accumulate = false;
                 cv::calcHist( &imgDiff, 1, 0, cv::Mat(), nPixel, 1,&histSize, &histRange, uniform, accumulate );
@@ -362,7 +362,6 @@ void storage_worker_cv::run()
                      }
                 }
 
-
                 if (movingPixel  || firstImage)
                      {
                         borderColor = ( 0 );
@@ -375,10 +374,12 @@ void storage_worker_cv::run()
                      }
 
                  textImg = textImg+ " | " + std::to_string(id_);
-
+                 if (queryGain) {
+                     textImg = textImg + " | E" + std::to_string((int)image.ExposureTime);
+                     textImg = textImg + "G" + std::to_string((int)image.Gain);
+                    }
                 cv::copyMakeBorder(image.MatImage, imgWithMeta, frameborder, 0, 0, 0, cv::BORDER_CONSTANT, borderColor );
                 
-
 
                 cv::putText(imgWithMeta, 
                         textImg,
@@ -454,6 +455,10 @@ void storage_worker_cv::run()
                             message = message + std::to_string((int)range[jj]);
                             break;
                          }
+                    }
+                    if (queryGain) {
+                        message = message + " | E: " + std::to_string((int)image.ExposureTime);
+                        message = message + " | G: " + std::to_string((int)image.Gain);
                     }
                     PrintThread{} << message<<std::endl;
                     std::cout << std::flush;

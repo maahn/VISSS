@@ -66,12 +66,14 @@ bool followermode = false;
 bool storeVideo = true;
 bool storeMeta = true;
 bool showPreview = true;
+bool queryGain = false;
 int nStorageThreads = 1;
 std::string encoding;
 std::chrono::time_point<std::chrono::system_clock> t_reset;
 
 //histogram
-float range[] = {20,30,40,60,80,100,120, 256  }; //the upper boundary is exclusive
+//float range[] = {20,30,40,60,80,100,120, 256  }; //the upper boundary is exclusive
+float range[8];// = {30,40,60,80,100,120, 140, 256  }; //the upper boundary is exclusive
 int histSize = 7;
 const float* histRange = { range };
 int minMovingPixel = 20;
@@ -82,6 +84,8 @@ struct MatMeta {
   unsigned long timestamp;
   unsigned long id;
   bool newFile;
+  float ExposureTime;
+  float Gain;
 }; 
 
 std::string get_timestamp(){

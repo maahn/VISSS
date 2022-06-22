@@ -48,6 +48,8 @@ const char* params
       "{ writeallframes w  | 0                 | write all frames whether sth is moving or not (for debugging) }"
       "{ followermode d    | 0                 | do not complain about camera timeouts }"
       "{ nopreview         |                   | no preview window }"
+      "{ minBrightChange b | 20                | minimum brightnes change to start recording [20,30] }"
+      "{ querygain q       | 0                 | query gain and bightness [0,1]}"
       "{ novideo           |                   | do not store video data }"
       "{ nometadata        |                   | do not store meta data }"
       "{ name n            | VISSS             | camera name }"
@@ -371,11 +373,18 @@ void *ImageCaptureThread( void *context)
                         // Insert a copy into all queues
                         // for (auto& q : queue) {
 
+
                         // Now the main capture loop
                         exportImgMeta.MatImage = exportImg.clone();
                         exportImgMeta.timestamp = img->timestamp;
                         exportImgMeta.id = img->id;
 
+                        if (queryGain) {
+                            GevGetFeatureValue( captureContext->camHandle, "ExposureTime",  &type, sizeof(valF), &valF);
+                            exportImgMeta.ExposureTime = valF;
+                            GevGetFeatureValue( captureContext->camHandle, "Gain",  &type, sizeof(valF), &valF);
+                            exportImgMeta.Gain = valF;
+                        }
                         // we need new files in every thread
                         if (framesInFile < nStorageThreads) {
                             exportImgMeta.newFile = true; 
@@ -397,6 +406,8 @@ void *ImageCaptureThread( void *context)
                         high_resolution_clock::time_point t2(high_resolution_clock::now());
                          double dt_us(static_cast<double>(duration_cast<microseconds>(t2 - t1).count()));
                         total_read_time += dt_us;
+
+
 
                         // std::cout << "Captured image #" << frame_count << " in "
                         //     << (dt_us / 1000.0) << " ms" << std::endl;
@@ -591,7 +602,9 @@ int main(int argc, char *argv[])
     char c;
     int res = 0;
     int writeallframes1;
+    int queryGain1;
     int followermode1;
+    int minBrightnessChange;
     FILE *fp = NULL;
     FILE *fp2 = NULL;
     // char uniqueName[FILENAME_MAX];
@@ -674,6 +687,30 @@ int main(int argc, char *argv[])
         global_error = true;
     }
 
+    minBrightnessChange = parser.get<int>("minBrightChange");
+    if (minBrightnessChange == 20) {
+        range[0] = 20;
+        range[1] =   30;
+        range[2] =   40;
+        range[3] =   60;
+        range[4] =   80;
+        range[5] =   100;
+        range[6] =   120;
+        range[7] =   256 ; //the upper boundary is exclusive;
+    } else if (minBrightnessChange == 30) {
+        range[0] = 30;
+        range[1] = 40;
+        range[2] =   60;
+        range[3] =   80;
+        range[4] =   100;
+        range[5] =   120;
+        range[6] =   140;
+        range[7] =   256 ; //the upper boundary is exclusive;
+    } else {
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| minBrightChange must be 20 or 30 " << minBrightnessChange<< std::endl;
+        global_error = true;
+    }
+
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: writeallframes "<< writeallframes << " " << writeallframes1 << std::endl;
     showPreview = !parser.has("nopreview");
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: showPreview "<< showPreview << std::endl;
@@ -681,6 +718,17 @@ int main(int argc, char *argv[])
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: storeVideo "<< storeVideo << std::endl;
     storeMeta = !parser.has("nometadata");
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: storeMeta "<< storeMeta << std::endl;
+
+    queryGain1 = parser.get<int>("querygain");
+    if (queryGain1 == 0) {
+        queryGain = false;
+    } else if (queryGain1 == 1) {
+        queryGain = true;
+    } else {
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| queryGain must be 0 or 1 " << queryGain1<< std::endl;
+        global_error = true;
+    }
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: queryGain "<< queryGain << std::endl;
 
     gethostname(hostname, HOST_NAME_MAX);
 

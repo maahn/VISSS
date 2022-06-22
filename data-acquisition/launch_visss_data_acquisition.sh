@@ -52,6 +52,12 @@ while [ $# -gt 0 ]; do
     --FOLLOWERMODE=*)
       FOLLOWERMODE="${1#*=}"
       ;;
+    --QUERYGAIN=*)
+      QUERYGAIN="${1#*=}"
+      ;;
+    --MINBRIGHT=*)
+      MINBRIGHT="${1#*=}"
+      ;;
     --LIVERATIO=*)
       LIVERATIO="${1#*=}"
       ;;
@@ -121,7 +127,7 @@ for (( ; ; ))
 do
 
 	timestamp=$(/bin/date +%FT%T)
-	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -d=$FOLLOWERMODE $CAMERACONFIG $IP"
+	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -d=$FOLLOWERMODE -q=$QUERYGAIN -b=$MINBRIGHT $CAMERACONFIG $IP"
 	/bin/echo "BASH2 $COMMAND"
 	if $COMMAND
 			then

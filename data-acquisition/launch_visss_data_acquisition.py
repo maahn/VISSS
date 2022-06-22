@@ -190,6 +190,8 @@ class runCpp:
             f" --NTHREADS={self.configuration['storagethreads']}"
             f" --NEWFILEINTERVAL={self.configuration['newfileinterval']}"
             f" --STOREALLFRAMES={int(self.configuration['storeallframes'])}"
+            f" --QUERYGAIN={int(self.configuration['querygain'])}"
+            f" --MINBRIGHT={self.configuration['minBrightchange']}"
         )
 
         frame1 = ttk.Frame(self.parent.mainframe)
@@ -661,7 +663,7 @@ class GUI(object):
             messagebox.showerror(title=None, message='File %s not found'%fname)
             settings = {}
         else:
-            for k in ['storeallframes', 'autopilot']:
+            for k in ['storeallframes', 'autopilot', 'querygain']:
                 if k in settings.keys():
                     if settings[k] in ['true', 'True', 1]:
                         settings[k] = True
