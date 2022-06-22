@@ -220,7 +220,7 @@ void *ImageCaptureThread( void *context)
     long int framesInFile = 0;
     uint last_id = 0;
     signed long last_cameratimestamp = 0; // signed to allow difference
-    uint last_utctimestamp_s = 0;
+    uint timestamp_s = 0;
     uint id_offset = 0;
 
     int type;
@@ -271,28 +271,6 @@ void *ImageCaptureThread( void *context)
         // While we are still running.
         while(!captureContext->exit)
         {
-            timeNow = static_cast<long int> (time(NULL));
-            reset_clock  = (
-                (new_file_interval > 0) && 
-                (last_utctimestamp_s % new_file_interval == 0) && 
-                ((timeNow - timeStart) > 10)
-                ) ;
-
-            if (reset_clock || first_image) { 
-                t_reset = std::chrono::system_clock::now();
-                statusF = GevSetFeatureValueAsString(captureContext->camHandle, "timestampControlReset", "1");
-                if (statusF == GEVLIB_OK) {
-                    std::cout << std::endl << "INFO | " << get_timestamp() << " | Reset clock to " << 
-                    t_reset.time_since_epoch().count()/1000 << std::endl;
-                } else {
-                    // if the clock rest does not work it typically indicates a larger problem, so better exit (and restart)
-                    std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to reset clock, error " << statusF << std::endl;
-                    global_error = true;
-
-                }
-                t_reset_uint_ = t_reset.time_since_epoch().count()/1000;
-                timeStart = static_cast<long int> (time(NULL));
-            }
 
 
             GEV_BUFFER_OBJECT *img = NULL;
@@ -307,6 +285,35 @@ void *ImageCaptureThread( void *context)
                 if (img->status == 0)
                 {
                     was_active = true;
+
+
+                // handle clock reset
+                timeNow = static_cast<long int> (time(NULL));
+                timestamp_s = (img->timestamp + t_reset_uint_applied)/1e6;
+                reset_clock  = (
+                    (new_file_interval > 0) && 
+                    (timestamp_s % new_file_interval == 0) && 
+                    ((timeNow - timeStart) > 10)
+                    ) ;
+
+                if (reset_clock || first_image) { 
+                    t_reset = std::chrono::system_clock::now();
+                    statusF = GevSetFeatureValueAsString(captureContext->camHandle, "timestampControlReset", "1");
+                    if (statusF == GEVLIB_OK) {
+                        std::cout << std::endl << "INFO | " << get_timestamp() << " | Reset clock to " << 
+                        t_reset.time_since_epoch().count()/1000 << ". ID " << img->id << std::endl;
+                    } else {
+                        // if the clock rest does not work it typically indicates a larger problem, so better exit (and restart)
+                        std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to reset clock, error " << statusF << std::endl;
+                        global_error = true;
+
+                    }
+                    t_reset_uint_ = t_reset.time_since_epoch().count()/1000;
+                    timeStart = static_cast<long int> (time(NULL));
+                }
+
+
+
                     m_latestBuffer = img->address;
 
                     // img->id max number is 65535
@@ -318,7 +325,8 @@ void *ImageCaptureThread( void *context)
 
                     // if clock jumps back by at least 1 second, we assume the camera clock was reset
                     if ((last_cameratimestamp>=0) && ((((signed long) img->timestamp) - last_cameratimestamp) < -1e6) ){
-                        std::cout << std::endl << "INFO | " << get_timestamp() << " | detected clock reset between "  << (img->timestamp) << " and " << last_cameratimestamp<< std::endl;
+                        std::cout << std::endl << "INFO | " << get_timestamp() << " | detected clock reset between "  << 
+                        (img->timestamp) << " and " << last_cameratimestamp << ". ID " << img->id << std::endl;
                         reset_clock_detected = true;
                         t_reset_uint_applied = t_reset_uint_;
                     } else if (first_image){
@@ -459,7 +467,7 @@ void *ImageCaptureThread( void *context)
 
                         last_id = exportImgMeta.id;
                         last_cameratimestamp = img->timestamp;
-                        last_utctimestamp_s = exportImgMeta.timestamp/1e6;
+                        //last_utctimestamp_s = exportImgMeta.timestamp/1e6;
 
 
                         ++frame_count;
