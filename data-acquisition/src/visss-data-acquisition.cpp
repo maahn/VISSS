@@ -71,7 +71,7 @@ typedef struct tagMY_CONTEXT
     int                     enable_sequence;
     int                     enable_save;
     int                     live_window_frame_ratio;
-    double                     fps;
+    int                     fps;
     bool              exit;
 } MY_CONTEXT, *PMY_CONTEXT;
 
@@ -310,13 +310,14 @@ void *ImageCaptureThread( void *context)
                     m_latestBuffer = img->address;
 
                     // img->id max number is 65535
-                    if ((last_id>=0) && (img->id != last_id+1)  && (last_id != 65535) ){
-                        std::cout << std::endl << "ERROR | " << get_timestamp() << " | missed frames between " << last_id << " and " << img->id << std::endl;
+                    if ((((signed long)img->id + id_offset)- (signed long)last_id) < - 1000) { // do not use 65535 in case frames are missed
+                        id_offset = id_offset + 65535;
+                        std::cout << std::endl << "INFO | " << get_timestamp() << " | frame id overflow detected " << img->id << " offset " << id_offset << std::endl;
                     }
 
 
                     // if clock jumps back by at least 1 second, we assume the camera clock was reset
-                    if ((last_cameratimestamp>=0) && ((((int) img->timestamp) - last_cameratimestamp) < -1e6) ){
+                    if ((last_cameratimestamp>=0) && ((((signed long) img->timestamp) - last_cameratimestamp) < -1e6) ){
                         std::cout << std::endl << "INFO | " << get_timestamp() << " | detected clock reset between "  << (img->timestamp) << " and " << last_cameratimestamp<< std::endl;
                         reset_clock_detected = true;
                         t_reset_uint_applied = t_reset_uint_;
@@ -407,7 +408,13 @@ void *ImageCaptureThread( void *context)
                         exportImgMeta.timestamp = img->timestamp + t_reset_uint_applied;
                         exportImgMeta.recordtime = tr.time_since_epoch().count()/1000;
 
-                        exportImgMeta.id = img->id;
+                        exportImgMeta.id = img->id + id_offset;
+
+                        // img->id max number is 65535
+                        if ((last_id>=0) && (exportImgMeta.id != last_id+1) ){
+                            std::cout << std::endl << "ERROR | " << get_timestamp() << " | missed frames between " << last_id << " and " << exportImgMeta.id << std::endl;
+                        }
+
 
                         if (queryGain) {
                             GevGetFeatureValue( captureContext->camHandle, "ExposureTime",  &type, sizeof(valF), &valF);
@@ -695,7 +702,7 @@ int main(int argc, char *argv[])
     new_file_interval = parser.get<int>("newfileinterval");
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: newfileinterval "<< new_file_interval << std::endl;
 
-    context.fps = parser.get<double>("fps");
+    context.fps = parser.get<int>("fps");
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: fps "<< context.fps << std::endl;
     // if there is more than one thread, reduce frame rate of the output accordingly
     context.fps = context.fps / nStorageThreads;

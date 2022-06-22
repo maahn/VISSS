@@ -72,6 +72,7 @@ std::string encoding;
 std::chrono::time_point<std::chrono::system_clock> t_reset;
 unsigned long t_reset_uint_ = 0;
 unsigned long t_reset_uint_applied = 0;
+unsigned long id_offset = 0;
 
 //histogram
 //float range[] = {20,30,40,60,80,100,120, 256  }; //the upper boundary is exclusive

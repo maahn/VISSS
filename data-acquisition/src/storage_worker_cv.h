@@ -35,7 +35,7 @@ private:
     std::string filename_;
     std::string filename_latest_ ;
     int32_t fourcc_;
-    double fps_;
+    int fps_;
     cv::Size frame_size_;
     bool is_color_;
 //    double quality_;
