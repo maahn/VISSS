@@ -215,6 +215,7 @@ void *ImageCaptureThread( void *context)
     bool reset_clock = true;
     bool reset_clock_detected = false;
     bool first_image = true;
+    bool after_first_reset = false;
     long int timeNow = 0;
     long int timeStart = 0;
     long int framesInFile = 0;
@@ -328,6 +329,7 @@ void *ImageCaptureThread( void *context)
                         std::cout << std::endl << "INFO | " << get_timestamp() << " | detected clock reset between "  << 
                         (img->timestamp) << " and " << last_cameratimestamp << ". ID " << img->id << std::endl;
                         reset_clock_detected = true;
+                        after_first_reset = true;
                         t_reset_uint_applied = t_reset_uint_;
                     } else if (first_image){
                          t_reset_uint_applied = t_reset_uint_;
@@ -367,6 +369,8 @@ void *ImageCaptureThread( void *context)
 //                     printf("%d ",pMode);
 //                     printf("%d ",img->id);
 // }
+
+
 
                     if ((captureContext->enable_sequence) || (sequence_init == 1))
                     {
@@ -444,7 +448,10 @@ void *ImageCaptureThread( void *context)
                         tt = exportImgMeta.id % nStorageThreads; 
  // std::cout << "INFOmain 5: "<< tt <<" "<< exportImgMeta.id << " "<< nStorageThreads << std::endl;
 
-                        queue[tt].push(exportImgMeta);
+                        // only process data after clock reset has been confirmed for the first time, otherwise timestamps are wrong
+                        if (after_first_reset) {
+                            queue[tt].push(exportImgMeta);
+                        } 
                         // }        
  // std::cout << "INFOmain 6: "  << queue[tt].size() << std::endl;
 
