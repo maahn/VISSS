@@ -43,7 +43,6 @@ private:
     double total_time_;
     // std::chrono::time_point<std::chrono::system_clock> t_reset;
     int live_window_frame_ratio_;
-    unsigned long t_reset_uint_;
     unsigned long t_record;
     bool firstImage;
     bool fileUsed;
@@ -292,7 +291,7 @@ void storage_worker_cv::run()
             if (!image.MatImage.empty()) {
                 high_resolution_clock::time_point t1(high_resolution_clock::now());
                 
-                last_timestamp = image.timestamp +t_reset_uint_; 
+                last_timestamp = image.timestamp; 
 
                 // t_record = t1.time_since_epoch().count()/1000;
 
@@ -399,11 +398,6 @@ void storage_worker_cv::run()
                 if (firstImage || image.newFile)
                 {
 
-                    if (name != "DRYRUN") {
-                        t_reset_uint_ = t_reset.time_since_epoch().count()/1000;
-                    } else {
-                        t_reset_uint_ = 0;
-                    }
 
 
                     close_files(last_timestamp);
@@ -431,7 +425,7 @@ void storage_worker_cv::run()
                             fileUsed = true;
                             }
                         if (storeMeta) {
-                            message = std::to_string(image.timestamp +t_reset_uint_)
+                            message = std::to_string(image.timestamp)
                                 + ", " + std::to_string(image.recordtime)
                                 + ", " + std::to_string(image.id)
                                 + ", " + std::to_string(queue_.size()) ;

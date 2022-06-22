@@ -286,8 +286,10 @@ void *ImageCaptureThread( void *context)
                     global_error = true;
 
                 }
+                t_reset_uint_ = t_reset.time_since_epoch().count()/1000;
+
                 first_image = false;
-                framesInFile = 0;
+                framesInFile = 0; // creates new file!
                 timeStart = static_cast<long int> (time(NULL));
             }
 
@@ -381,7 +383,7 @@ void *ImageCaptureThread( void *context)
 
                         // Now the main capture loop
                         exportImgMeta.MatImage = exportImg.clone();
-                        exportImgMeta.timestamp = img->timestamp;
+                        exportImgMeta.timestamp = img->timestamp + t_reset_uint_;
                         exportImgMeta.recordtime = tr.time_since_epoch().count()/1000;
 
                         exportImgMeta.id = img->id;
