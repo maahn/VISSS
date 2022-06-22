@@ -213,10 +213,15 @@ void *ImageCaptureThread( void *context)
     MY_CONTEXT *captureContext = (MY_CONTEXT *)context;
     bool was_active = false;
     bool reset_clock = true;
+    bool reset_clock_detected = false;
     bool first_image = true;
     long int timeNow = 0;
     long int timeStart = 0;
     long int framesInFile = 0;
+    uint last_id = 0;
+    signed long last_cameratimestamp = 0; // signed to allow difference
+    uint last_utctimestamp_s = 0;
+    uint id_offset = 0;
 
     int type;
     UINT32 val = 0;
@@ -259,7 +264,6 @@ void *ImageCaptureThread( void *context)
         double total_read_time(0.0);
         int32_t frame_count(0);
 
-        uint last_id = 0;
 
         std::cout << "DEBUG | " << get_timestamp() << "| " << "Capture Loop ready" << std::endl;
         timeStart = static_cast<long int> (time(NULL));
@@ -270,7 +274,7 @@ void *ImageCaptureThread( void *context)
             timeNow = static_cast<long int> (time(NULL));
             reset_clock  = (
                 (new_file_interval > 0) && 
-                (timeNow % new_file_interval == 0) && 
+                (last_utctimestamp_s % new_file_interval == 0) && 
                 ((timeNow - timeStart) > 10)
                 ) ;
 
@@ -287,9 +291,6 @@ void *ImageCaptureThread( void *context)
 
                 }
                 t_reset_uint_ = t_reset.time_since_epoch().count()/1000;
-
-                first_image = false;
-                framesInFile = 0; // creates new file!
                 timeStart = static_cast<long int> (time(NULL));
             }
 
@@ -314,6 +315,27 @@ void *ImageCaptureThread( void *context)
                     }
 
 
+                    // if clock jumps back by at least 1 second, we assume the camera clock was reset
+                    if ((last_cameratimestamp>=0) && ((((int) img->timestamp) - last_cameratimestamp) < -1e6) ){
+                        std::cout << std::endl << "INFO | " << get_timestamp() << " | detected clock reset between "  << (img->timestamp) << " and " << last_cameratimestamp<< std::endl;
+                        reset_clock_detected = true;
+                        t_reset_uint_applied = t_reset_uint_;
+                    } else if (first_image){
+                         t_reset_uint_applied = t_reset_uint_;
+
+                    } else {
+                        reset_clock_detected = false;
+                    }
+
+                    // creates new file!
+                    if (reset_clock || first_image) { 
+                        framesInFile = 0; 
+                    }
+                    first_image = false; // applies only to very first image
+
+
+
+
                     // UINT32 TotalBuffers ;
                     // UINT32 NumUsed ;
                     // UINT32 NumFree;
@@ -336,7 +358,6 @@ void *ImageCaptureThread( void *context)
 //                     printf("%d ",pMode);
 //                     printf("%d ",img->id);
 // }
-                    last_id = img->id;
 
                     if ((captureContext->enable_sequence) || (sequence_init == 1))
                     {
@@ -383,7 +404,7 @@ void *ImageCaptureThread( void *context)
 
                         // Now the main capture loop
                         exportImgMeta.MatImage = exportImg.clone();
-                        exportImgMeta.timestamp = img->timestamp + t_reset_uint_;
+                        exportImgMeta.timestamp = img->timestamp + t_reset_uint_applied;
                         exportImgMeta.recordtime = tr.time_since_epoch().count()/1000;
 
                         exportImgMeta.id = img->id;
@@ -428,6 +449,11 @@ void *ImageCaptureThread( void *context)
                         //     GevGetFeatureValue( captureContext->camHandle, "transferQueueCurrentBlockCount",  &type, sizeof(valI), &valI);
                         //     std::cout << " transferQueueCurrentBlockCount " << valI << " blocks"  << " ";
                         // }
+
+                        last_id = exportImgMeta.id;
+                        last_cameratimestamp = img->timestamp;
+                        last_utctimestamp_s = exportImgMeta.timestamp/1e6;
+
 
                         ++frame_count;
                         sequence_count++;

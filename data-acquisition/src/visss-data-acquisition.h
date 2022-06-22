@@ -71,6 +71,7 @@ int nStorageThreads = 1;
 std::string encoding;
 std::chrono::time_point<std::chrono::system_clock> t_reset;
 unsigned long t_reset_uint_ = 0;
+unsigned long t_reset_uint_applied = 0;
 
 //histogram
 //float range[] = {20,30,40,60,80,100,120, 256  }; //the upper boundary is exclusive
@@ -283,3 +284,15 @@ private:
 };
 
 std::mutex PrintThread::_mutexPrint{};
+
+// https://stackoverflow.com/questions/34857119/how-to-convert-stdchronotime-point-to-string
+using time_point = std::chrono::system_clock::time_point;
+std::string serializeTimePoint( const time_point& time, const std::string& format)
+{
+    std::time_t tt = std::chrono::system_clock::to_time_t(time);
+    std::tm tm = *std::gmtime(&tt); //GMT (UTC)
+    //std::tm tm = *std::localtime(&tt); //Locale time-zone, usually UTC by default.
+    std::stringstream ss;
+    ss << std::put_time( &tm, format.c_str() );
+    return ss.str();
+}

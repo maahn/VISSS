@@ -101,11 +101,11 @@ void storage_worker_cv::add_meta_data()
 
     //0.2 with mean and standard deviation
     //0.3 with number of changing pixels
-    //0.4 with queue length
+    //0.4 with last capture time
 
 
 
-    fMeta_ << "# VISSS file format version: 0.3"<< "\n";
+    fMeta_ << "# VISSS file format version: 0.4"<< "\n";
     fMeta_ << "# VISSS git tag: " << GIT_TAG
           <<  "\n";
     fMeta_ << "# VISSS git branch: " << GIT_BRANCH
@@ -114,7 +114,7 @@ void storage_worker_cv::add_meta_data()
             << fractional_seconds  << "\n";
     fMeta_ << "# us since epoche: " 
           << t_reset_uint_ << "\n";
-    fMeta_ << "# Camera serial number: "
+    fMeta_ << "# Camera serial number: "    
           << DeviceIDMeta << "\n";
     fMeta_ << "# Camera configuration: "
           <<  configFile.substr(configFile.find_last_of("/\\") + 1)<< "\n";
@@ -196,14 +196,16 @@ void storage_worker_cv::close_files(unsigned long timestamp) {
 void storage_worker_cv::create_filename() {
 
     std::string full_path;
-    time_t t = time(0);   // get time now
-    struct tm * now = localtime( & t );
+    // std::time_t now_c = std::chrono::system_clock::to_time_t(t_reset);
+    // std::tm now_tm* = *std::localtime(&now_c);
     int res = 0;
-    char timestamp1 [80];
-    strftime (timestamp1,80,"%Y/%m/%d",now);
-    char timestamp2 [80];
-    strftime (timestamp2,80,"%Y%m%d-%H%M%S",now);
+    // char timestamp1 [80];
+    // strftime (timestamp1,80,"%Y/%m/%d", now_tm);
+    // char timestamp2 [80];
+    // strftime (timestamp2,80,"%Y%m%d-%H%M%S", now_tm);
 
+    std::string timestamp1 = serializeTimePoint(t_reset, "%Y/%m/%d");
+    std::string timestamp2 =serializeTimePoint(t_reset, "%Y%m%d-%H%M%S");
 
 
     if (name != "DRYRUN") {
@@ -251,7 +253,7 @@ void storage_worker_cv::run()
     int result;
     result = nice(-25);
 
-    unsigned long  last_timestamp;
+    unsigned long  last_timestamp = 0;
     long int frame_count_new_file = 0;
     firstImage = true;
     std::string message;
@@ -291,7 +293,6 @@ void storage_worker_cv::run()
             if (!image.MatImage.empty()) {
                 high_resolution_clock::time_point t1(high_resolution_clock::now());
                 
-                last_timestamp = image.timestamp; 
 
                 // t_record = t1.time_since_epoch().count()/1000;
 
@@ -476,6 +477,7 @@ void storage_worker_cv::run()
                 imgOld = image.MatImage.clone();
                 firstImage = false;
                 ++frame_count;
+                last_timestamp = image.timestamp; 
 
 
                 high_resolution_clock::time_point t2(high_resolution_clock::now());
