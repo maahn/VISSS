@@ -82,6 +82,7 @@ int minMovingPixel = 20;
 struct MatMeta {
   cv::Mat MatImage;
   unsigned long timestamp;
+  unsigned long recordtime;
   unsigned long id;
   bool newFile;
   float ExposureTime;

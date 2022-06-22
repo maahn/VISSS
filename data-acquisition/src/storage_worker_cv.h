@@ -294,7 +294,7 @@ void storage_worker_cv::run()
                 
                 last_timestamp = image.timestamp +t_reset_uint_; 
 
-                t_record = t1.time_since_epoch().count()/1000;
+                // t_record = t1.time_since_epoch().count()/1000;
 
                 if (firstImage)  { 
                     imgOld = image.MatImage * 0;
@@ -432,7 +432,7 @@ void storage_worker_cv::run()
                             }
                         if (storeMeta) {
                             message = std::to_string(image.timestamp +t_reset_uint_)
-                                + ", " + std::to_string(t_record)
+                                + ", " + std::to_string(image.recordtime)
                                 + ", " + std::to_string(image.id)
                                 + ", " + std::to_string(queue_.size()) ;
 

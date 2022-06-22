@@ -296,6 +296,8 @@ void *ImageCaptureThread( void *context)
             GEV_STATUS status = 0;
             // Wait for images to be received
             status = GevWaitForNextImage(captureContext->camHandle, &img, 1000);
+            // fet time for recordtime timestamp
+            high_resolution_clock::time_point tr(high_resolution_clock::now());
 
             if ((img != NULL) && (status == GEVLIB_OK))
             {
@@ -380,6 +382,8 @@ void *ImageCaptureThread( void *context)
                         // Now the main capture loop
                         exportImgMeta.MatImage = exportImg.clone();
                         exportImgMeta.timestamp = img->timestamp;
+                        exportImgMeta.recordtime = tr.time_since_epoch().count()/1000;
+
                         exportImgMeta.id = img->id;
 
                         if (queryGain) {
