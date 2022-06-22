@@ -47,12 +47,12 @@ Video In Situ Snowfall Sensor data acquisition software
 
 ### 0.3
  * For deployments in 22/23
-
-#### planed changes
- * change from mov to mkv files to handle crashes better
- * assign record_time as early as possible
- * apply camera time request when it is reset in camera - or create new file after reset!
- * fix cature_id overflow
- * crate timestamp in filename smarter - from record_time for consistency? 
+ * changed from mov to mkv files to handle crashes better
+ * write last timestamp to ascii file when closing (actually first time stamp of next file...)
  * restart data acqusition when reset clock fails
- * write last timestamp to ascii fuile when closing
+ * assign record_time as early as possible
+ * apply camera time request when it is reset in camera 
+ * fix cature_id overflow
+ * crate timestamp in filename smarter - from camera reset_time (capture_time)
+
+
