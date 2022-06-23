@@ -50,3 +50,4 @@ data-acquisition/visss-data-acquisition-dryrun
 .DS_Store
 .ipynb_checkpoints
 tmp.json
+data-acquisition/xml/
