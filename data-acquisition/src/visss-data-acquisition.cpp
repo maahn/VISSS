@@ -221,7 +221,6 @@ void *ImageCaptureThread( void *context)
     long int framesInFile = 0;
     uint last_id = 0;
     signed long last_cameratimestamp = 0; // signed to allow difference
-    uint timestamp_s = 0;
     uint id_offset = 0;
 
     int type;

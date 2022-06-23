@@ -110,7 +110,7 @@ void storage_worker_cv::add_meta_data()
           <<  "\n";
     fMeta_ << "# VISSS git branch: " << GIT_BRANCH
           <<  "\n";
-    fMeta_ << "# Camera start time: " << ctime_no_newline << ' '
+    fMeta_ << "# Camera reset time: " << ctime_no_newline << ' '
             << fractional_seconds  << "\n";
     fMeta_ << "# us since epoche: " 
           << t_reset_uint_ << "\n";
@@ -204,8 +204,16 @@ void storage_worker_cv::create_filename() {
     // char timestamp2 [80];
     // strftime (timestamp2,80,"%Y%m%d-%H%M%S", now_tm);
 
-    std::string timestamp1 = serializeTimePoint(t_reset, "%Y/%m/%d");
-    std::string timestamp2 =serializeTimePoint(t_reset, "%Y%m%d-%H%M%S");
+    std::time_t temp = timestamp_s;
+    std::tm* t = std::gmtime(&temp);
+    char timestamp1 [80];
+    strftime (timestamp1,80,"%Y/%m/%d", t);
+    char timestamp2 [80];
+    strftime (timestamp2,80,"%Y%m%d-%H%M%S", t);
+
+
+//    std::string timestamp1 = serializeTimePoint(t_reset, "%Y/%m/%d");
+//    std::string timestamp2 =serializeTimePoint(t_reset, "%Y%m%d-%H%M%S");
 
 
     if (name != "DRYRUN") {
