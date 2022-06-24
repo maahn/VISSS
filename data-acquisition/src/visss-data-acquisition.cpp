@@ -290,6 +290,7 @@ void *ImageCaptureThread( void *context)
                 // handle clock reset
                 timeNow = static_cast<long int> (time(NULL));
                 timestamp_s = (img->timestamp + t_reset_uint_applied)/1e6;
+                timestamp_us = (img->timestamp + t_reset_uint_applied);
                 reset_clock  = (
                     (new_file_interval > 0) && 
                     (timestamp_s % new_file_interval == 0) && 

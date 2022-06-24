@@ -73,6 +73,7 @@ std::chrono::time_point<std::chrono::system_clock> t_reset;
 unsigned long t_reset_uint_ = 0;
 unsigned long t_reset_uint_applied = 0;
 unsigned long  timestamp_s = 0;
+unsigned long  timestamp_us = 0;
 
 unsigned long id_offset = 0;
 

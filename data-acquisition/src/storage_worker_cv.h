@@ -92,17 +92,22 @@ void storage_worker_cv::add_meta_data()
 {
 
 
-    std::chrono::milliseconds ms = duration_cast<std::chrono::milliseconds>(t_reset.time_since_epoch());
-    std::chrono::seconds s = duration_cast<std::chrono::seconds>(ms);
-    std::time_t t = s.count();
-    std::size_t fractional_seconds = ms.count() % 1000;
-    char *ctime_no_newline;
-    ctime_no_newline = strtok(ctime(&t), "\n");
+    // std::chrono::milliseconds ms = duration_cast<std::chrono::milliseconds>(t_reset.time_since_epoch());
+    // std::chrono::seconds s = duration_cast<std::chrono::seconds>(ms);
+    // std::time_t t = s.count();
+    // std::size_t fractional_seconds = ms.count() % 1000;
+    // char *ctime_no_newline;
+    // ctime_no_newline = strtok(ctime(&t), "\n");
 
     //0.2 with mean and standard deviation
     //0.3 with number of changing pixels
     //0.4 with last capture time
 
+    std::time_t temp = timestamp_s;
+    std::tm* t = std::gmtime(&temp);
+
+    char timestamp3 [80];
+    strftime (timestamp3,80,"%Y%m%d-%H%M%S", t);
 
 
     fMeta_ << "# VISSS file format version: 0.4"<< "\n";
@@ -110,10 +115,9 @@ void storage_worker_cv::add_meta_data()
           <<  "\n";
     fMeta_ << "# VISSS git branch: " << GIT_BRANCH
           <<  "\n";
-    fMeta_ << "# Camera reset time: " << ctime_no_newline << ' '
-            << fractional_seconds  << "\n";
+    fMeta_ << "# Camera reset time: " << timestamp3 << "\n";
     fMeta_ << "# us since epoche: " 
-          << t_reset_uint_ << "\n";
+          << timestamp_us << "\n";
     fMeta_ << "# Camera serial number: "    
           << DeviceIDMeta << "\n";
     fMeta_ << "# Camera configuration: "
