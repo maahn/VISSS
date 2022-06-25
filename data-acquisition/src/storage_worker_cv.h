@@ -52,9 +52,9 @@ private:
     FILE *pipeout;
 
 
-    void add_meta_data();
+    void add_meta_data(unsigned long timestamp);
     void close_files(unsigned long timestamp);
-    void open_files();
+    void open_files(unsigned long timestamp);
     void create_filename();
 
 };
@@ -88,7 +88,7 @@ storage_worker_cv::storage_worker_cv(frame_queue& queue
 // // ----------------------------------------------------------------------------
 
 
-void storage_worker_cv::add_meta_data() 
+void storage_worker_cv::add_meta_data(unsigned long timestamp) 
 {
 
 
@@ -103,11 +103,11 @@ void storage_worker_cv::add_meta_data()
     //0.3 with number of changing pixels
     //0.4 with last capture time
 
-    std::time_t temp = timestamp_s;
+    std::time_t temp = timestamp/1e6;
     std::tm* t = std::gmtime(&temp);
 
-    char timestamp3 [80];
-    strftime (timestamp3,80,"%Y%m%d-%H%M%S", t);
+    char timestampStr [80];
+    strftime (timestampStr,80,"%Y%m%d-%H%M%S", t);
 
 
     fMeta_ << "# VISSS file format version: 0.4"<< "\n";
@@ -115,9 +115,9 @@ void storage_worker_cv::add_meta_data()
           <<  "\n";
     fMeta_ << "# VISSS git branch: " << GIT_BRANCH
           <<  "\n";
-    fMeta_ << "# Camera reset time: " << timestamp3 << "\n";
+    fMeta_ << "# Camera reset time: " << timestampStr << "\n";
     fMeta_ << "# us since epoche: " 
-          << timestamp_us << "\n";
+          << timestamp << "\n";
     fMeta_ << "# Camera serial number: "    
           << DeviceIDMeta << "\n";
     fMeta_ << "# Camera configuration: "
@@ -138,7 +138,7 @@ void storage_worker_cv::add_meta_data()
 }
 
 
-void storage_worker_cv::open_files() 
+void storage_worker_cv::open_files(unsigned long timestamp) 
 {
     create_filename();
 
@@ -167,7 +167,7 @@ void storage_worker_cv::open_files()
     if (storeMeta) {
         // Open the text file.
         fMeta_.open(filename_+".txt");
-        add_meta_data();
+        add_meta_data(timestamp);
         PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Opened "<< filename_+".txt"<< std::endl;
     }
 
@@ -414,7 +414,7 @@ void storage_worker_cv::run()
 
 
                     close_files(last_timestamp);
-                    open_files();
+                    open_files(image.timestamp);
 
                     if (storeVideo) {
                         cv::imwrite(filename_+".jpg", imgWithMeta );
