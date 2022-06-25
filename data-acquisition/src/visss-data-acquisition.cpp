@@ -216,6 +216,8 @@ void *ImageCaptureThread( void *context)
     bool reset_clock_detected = false;
     bool first_image = true;
     bool after_first_reset = false;
+    bool waiting_for_clock_reset = false;
+
     long int timeNow = 0;
     long int timeStart = 0;
     long int framesInFile = 0;
@@ -311,13 +313,14 @@ void *ImageCaptureThread( void *context)
                     }
                     t_reset_uint_ = t_reset.time_since_epoch().count()/1000;
                     timeStart = static_cast<long int> (time(NULL));
+                    waiting_for_clock_reset = true;
                 }
 
 
 
                     m_latestBuffer = img->address;
 
-                    // img->id max number is 65535
+                    // img->id max number is 65535 for m1280 cammera
                     if ((((signed long)img->id + id_offset)- (signed long)last_id) < - 1000) { // do not use 65535 in case frames are missed
                         id_offset = id_offset + 65535;
                         std::cout << std::endl << "INFO | " << get_timestamp() << " | frame id overflow detected " << img->id << " offset " << id_offset << std::endl;
@@ -330,6 +333,8 @@ void *ImageCaptureThread( void *context)
                         (img->timestamp) << " and " << last_cameratimestamp << ". ID " << img->id << std::endl;
                         reset_clock_detected = true;
                         after_first_reset = true;
+                        waiting_for_clock_reset = false;
+
                         t_reset_uint_applied = t_reset_uint_;
                     } else if (first_image){
                          t_reset_uint_applied = t_reset_uint_;
@@ -339,7 +344,7 @@ void *ImageCaptureThread( void *context)
                     }
 
                     // creates new file!
-                    if (reset_clock || first_image) { 
+                    if (reset_clock_detected || first_image) { 
                         framesInFile = 0; 
                     }
                     first_image = false; // applies only to very first image
@@ -448,8 +453,8 @@ void *ImageCaptureThread( void *context)
                         tt = exportImgMeta.id % nStorageThreads; 
  // std::cout << "INFOmain 5: "<< tt <<" "<< exportImgMeta.id << " "<< nStorageThreads << std::endl;
 
-                        // only process data after clock reset has been confirmed for the first time, otherwise timestamps are wrong
-                        if (after_first_reset) {
+                        // only process data after clock reset has been confirmed, otherwise timestamps are wrong
+                        if (!waiting_for_clock_reset) {
                             queue[tt].push(exportImgMeta);
                         } 
                         // }        
