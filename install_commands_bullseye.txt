@@ -1,8 +1,8 @@
 
-Install Debian Bullseye with MMATE desktop and user visss
+Install Debian Bullseye with MATE desktop, ssh server, webserver and user visss
+***********
 
-add viss to sudoer:
-
+add visss user to sudoer:
 su
 /sbin/adduser username sudo
 
