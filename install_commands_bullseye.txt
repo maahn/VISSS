@@ -71,8 +71,11 @@ available_netif="enp35s0f0 enp35s0f1"
 
 
 ********* autologin without Password
+make sure lightdm is the used display manager with:
 
-add to /etc/lightdm/lightdm.conf
+sudo dpkg-reconfigure lightdm
+
+then, add to /etc/lightdm/lightdm.conf
 
 [SeatDefaults]
 autologin-user=visss
