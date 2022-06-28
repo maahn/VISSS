@@ -70,7 +70,7 @@ something like at line 33:
 available_netif="enp35s0f0 enp35s0f1"
 
 
-********* autologin
+********* autologin without Password
 
 add to /etc/lightdm/lightdm.conf
 
@@ -78,6 +78,8 @@ add to /etc/lightdm/lightdm.conf
 autologin-user=visss
 autologin-user-timeout=0
 user-session=mate
+
+don't forget to reboot to test whether it works!
 
 ### timezone
 
