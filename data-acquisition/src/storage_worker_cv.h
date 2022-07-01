@@ -277,6 +277,9 @@ void storage_worker_cv::run()
     std::string old_string;
     std::string new_string;
     std::string textImg;
+    std::time_t temp;
+    std::tm* t;
+    char timestampStr [80];
 
     // boost::container::vector<bool>[histSize] movingPixels;
     bool movingPixels[histSize];
@@ -365,7 +368,13 @@ void storage_worker_cv::run()
                 } else {
                     textImg = site + " | ";
                 }
-                textImg = textImg + get_timestamp() + " | " + name + 
+
+                temp = image.timestamp/1e6;
+                t = std::gmtime(&temp);
+                strftime (timestampStr,80,"%Y/%m/%d %H:%M:%S", t);
+                temp = std::round((image.timestamp%1000000) / 1e4);
+
+                textImg = textImg + timestampStr + '.'+ std::to_string((int)temp) +" | " + name + 
                     " | Q:" + std::to_string(queue_.size()) + " | M: ";
                 for (int jj = histSize; jj --> 0; )
                 {
