@@ -62,6 +62,8 @@ try:
     #item = "%s\r\n" % (p.stdout.readline()[1:-5],)
     line = p.stdout.readline()
 
+    line = line.replace('\x02', "").replace('\x03', "")
+
     if p.poll() is not None:
       #print(p.stderr.readline())
       print(line)
@@ -77,12 +79,12 @@ try:
         errorFile.write(string+"\n")
       continue
      
-    # #check checksum
-    # if str(checksum(line[:-3])) != str(line[-3:-1]):
-    #   string =datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f")+"BAD DATA (wrong checksum):"+ repr(line)
-    #   print(string)   
-    #   errorFile.write(string+"\n")
-    #   continue
+    #check checksum
+    if str(checksum(line[:-3])) != str(line[-3:-1]):
+      string =datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f")+"BAD DATA (wrong checksum):"+ repr(line)
+      print(string)   
+      errorFile.write(string+"\n")
+      continue
     
     item = "%s;%s" % (datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f"), line)
 
