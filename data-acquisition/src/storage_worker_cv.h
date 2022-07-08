@@ -154,12 +154,12 @@ void storage_worker_cv::open_files(unsigned long timestamp)
         ffmpegCommand += " " +filename_ + ".mkv";
         
         pipeout = popen(ffmpegCommand.data(), "w");
-        // writer_.open(filename_ + ".mov", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
+        // writer_.open(filename_ + ".mkv", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
         PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Started "<< ffmpegCommand<< std::endl;
         PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
     }
-    //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=veryfast mb-tree=true me=dia analyse=i8x8 rc-lookahead=20 subme=1 ! queue ! qtmux !  filesink location=video-h264_lookahead20.mov",
-    //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=superfast rc-lookahead=80 subme=2 ! queue ! qtmux !  filesink location=video-h264_lookahead80a_subme2.mov",
+    //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=veryfast mb-tree=true me=dia analyse=i8x8 rc-lookahead=20 subme=1 ! queue ! qtmux !  filesink location=video-h264_lookahead20.mkv",
+    //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=superfast rc-lookahead=80 subme=2 ! queue ! qtmux !  filesink location=video-h264_lookahead80a_subme2.mkv",
     //                            cv::CAP_GSTREAMER, 0, fps_, frame_size_, is_color_);
 // 
    fileUsed = false;
@@ -183,11 +183,11 @@ void storage_worker_cv::close_files(unsigned long timestamp) {
         fflush(pipeout);
         pclose(pipeout);
         if (fileUsed) {
-            PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Written "<< filename_+".mov"<< std::endl;
-            create_symlink(filename_+".mov",  filename_latest_+".mov");
+            PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Written "<< filename_+".mkv"<< std::endl;
+            create_symlink(filename_+".mkv",  filename_latest_+".mkv");
         } else if (storeVideo) {
-            std::remove((filename_+".mov").c_str());
-            PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Empty file removed: " << filename_<<".mov" <<std::endl;
+            std::remove((filename_+".mkv").c_str());
+            PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Empty file removed: " << filename_<<".mkv" <<std::endl;
         }
     }
     //PrintThread{} << std::endl << "STATUS | " << get_timestamp() << " | All files closed. "<<std::endl;
