@@ -55,7 +55,7 @@ private:
     void add_meta_data(unsigned long timestamp);
     void close_files(unsigned long timestamp);
     void open_files(unsigned long timestamp);
-    void create_filename();
+    void create_filename(unsigned long timestamp);
 
 };
 // ----------------------------------------------------------------------------
@@ -140,7 +140,7 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp)
 
 void storage_worker_cv::open_files(unsigned long timestamp) 
 {
-    create_filename();
+    create_filename(timestamp);
 
     if (storeVideo) {
         std::string ffmpegCommand = "ffmpeg -loglevel warning -y -f rawvideo ";
@@ -197,7 +197,7 @@ void storage_worker_cv::close_files(unsigned long timestamp) {
 }
 
 
-void storage_worker_cv::create_filename() {
+void storage_worker_cv::create_filename(unsigned long timestamp) {
 
     std::string full_path;
     // std::time_t now_c = std::chrono::system_clock::to_time_t(t_reset);
@@ -208,8 +208,9 @@ void storage_worker_cv::create_filename() {
     // char timestamp2 [80];
     // strftime (timestamp2,80,"%Y%m%d-%H%M%S", now_tm);
 
-    std::time_t temp = timestamp_s;
+    std::time_t temp = timestamp/1e6;
     std::tm* t = std::gmtime(&temp);
+
     char timestamp1 [80];
     strftime (timestamp1,80,"%Y/%m/%d", t);
     char timestamp2 [80];
