@@ -46,7 +46,7 @@ private:
     unsigned long t_record;
     bool firstImage;
     bool fileUsed;
-
+    bool statusFrame;
 
     // cv::VideoWriter writer_;
     FILE *pipeout;
@@ -443,8 +443,9 @@ void storage_worker_cv::run()
 
                 }
 
-
-                if (writeallframes || movingPixel  || firstImage)
+                // store a frame every 10 s in thread 0 to have data about clock and capture_id drifts
+                statusFrame = (frame_count % ((int)fps_ *10) == 0) && (id_ == 0);
+                if (writeallframes || movingPixel  || firstImage || image.newFile || statusFrame )
                      {
 
                         if (storeVideo) { 
