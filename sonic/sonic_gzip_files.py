@@ -2,6 +2,7 @@
 import datetime
 import time
 import os
+import sys
 from subprocess import call
 import gzip
 
@@ -9,6 +10,7 @@ import gzip
 fpath_in = "/data/temp/sonic/"
 inFiles = os.listdir(fpath_in)
 fpath_out = "/data/nyaalesund/sonic"
+fpath_out = sys.argv[1]
 
 for inFile in inFiles:
 

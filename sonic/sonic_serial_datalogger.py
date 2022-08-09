@@ -2,19 +2,25 @@
 import datetime
 import time
 import os
+import glob
 from subprocess import Popen, PIPE, STDOUT
 import gzip
 from functools import reduce
 
 ###settings
-com_port ='/dev/ttyF0'
-#fpath="/data/nyaalesund/sonic"
-#fsuffix = "txt.gz"
 
 fpath="/data/temp/sonic/"
 fsuffix = "txt"
 
-errorFname="/data/nyaalesund/sonic/sonic_errors.txt"
+
+
+if len(glob.glob('/dev/ttyUSB0'))==1:
+  com_port ='/dev/ttyUSB0'
+else:
+  com_port ='/dev/ttyF0'
+
+
+errorFname="/data/sonic_errors.txt"
 
 # to do: update checksum for thies sonic
 def checksum(st):
