@@ -523,20 +523,20 @@ void *ImageCaptureThread( void *context)
             else if (status  == GEVLIB_ERROR_TIME_OUT)
             {
                 if (captureContext->enable_sequence) {
-                    if (followermode) {
-                        if ((new_file_interval == 0) || (timeNow % new_file_interval == 0)) {
-                            std::cerr << "INFO | " << get_timestamp() <<" | Waiting for trigger camera"
-                            << std::endl;
-                        } else {
-                            std::cerr << "STATUS | " << get_timestamp() <<" | Waiting for trigger camera"
-                            << std::endl;
-                        }
-                    }
-                    else {
+                    // if (followermode) {
+                    //     if ((new_file_interval == 0) || (timeNow % new_file_interval == 0)) {
+                    //         std::cerr << "INFO | " << get_timestamp() <<" | Waiting for trigger camera"
+                    //         << std::endl;
+                    //     } else {
+                    //         std::cerr << "STATUS | " << get_timestamp() <<" | Waiting for trigger camera"
+                    //         << std::endl;
+                    //     }
+                    // }
+                    // else {
                         n_timeouts += 1;
                         std::cerr << "ERROR | " << get_timestamp() <<" | Camera time out"
                         << " #" << n_timeouts << std::endl;
-                    }
+                    // }
                 }
             }
             else {
@@ -545,7 +545,7 @@ void *ImageCaptureThread( void *context)
                 << " #" << n_timeouts << std::endl;
             }
 
-            if (n_timeouts > max_n_timeouts) {
+            if (n_timeouts > max_n_timeouts1) {
                 std::cerr << "FATAL ERROR | " << get_timestamp() << " | Too many timeouts." <<std::endl;
                 global_error = true;
             }
@@ -741,9 +741,9 @@ int main(int argc, char *argv[])
     }
     followermode1 = parser.get<int>("followermode");
     if (followermode1 == 0) {
-        followermode = false;
+        max_n_timeouts1 = max_n_timeouts;
     } else if (followermode1 == 1) {
-        followermode = true;
+        max_n_timeouts1 = max_n_timeouts * 10; //tolerate more timeouts as a follower
     } else {
         std::cerr << "FATAL ERROR | " << get_timestamp() << "| followermode must be 0 or 1 " << followermode1<< std::endl;
         global_error = true;
