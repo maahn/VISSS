@@ -8,8 +8,11 @@ from functools import reduce
 
 ###settings
 com_port ='/dev/ttyF0'
-fpath="/data/nyaalesund/sonic"
-fsuffix = "txt.gz"
+#fpath="/data/nyaalesund/sonic"
+#fsuffix = "txt.gz"
+
+fpath="/data/temp/sonic/"
+fsuffix = "txt"
 
 errorFname="/data/nyaalesund/sonic/sonic_errors.txt"
 
@@ -32,18 +35,19 @@ Day = today[6:]
 
 #create/open file
 try:
-  os.makedirs(fpath+"/"+yearMonth+"/")
+  #os.makedirs(fpath+"/"+yearMonth+"/")
+  os.makedirs(fpath)
 except OSError:
   pass
 
 count = 0  
-fname = fpath+"/"+yearMonth+"/"+yearMonth+Day+"_"+str(count)+"."+fsuffix
+fname = fpath+"/"+yearMonth+Day+"_"+str(count)+"."+fsuffix
 
 while os.path.exists(fname):
   count = count + 1 
-  fname = fpath+"/"+yearMonth+"/"+yearMonth+Day+"_"+str(count)+"."+fsuffix
+  fname = fpath+"/"+yearMonth+Day+"_"+str(count)+"."+fsuffix
 
-outFile = gzip.open(fname,"at")
+outFile = open(fname,"at")
 
 print("Sonic serial data logger")
 print(today, fname)
@@ -95,12 +99,12 @@ try:
       yearMonth = today[:6]
       Day = today[6:]
       try:
-        os.mkdir(fpath+"/"+yearMonth+"/")
+        os.mkdir(fpath+"/")
       except OSError:
         pass
 
-      fname = fpath+"/"+yearMonth+"/"+yearMonth+Day+"_0"+"."+fsuffix
-      outFile = gzip.open(fname,"at")
+      fname = fpath+"/"+yearMonth+Day+"_0"+"."+fsuffix
+      outFile = open(fname,"at")
       print(today, fname)
 
     #write data

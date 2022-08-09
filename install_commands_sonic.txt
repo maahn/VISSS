@@ -23,3 +23,7 @@ ls /dev/ttyF0
 
 7) enable autostart of the script
 ln -s /home/visss/VISSS/scripts/sonic_logger.desktop /home/visss/.config/autostart/
+
+add cronjob for gzip cpmpression
+
+2 1 * * * python3 /home/visss/VISSS/sonic/sonic_gzip_files.py
