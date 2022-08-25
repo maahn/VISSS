@@ -30,6 +30,7 @@ from textwrap import dedent
 from threading import Thread
 from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
+from pysolar import solar
 
 from urllib.error import HTTPError, URLError
 
@@ -46,6 +47,7 @@ DEFAULTSETTINGS = {
     'geometry': "%dx%d" % (300, 300),
     'configFile': None,
     'autopilot': False,
+    'checkdaylight': False,
 }
 LOGFORMAT = '%(asctime)s: %(levelname)s: %(name)s:%(message)s'
 TRIGGERINTERVALLFACTOR = 2  # data can be factor 2 older than interval
@@ -514,8 +516,13 @@ class GUI(object):
         self.settings = deepcopy(DEFAULTSETTINGS)
         self.settings.update(self.read_settings(SETTINGSFILE))
         # reset geometery if broken
+
+
         if self.settings['geometry'].startswith('1x1'):
             self.settings['geometry'] = DEFAULTSETTINGS['geometry']
+
+        self.sunAltitude = 999
+        self.sunOldAltitude = 999
 
         self.root = tk.Tk()
 
@@ -551,6 +558,7 @@ class GUI(object):
 
 
         self.autopilot = tk.IntVar()
+        self.checkdaylight = tk.IntVar()
         self.apps = []
         if 'camera' in self.configuration.keys():
             for cameraConfig in self.configuration['camera']:
@@ -569,8 +577,21 @@ class GUI(object):
             command=self.click_autopilot,
             variable=self.autopilot)
         ChkBttn.pack(side=tk.LEFT, pady=6, padx=6)
+
+        ChkBttn2 = ttk.Checkbutton(
+            config,
+            text='always on during day',
+            command=self.click_checkdaylight,
+            variable=self.checkdaylight)
+        ChkBttn2.pack(side=tk.LEFT, pady=6, padx=6)
+
+        # the original setting is lost during ChkBtn invoke when the state of GUI is read... 
+        settings_checkdaylight = deepcopy(self.settings['checkdaylight'])
+
         if self.settings['autopilot']:
             ChkBttn.invoke()
+        if settings_checkdaylight:
+            ChkBttn2.invoke()
 
         if (('externalTrigger' in self.configuration.keys()) and
                 (self.configuration['externalTrigger'] is not None)):
@@ -640,7 +661,13 @@ class GUI(object):
                         self.externalTriggerStatus[0][0] = True
                     except IndexError:
                         self.externalTriggerStatus[0].append(True)
-                    
+  
+    def click_checkdaylight(self):
+
+        self.save_settings(None)
+        self.loggerRoot.info('checkdaylight set to %s' % bool(self.checkdaylight.get()))
+
+
     def askopenfile(self):
         file = filedialog.askopenfilename(filetypes=[("YAML files", ".yaml")])
         if file is not None:
@@ -664,7 +691,7 @@ class GUI(object):
             messagebox.showerror(title=None, message='File %s not found'%fname)
             settings = {}
         else:
-            for k in ['storeallframes', 'autopilot', 'querygain']:
+            for k in ['storeallframes', 'autopilot', 'querygain', 'checkdaylight']:
                 if k in settings.keys():
                     if settings[k] in ['true', 'True', 1]:
                         settings[k] = True
@@ -677,19 +704,20 @@ class GUI(object):
         return settings
 
     def save_settings(self, event):
-        # it is called to often event hough window size is not changing
+        # it is called to often event though window size is not changing
         if event is not None:
             if self.settings['geometry'] == self.root.geometry():
                 return
         # gather setings
         self.settings['geometry'] = self.root.geometry()
         self.settings['autopilot'] = bool(self.autopilot.get())
+        self.settings['checkdaylight'] = bool(self.checkdaylight.get())
 
         # write settings
         with open(SETTINGSFILE, "w+") as stream:
             yaml.dump(self.settings, stream, default_flow_style=False,
                       allow_unicode=True)
-        self.loggerRoot.debug('save_settings: %s' % self.settings)
+        self.loggerRoot.info('save_settings: %s' % self.settings)
         return
 
     def killall(self):
@@ -699,7 +727,21 @@ class GUI(object):
             app.quit()
         self.root.destroy()
 
+    def sunIsUp(self):
 
+        now = datetime.datetime.now(datetime.timezone.utc)
+        longitude = self.configuration['longitude']
+        latitude = self.configuration['latitude']
+        self.sunAltitude = int(round(solar.get_altitude(latitude, longitude, now)))
+
+        if (self.sunAltitude >= 0) and (self.sunOldAltitude < 0):
+            self.loggerRoot.info('sunIsUp: sunrise detected')
+        if (self.sunAltitude < 0) and (self.sunOldAltitude >= 0):
+            self.loggerRoot.info('sunIsUp: sunset detected')
+
+        self.sunOldAltitude = deepcopy(self.sunAltitude)
+
+        return self.sunAltitude >= 0
 
 
     def queryExternalTrigger(
@@ -734,6 +776,25 @@ class GUI(object):
                 nBuffer,
             ))  # schedule next update
             return
+
+        elif bool(self.checkdaylight.get()) and self.sunIsUp():
+            triggerWidget.config(background="gray")
+            trigger.set(f'sun is at {self.sunAltitude}° - external trigger disabled')
+            writeHTML(self.triggerHtmlFile, f'sun is at {self.sunAltitude}° - external trigger disabled', "gray")
+            self.root.after(1000, lambda: self.queryExternalTrigger(
+                nn,
+                trigger,
+                triggerWidget,
+                name,
+                address,
+                interval,
+                threshold,
+                minMax,
+                stopOnTimeout,
+                nBuffer,
+            ))  # schedule next update
+            return
+
 
         self.root.after(interval*1000, lambda: self.queryExternalTrigger(
             nn,
@@ -803,9 +864,11 @@ class GUI(object):
             measurement = '%g' % data['measurement']
             unit = data['unit']
 
-        self.loggerRoot.info('queryExternalTrigger: continue Measurement %r %i/%i' %
-                        (continueMeasurement, np.sum(self.externalTriggerStatus[nn]),
-            nBuffer))
+        string = '%s: %s %s %i/%i at %s' % (
+            name, measurement, unit, np.sum(self.externalTriggerStatus[nn]),
+            nBuffer, data['timestamp'])
+
+        self.loggerRoot.info(string)
 
         self.externalTriggerStatus[nn].append(continueMeasurement)
 
@@ -814,9 +877,6 @@ class GUI(object):
         else:
             color = "yellow"
 
-        string = '%s: %s %s %i/%i at %s' % (
-            name, measurement, unit, np.sum(self.externalTriggerStatus[nn]),
-            nBuffer, data['timestamp'])
         triggerWidget.config(background=color)
         trigger.set(string)
         writeHTML(self.triggerHtmlFile, string, color)
