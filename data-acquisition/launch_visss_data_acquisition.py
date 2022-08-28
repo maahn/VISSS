@@ -736,6 +736,7 @@ class GUI(object):
 
         if (self.sunAltitude >= 0) and (self.sunOldAltitude < 0):
             self.loggerRoot.info('sunIsUp: sunrise detected')
+
         if (self.sunAltitude < 0) and (self.sunOldAltitude >= 0):
             self.loggerRoot.info('sunIsUp: sunset detected')
 
@@ -778,10 +779,10 @@ class GUI(object):
             return
 
         elif bool(self.checkdaylight.get()) and self.sunIsUp():
-            triggerWidget.config(background="gray")
+            triggerWidget.config(background="green")
             trigger.set(f'sun is at {self.sunAltitude}° - external trigger disabled')
             writeHTML(self.triggerHtmlFile, f'sun is at {self.sunAltitude}° - external trigger disabled', "gray")
-            self.root.after(1000, lambda: self.queryExternalTrigger(
+            self.root.after(interval*1000, lambda: self.queryExternalTrigger(
                 nn,
                 trigger,
                 triggerWidget,
@@ -793,6 +794,12 @@ class GUI(object):
                 stopOnTimeout,
                 nBuffer,
             ))  # schedule next update
+
+            #start measurements if required:
+            self.externalTriggerStatus[nn].append(True)
+            for app in self.apps:
+                app.statusWatcher()
+
             return
 
 
