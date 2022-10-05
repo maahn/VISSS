@@ -47,7 +47,6 @@ DEFAULTSETTINGS = {
     'geometry': "%dx%d" % (300, 300),
     'configFile': None,
     'autopilot': False,
-    'checkdaylight': False,
 }
 LOGFORMAT = '%(asctime)s: %(levelname)s: %(name)s:%(message)s'
 TRIGGERINTERVALLFACTOR = 2  # data can be factor 2 older than interval
@@ -77,7 +76,16 @@ def writeHTML(file, status, color):
     """
     with open(file, 'w') as f:
         f.write(html)
-    
+
+def convert2bool(var):
+    if var in ['true', 'True', 1]:
+        var = True
+    elif var in ['false', 'False', 0]:
+        var = False
+    else:
+        raise ValueError('convert2bool: %s' % var)
+    return var
+
 
 class QueueHandler(logging.Handler):
     """Class to send logging records to a queue
@@ -558,7 +566,6 @@ class GUI(object):
 
 
         self.autopilot = tk.IntVar()
-        self.checkdaylight = tk.IntVar()
         self.apps = []
         if 'camera' in self.configuration.keys():
             for cameraConfig in self.configuration['camera']:
@@ -577,21 +584,8 @@ class GUI(object):
             command=self.click_autopilot,
             variable=self.autopilot)
         ChkBttn.pack(side=tk.LEFT, pady=6, padx=6)
-
-        ChkBttn2 = ttk.Checkbutton(
-            config,
-            text='always on during day',
-            command=self.click_checkdaylight,
-            variable=self.checkdaylight)
-        ChkBttn2.pack(side=tk.LEFT, pady=6, padx=6)
-
-        # the original setting is lost during ChkBtn invoke when the state of GUI is read... 
-        settings_checkdaylight = deepcopy(self.settings['checkdaylight'])
-
         if self.settings['autopilot']:
             ChkBttn.invoke()
-        if settings_checkdaylight:
-            ChkBttn2.invoke()
 
         if (('externalTrigger' in self.configuration.keys()) and
                 (self.configuration['externalTrigger'] is not None)):
@@ -661,12 +655,6 @@ class GUI(object):
                         self.externalTriggerStatus[0][0] = True
                     except IndexError:
                         self.externalTriggerStatus[0].append(True)
-  
-    def click_checkdaylight(self):
-
-        self.save_settings(None)
-        self.loggerRoot.info('checkdaylight set to %s' % bool(self.checkdaylight.get()))
-
 
     def askopenfile(self):
         file = filedialog.askopenfilename(filetypes=[("YAML files", ".yaml")])
@@ -691,14 +679,10 @@ class GUI(object):
             messagebox.showerror(title=None, message='File %s not found'%fname)
             settings = {}
         else:
-            for k in ['storeallframes', 'autopilot', 'querygain', 'checkdaylight']:
+            for k in ['storeallframes', 'autopilot', 'querygain']:
                 if k in settings.keys():
-                    if settings[k] in ['true', 'True', 1]:
-                        settings[k] = True
-                    elif settings[k] in ['false', 'False', 0]:
-                        settings[k] = False
-                    else:
-                        raise ValueError('%s: %s' % (k, settings[k]))
+                    settings[k] = convert2bool(settings[k])
+
 
         self.loggerRoot.info('read_settings: %s' % settings)
         return settings
@@ -711,7 +695,6 @@ class GUI(object):
         # gather setings
         self.settings['geometry'] = self.root.geometry()
         self.settings['autopilot'] = bool(self.autopilot.get())
-        self.settings['checkdaylight'] = bool(self.checkdaylight.get())
 
         # write settings
         with open(SETTINGSFILE, "w+") as stream:
@@ -757,6 +740,7 @@ class GUI(object):
         minMax,
         stopOnTimeout,
         nBuffer,
+        nightOnly,
     ):
 
 
@@ -775,10 +759,11 @@ class GUI(object):
                 minMax,
                 stopOnTimeout,
                 nBuffer,
+                nightOnly,
             ))  # schedule next update
             return
 
-        elif bool(self.checkdaylight.get()) and self.sunIsUp():
+        elif nightOnly and self.sunIsUp():
             triggerWidget.config(background="green")
             trigger.set(f'sun is at {self.sunAltitude}° - external trigger disabled')
             writeHTML(self.triggerHtmlFile, f'sun is at {self.sunAltitude}° - external trigger disabled', "gray")
@@ -793,6 +778,7 @@ class GUI(object):
                 minMax,
                 stopOnTimeout,
                 nBuffer,
+                nightOnly,
             ))  # schedule next update
 
             #start measurements if required:
@@ -814,6 +800,7 @@ class GUI(object):
             minMax,
             stopOnTimeout,
             nBuffer,
+            nightOnly,
         ))  # schedule next update
 
         # default values
@@ -830,12 +817,8 @@ class GUI(object):
         else:
             raise ValueError('minMax must be min or max')
 
-        if stopOnTimeout in ['true', 'True', 1]:
-            stopOnTimeout = True
-        elif stopOnTimeout in ['false', 'False', 0]:
-            stopOnTimeout = False
-        else:
-            raise ValueError('stopOnTimeout: %s' % stopOnTimeout)
+        stopOnTimeout = convert2bool(stopOnTimeout)
+        nightOnly = convert2bool(nightOnly)
 
         now = np.datetime64('now')
         try:
