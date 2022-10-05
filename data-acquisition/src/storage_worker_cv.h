@@ -34,6 +34,7 @@ private:
     std::string path_;
     std::string filename_;
     std::string filename_latest_ ;
+    std::string filename_final_ ;
     int32_t fourcc_;
     int fps_;
     cv::Size frame_size_;
@@ -180,11 +181,13 @@ void storage_worker_cv::close_files(unsigned long timestamp) {
         fMeta_ << "# Last capture time: "
           << std::to_string(timestamp) << "\n";
         fMeta_.close();
+        std::rename((filename_+".txt").c_str(), (filename_final_+".txt").c_str());
         fflush(pipeout);
         pclose(pipeout);
         if (fileUsed) {
-            PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Written "<< filename_+".mkv"<< std::endl;
-            create_symlink(filename_+".mkv",  filename_latest_+".mkv");
+            std::rename((filename_+".mkv").c_str(), (filename_final_+".mkv").c_str());
+            PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Written "<< filename_final_+".mkv"<< std::endl;
+            create_symlink(filename_final_+".mkv",  filename_latest_+".mkv");
         } else if (storeVideo) {
             std::remove((filename_+".mkv").c_str());
             PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Empty file removed: " << filename_<<".mkv" <<std::endl;
@@ -223,13 +226,20 @@ void storage_worker_cv::create_filename(unsigned long timestamp) {
 
     if (name != "DRYRUN") {
         full_path = path_ + "/" + hostname + "_" + name + "_" + DeviceID + "/data/" + timestamp1 + "/" ;
-        filename_ = full_path + hostname + "_" + name + "_" + DeviceID  + "_" + timestamp2 + "_" + std::to_string(id_);
+        filename_ = path_ + "/tmp/" + hostname + "_" + name + "_" + DeviceID  + "_" + timestamp2 + "_" + std::to_string(id_);
+        filename_final_ = full_path + hostname + "_" + name + "_" + DeviceID  + "_" + timestamp2 + "_" + std::to_string(id_);
     } else {
         full_path = path_  + "/" ;
-        filename_ = full_path + DeviceIDMeta+ "_DRYRUN" + "_" + std::to_string(id_);
+        filename_ = path_ + "/tmp/" + DeviceIDMeta+ "_DRYRUN" + "_" + std::to_string(id_);
+        filename_final_ = full_path + DeviceIDMeta+ "_DRYRUN" + "_" + std::to_string(id_);
     }
     filename_latest_ = path_ + "/" + name  + "_latest" + "_" + std::to_string(id_) ;
 
+    res = mkdir_p((path_ + "/tmp/").c_str());
+    if (res != 0) {
+        std::cerr << "FATAL ERROR"<< id_ << " | " << get_timestamp() << " | Cannot create path "<< (path_ + "/tmp/").c_str() <<std::endl;
+        global_error = true;
+    }
     res = mkdir_p(full_path.c_str());
     if (res != 0) {
         std::cerr << "FATAL ERROR"<< id_ << " | " << get_timestamp() << " | Cannot create path "<< full_path.c_str() <<std::endl;
@@ -433,10 +443,10 @@ void storage_worker_cv::run()
                     open_files(image.timestamp);
 
                     if (storeVideo) {
-                        cv::imwrite(filename_+".jpg", imgWithMeta );
-                        create_symlink(filename_+".jpg",  filename_latest_+".jpg");
+                        cv::imwrite(filename_final_+".jpg", imgWithMeta );
+                        create_symlink(filename_final_+".jpg",  filename_latest_+".jpg");
                         PrintThread{} ;
-                        PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Written "<< filename_+".jpg"<< std::endl;
+                        PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Written "<< filename_final_+".jpg"<< std::endl;
                         }
 
                     frame_count_new_file = frame_count;
