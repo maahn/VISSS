@@ -278,6 +278,7 @@ void storage_worker_cv::run()
 
     unsigned long  last_timestamp = 0;
     long int frame_count_new_file = 0;
+
     firstImage = true;
     std::string message;
     cv::Mat imgSmall;
@@ -315,6 +316,8 @@ void storage_worker_cv::run()
 
     try {
         int32_t frame_count(0);
+        int32_t framesSinceLastStatus(0);
+        
         for (;;) {
 
             MatMeta image(queue_.pop());
@@ -454,7 +457,11 @@ void storage_worker_cv::run()
                 }
 
                 // store a frame every 10 s in thread 0 to have data about clock and capture_id drifts
-                statusFrame = (frame_count % ((int)fps_ *10) == 0) && (id_ == 0);
+                //statusFrame = (frame_count % ((int)fps_ *10) == 0) && (id_ == 0);
+                statusFrame = ((image.timestamp/(int)1e6)%10 == 0) && (framesSinceLastStatus > (1.5*fps_))  && (id_ == 0);
+                if (statusFrame) {
+                    framesSinceLastStatus = 0;
+                }
                 if (writeallframes || movingPixel  || firstImage || image.newFile || statusFrame )
                      {
 
@@ -516,6 +523,7 @@ void storage_worker_cv::run()
                 imgOld = image.MatImage.clone();
                 firstImage = false;
                 ++frame_count;
+                ++framesSinceLastStatus;
                 last_timestamp = image.timestamp; 
 
 
