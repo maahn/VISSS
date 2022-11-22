@@ -35,9 +35,9 @@ p = Popen(command, stdin=PIPE, stdout=PIPE, stderr=STDOUT, encoding='utf-8')
 #p = Popen(['cat',com_port],stdin=PIPE, stdout=PIPE, stderr=PIPE)
 
 #save date variable
-today = datetime.datetime.utcnow().strftime("%Y%m%d")
+today = datetime.datetime.utcnow().strftime("%Y%m%d%H")
 yearMonth = today[0:6]
-Day = today[6:]
+Day = today[6:8]
 
 #create/open file
 try:
@@ -46,14 +46,17 @@ try:
 except OSError:
   pass
 
-count = 0  
-fname = fpath+"/"+yearMonth+Day+"_"+str(count)+"."+fsuffix
+# count = 0  
+# fname = fpath+"/"+yearMonth+Day+"_"+str(count)+"."+fsuffix
+hour = today[8:10] 
+fname = fpath+"/"+yearMonth+Day+"_"+hour+"."+fsuffix
 
-while os.path.exists(fname):
-  count = count + 1 
-  fname = fpath+"/"+yearMonth+Day+"_"+str(count)+"."+fsuffix
+# while os.path.exists(fname):
+#   count = count + 1 
+#   fname = fpath+"/"+yearMonth+Day+"_"+str(count)+"."+fsuffix
 
-outFile = open(fname,"at")
+outFile = open(fname,"at+")
+
 
 print("Sonic serial data logger")
 print(today, fname)
@@ -99,18 +102,21 @@ try:
     item = "%s;%s" % (datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f"), line)
 
     #if new day, first make new file! 
-    if datetime.datetime.utcnow().strftime("%Y%m%d") != today:
+    now = datetime.datetime.utcnow().strftime("%Y%m%d%H")
+    if now != today:
       outFile.close()
-      today = datetime.datetime.utcnow().strftime("%Y%m%d")
+      today = now
       yearMonth = today[:6]
-      Day = today[6:]
+      Day = today[6:8]
       try:
         os.mkdir(fpath+"/")
       except OSError:
         pass
 
-      fname = fpath+"/"+yearMonth+Day+"_0"+"."+fsuffix
-      outFile = open(fname,"at")
+      hour = today[8:10] 
+      fname = fpath+"/"+yearMonth+Day+"_"+hour+"."+fsuffix
+
+      outFile = open(fname,"at+")
       print(today, fname)
 
     #write data
