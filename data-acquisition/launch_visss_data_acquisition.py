@@ -31,6 +31,7 @@ from threading import Thread
 from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
 from pysolar import solar
+from filelock import Timeout, FileLock
 
 from urllib.error import HTTPError, URLError
 
@@ -877,15 +878,25 @@ class GUI(object):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-log',
-                        '--loglevel',
-                        default='info',
-                        help=('Provide logging level. Example --loglevel '
-                              'debug, default=info'))
 
-    args = parser.parse_args()
-    visssgui = GUI(args.loglevel.upper())
-    visssgui.root.protocol("WM_DELETE_WINDOW", visssgui.killall)
-    visssgui.root.mainloop()
+    lockfile = "/tmp/launch_visss_data_acquisition.lock"
+    lock = FileLock(lockfile, timeout = 1)
+
+    try:
+        with lock:
+            parser = argparse.ArgumentParser()
+            parser.add_argument('-log',
+                                '--loglevel',
+                                default='info',
+                                help=('Provide logging level. Example --loglevel '
+                                      'debug, default=info'))
+
+            args = parser.parse_args()
+            visssgui = GUI(args.loglevel.upper())
+            visssgui.root.protocol("WM_DELETE_WINDOW", visssgui.killall)
+            visssgui.root.mainloop()
+
+    except Timeout:
+        print("lock file error.")
+        messagebox.showerror(title=None, message=f'VISSS data acqusition GUI alreaady running! Lock file: {lockfile}')
 
