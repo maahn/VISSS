@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 echo "<html><pre>"
+hostname
+date
 
 echo "********************************************************************************"
 echo uptime
@@ -15,4 +17,3 @@ echo df -h / /data
 df -h / /data
 
 echo "</pre></html>"
-
