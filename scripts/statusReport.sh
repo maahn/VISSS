@@ -9,8 +9,8 @@ echo uptime
 uptime
 
 echo "********************************************************************************"
-echo ps -eo pcpu,pmem,pid,user,args | sort -r -k1 | head
-ps -eo pcpu,pmem,pid,user,args | sort -r -k1 | head
+echo "ps  --sort=-pcpu -eo pcpu,pmem,pid,user,args | head"
+ps  --sort=-pcpu -eo pcpu,pmem,pid,user,args | head
 
 echo "********************************************************************************"
 echo df -h / /data
