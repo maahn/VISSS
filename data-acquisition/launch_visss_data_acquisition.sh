@@ -128,15 +128,15 @@ do
 
 	timestamp=$(/bin/date +%FT%T)
 	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -d=$FOLLOWERMODE -q=$QUERYGAIN -b=$MINBRIGHT $CAMERACONFIG $IP"
-	/bin/echo "BASH2 $COMMAND"
+	/bin/echo "BASH $COMMAND"
 	if $COMMAND
 			then
 				/bin/echo "BASH worked"
 				exit
 	else
 		/bin/echo "BASH Didn't work, trying again in 5s"
-		/usr/bin/paplay /usr/share/sounds/ubuntu/stereo/dialog-question.ogg
 		/bin/sleep 5
+    /bin/echo "BASH Restarting VISSS"
 	fi
 done
 

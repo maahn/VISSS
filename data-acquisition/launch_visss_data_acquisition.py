@@ -453,6 +453,10 @@ class runCpp:
 
     def display(self, record):
 
+        #capture VISSS restarts
+        if "Restarting VISSS" in record.getMessage():
+            self.writeToStatusFile('start, cpp')
+
         msg = self.queue_handler.format(record)
 
         # cut very long text
