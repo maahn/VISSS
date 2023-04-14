@@ -55,4 +55,5 @@ Video In Situ Snowfall Sensor data acquisition software
  * fix cature_id overflow
  * crate timestamp in filename smarter - from camera reset_time (capture_time)
 
-
+#### known bugs
+* C++ restart after camera failure not reported in status file leading to capture_id reset no beeing handled properly
