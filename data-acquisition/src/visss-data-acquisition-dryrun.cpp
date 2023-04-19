@@ -18,16 +18,19 @@ const char* params
     = "{ help h            |                   | Print usage }"
       "{ output o          | ./                | Output Path }"
       "{ site s            | none              | site string }"
-      "{ quality q         | 16                | quality 0-51 }"
-      "{ preset p          | veryfast          | preset (ultrafast - placebo) }"
+      "{ encoding e        | -c:v@libx264      | ffmpeg encoding options with '@' replacing ' '}"
       "{ liveratio l       | 70                | every Xth frame will be displayed in the live window }"
       "{ fps f             | 140               | frames per seconds of output }"
       "{ newfileinterval i | 300               | write new file very ?s. Set to 0 to deactivate}"
       "{ maxframes m       | -1                | stop after this many frames (for debugging) }"
       "{ writeallframes w  |                   | write all frames whether sth is moving or not (for debugging) }"
+      "{ followermode d    | 0                 | do not complain about camera timeouts }"
       "{ nopreview         |                   | no preview window }"
+      "{ minBrightChange b | 20                | minimum brightnes change to start recording [20,30] }"
+      "{ querygain q       | 0                 | query gain and bightness [0,1]}"
       "{ novideo           |                   | do not store video data }"
       "{ nometadata        |                   | do not store meta data }"
+      "{ threads t         | 1                 | number of storage threads }"
       "{ @videofile        | <none>            | video input file }";
 
 // ====================================
@@ -112,6 +115,8 @@ void *ImageCaptureThread( void *context)
 
             // Wait for images to be received
             captureContext->fileHandle >> exportImg;
+            // get time for recordtime timestamp
+            high_resolution_clock::time_point tr(high_resolution_clock::now());
 
 
             if (!exportImg.empty())
@@ -192,6 +197,7 @@ void *ImageCaptureThread( void *context)
                         cv::cvtColor(croppedImg, exportImgMeta.MatImage, cv::COLOR_BGR2GRAY);
 
                         exportImgMeta.timestamp = ascii_timestamp;
+                        exportImgMeta.recordtime = tr.time_since_epoch().count()/1000;
                         exportImgMeta.id = ascii_id;
 
                         // Insert a copy into all queues
@@ -311,11 +317,20 @@ void *ImageCaptureThread( void *context)
 
 int main(int argc, char** argv)
 {
-cv::String videoFileIn;
-std::string videoFileInRaw;
-MY_CONTEXT context ;
+    cv::String videoFileIn;
+    std::string videoFileInRaw;
+    MY_CONTEXT context ;
     pthread_t  tid;
     char c;
+    int res = 0;
+    int writeallframes1;
+    int queryGain1;
+    int followermode1;
+    int minBrightnessChange;
+    FILE *fp = NULL;
+    FILE *fp2 = NULL;
+    // char uniqueName[FILENAME_MAX];
+    // uint32_t macLow = 0; // Low 32-bits of the mac address (for file naming).
 
     //============================================================================
     // Greetings
@@ -332,86 +347,105 @@ MY_CONTEXT context ;
         parser.printMessage();
         return 0;
     }
-    cv::String output = parser.get<cv::String>("output");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: Output path "<< output << std::endl;
 
     videoFileIn = parser.get<cv::String>(0);
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: Video file "<< videoFileIn << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Video file "<< videoFileIn << std::endl;
     videoFileInRaw = videoFileIn.substr(0, videoFileIn.find_last_of("."));
     size_t sep = videoFileInRaw.find_last_of("\\/");
     if (sep != std::string::npos)
         videoFileInRaw = videoFileInRaw.substr(sep + 1, videoFileInRaw.size() - sep - 1);
 
+    cv::String output = parser.get<cv::String>("output");
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Output path "<< output << std::endl;
 
-    context.quality = parser.get<cv::String>("quality");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: FFMPEG Quality "<< context.quality << std::endl;
-    context.preset = parser.get<cv::String>("preset");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: FFMPEG preset "<< context.preset << std::endl;
+
+    encoding = parser.get<cv::String>("encoding");
+    // std::cout << "DEBUG | " << get_timestamp() << " | PARSER: FFMPEG encoding "<< encoding << std::endl;
+    replace(encoding.begin(), encoding.end(), '@', ' ');
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: FFMPEG encoding "<< encoding << std::endl;
+
     site = parser.get<cv::String>("site");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: site "<< site << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: site "<< site << std::endl;
+
+    nStorageThreads = parser.get<int>("threads");
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: threads "<< nStorageThreads << std::endl;
 
     context.live_window_frame_ratio = parser.get<int>("liveratio");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: liveratio "<< context.live_window_frame_ratio << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: liveratio "<< context.live_window_frame_ratio << std::endl;
 
     new_file_interval = parser.get<int>("newfileinterval");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: newfileinterval "<< new_file_interval << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: newfileinterval "<< new_file_interval << std::endl;
 
-    context.fps = parser.get<double>("fps");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: fps "<< context.fps << std::endl;
+    context.fps = parser.get<int>("fps");
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: fps "<< context.fps << std::endl;
+    // if there is more than one thread, reduce frame rate of the output accordingly
+    context.fps = context.fps / nStorageThreads;
 
     maxframes = parser.get<int>("maxframes");
-    std::cout << "STATUS | " << get_timestamp() << " | PARSER: maxframes "<< maxframes << std::endl;
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: maxframes "<< maxframes << std::endl;
 
-    writeallframes = parser.has("writeallframes");
+    writeallframes1 = parser.get<int>("writeallframes");
+    if (writeallframes1 == 0) {
+        writeallframes = false;
+    } else if (writeallframes1 == 1) {
+        writeallframes = true;
+    } else {
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| writeallframes must be 0 or 1 " << writeallframes1<< std::endl;
+        global_error = true;
+    }
+    followermode1 = parser.get<int>("followermode");
+    if (followermode1 == 0) {
+        max_n_timeouts1 = max_n_timeouts;
+    } else if (followermode1 == 1) {
+        max_n_timeouts1 = max_n_timeouts * 10; //tolerate more timeouts as a follower
+    } else {
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| followermode must be 0 or 1 " << followermode1<< std::endl;
+        global_error = true;
+    }
+
+    minBrightnessChange = parser.get<int>("minBrightChange");
+    if (minBrightnessChange == 20) {
+        range[0] = 20;
+        range[1] =   30;
+        range[2] =   40;
+        range[3] =   60;
+        range[4] =   80;
+        range[5] =   100;
+        range[6] =   120;
+        range[7] =   256 ; //the upper boundary is exclusive;
+    } else if (minBrightnessChange == 30) {
+        range[0] = 30;
+        range[1] = 40;
+        range[2] =   60;
+        range[3] =   80;
+        range[4] =   100;
+        range[5] =   120;
+        range[6] =   140;
+        range[7] =   256 ; //the upper boundary is exclusive;
+    } else {
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| minBrightChange must be 20 or 30 " << minBrightnessChange<< std::endl;
+        global_error = true;
+    }
+
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: writeallframes "<< writeallframes << " " << writeallframes1 << std::endl;
     showPreview = !parser.has("nopreview");
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: showPreview "<< showPreview << std::endl;
     storeVideo = !parser.has("novideo");
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: storeVideo "<< storeVideo << std::endl;
     storeMeta = !parser.has("nometadata");
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: storeMeta "<< storeMeta << std::endl;
 
-
-    std::set<std::string> presets = {
-        "ultrafast",
-        "superfast",
-        "veryfast",
-        "faster",
-        "fast",
-        "medium",
-        "slow",
-        "slower",
-        "placebo",
-    };
-
-    if (presets.find(context.preset) == presets.end()){
-        std::cerr << "FATAL ERROR | " << get_timestamp() << "| Do not know preset " << context.preset<< std::endl;
+    queryGain1 = parser.get<int>("querygain");
+    if (queryGain1 == 0) {
+        queryGain = false;
+    } else if (queryGain1 == 1) {
+        queryGain = true;
+    } else {
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| queryGain must be 0 or 1 " << queryGain1<< std::endl;
         global_error = true;
     }
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: queryGain "<< queryGain << std::endl;
 
-
-    char OPENCV_FFMPEG_PRESET[100];
-    strcpy(OPENCV_FFMPEG_PRESET,"OPENCV_FFMPEG_PRESET=");
-    strcat(OPENCV_FFMPEG_PRESET,context.preset.c_str());
-    char OPENCV_FFMPEG_CRF[100];
-    strcpy(OPENCV_FFMPEG_CRF,"OPENCV_FFMPEG_CRF=");
-    strcat(OPENCV_FFMPEG_CRF,context.quality.c_str());
-    char OPENCV_FFMPEG_THREADCOUNT[100];
-    strcpy(OPENCV_FFMPEG_THREADCOUNT,"OPENCV_FFMPEG_THREADCOUNT=1");
-
-
-    if(putenv(OPENCV_FFMPEG_PRESET)!=0)
-    {
-        std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_FFMPEG_PRESET<< std::endl;
-        exit(1);
-    }
-    if(putenv(OPENCV_FFMPEG_CRF)!=0)
-    {
-        std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_FFMPEG_CRF<< std::endl;
-        global_error = true;
-    }
-
-    if(putenv(OPENCV_FFMPEG_THREADCOUNT)!=0)
-    {
-       std::cerr << "FATAL ERROR | " << get_timestamp() << "| putenv failed: " << OPENCV_FFMPEG_THREADCOUNT<< std::endl;
-       global_error = true;
-    }
 
     gethostname(hostname, HOST_NAME_MAX);
 
