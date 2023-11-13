@@ -46,6 +46,7 @@ const char* params
       "{ newfileinterval i | 300               | write new file very ?s. Set to 0 to deactivate}"
       "{ maxframes m       | -1                | stop after this many frames (for debugging) }"
       "{ writeallframes w  | 0                 | write all frames whether sth is moving or not (for debugging) }"
+      "{ rotateimage r     | 0                 | rotate image clockwise [0,1] }"
       "{ followermode d    | 0                 | do not complain about camera timeouts }"
       "{ nopreview         |                   | no preview window }"
       "{ minBrightChange b | 20                | minimum brightnes change to start recording [20,30] }"
@@ -664,8 +665,10 @@ int main(int argc, char *argv[])
     char c;
     int res = 0;
     int writeallframes1;
+    int rotateImage1;
     int queryGain1;
     int followermode1;
+    int rotate1;
     int minBrightnessChange;
     FILE *fp = NULL;
     FILE *fp2 = NULL;
@@ -780,6 +783,16 @@ int main(int argc, char *argv[])
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: storeVideo "<< storeVideo << std::endl;
     storeMeta = !parser.has("nometadata");
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: storeMeta "<< storeMeta << std::endl;
+    rotateImage1 = parser.get<int>("rotateimage");
+    if (rotateImage1 == 0) {
+        rotateImage = false;
+    } else if (rotateImage1 == 1) {
+        rotateImage = true;
+    } else {
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| rotateImage must be 0 or 1 " << rotateImage1<< std::endl;
+        global_error = true;
+    }
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: rotateImage "<< rotateImage << std::endl;
 
     queryGain1 = parser.get<int>("querygain");
     if (queryGain1 == 0) {

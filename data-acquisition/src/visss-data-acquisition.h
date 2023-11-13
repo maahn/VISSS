@@ -66,6 +66,7 @@ int max_n_timeouts1 = 0;
 bool storeVideo = true;
 bool storeMeta = true;
 bool showPreview = true;
+bool rotateImage = false;
 bool queryGain = false;
 int nStorageThreads = 1;
 std::string encoding;

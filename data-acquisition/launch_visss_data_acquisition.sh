@@ -55,6 +55,9 @@ while [ $# -gt 0 ]; do
     --QUERYGAIN=*)
       QUERYGAIN="${1#*=}"
       ;;
+    --ROTATEIMAGE=*)
+      ROTATEIMAGE="${1#*=}"
+      ;;
     --MINBRIGHT=*)
       MINBRIGHT="${1#*=}"
       ;;
@@ -127,7 +130,7 @@ for (( ; ; ))
 do
 
 	timestamp=$(/bin/date +%FT%T)
-	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -d=$FOLLOWERMODE -q=$QUERYGAIN -b=$MINBRIGHT $CAMERACONFIG $IP"
+	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT $CAMERACONFIG $IP"
 	/bin/echo "BASH $COMMAND"
 	if $COMMAND
 			then

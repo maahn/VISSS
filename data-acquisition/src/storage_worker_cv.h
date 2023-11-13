@@ -55,7 +55,7 @@ private:
 
     void add_meta_data(unsigned long timestamp);
     void close_files(unsigned long timestamp);
-    void open_files(unsigned long timestamp);
+    void open_files(unsigned long timestamp, cv::Size imgSize);
     void create_filename(unsigned long timestamp);
 
 };
@@ -139,7 +139,7 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp)
 }
 
 
-void storage_worker_cv::open_files(unsigned long timestamp) 
+void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) 
 {
     create_filename(timestamp);
 
@@ -148,7 +148,7 @@ void storage_worker_cv::open_files(unsigned long timestamp)
         ffmpegCommand += "-vcodec rawvideo -framerate ";
         ffmpegCommand += std::to_string(fps_);
         ffmpegCommand += " -pix_fmt gray -s ";
-        ffmpegCommand += std::to_string(frame_size_.width) + "x" + std::to_string(frame_size_.height);
+        ffmpegCommand += std::to_string(imgSize.width) + "x" + std::to_string(imgSize.height);
         ffmpegCommand += " -i - ";
         ffmpegCommand += encoding;
         ffmpegCommand += " -r "+ std::to_string(fps_);
@@ -330,8 +330,8 @@ void storage_worker_cv::run()
                 if (firstImage)  { 
                     imgOld = image.MatImage * 0;
                 }   
-                cv::absdiff(image.MatImage, imgOld, imgDiff);
 
+                cv::absdiff(image.MatImage, imgOld, imgDiff);
 
                 // get cummulative histogramm of differenc ebetween images
                 bool uniform = false;
@@ -372,19 +372,19 @@ void storage_worker_cv::run()
 
                 //PrintThread{} <<  "M2 = " << std::endl << " "  << nPixelA[0]<< " "<< nPixelA[1]<< " "<< nPixelA[2]<< " "<< nPixelA[3]<< " "<< nPixelA[4]<< " "<< nPixelA[5] << " "<< nPixelA[6]<< std::endl << std::endl;
 
-
-
-
+                imgOld = image.MatImage.clone();
+                //rotate image if required
+                if (rotateImage) {
+                    cv::rotate(image.MatImage, image.MatImage, cv::ROTATE_90_CLOCKWISE);
+                }
                 //for (int tt : thresholds) {
                 //    nPixel[tt] = cv::sum(imgDiff > thresholds[tt])[0];
                 //} https://webcache.googleusercontent.com/search?q=cache:iUCC_CSnaLwJ:https://answers.opencv.org/question/60753/counting-black-white-pixels-with-a-threshold/+&cd=1&hl=de&ct=clnk&gl=de
-
                 if (site == "none") {
                     textImg = "";
                 } else {
                     textImg = site + " | ";
                 }
-
                 temp = image.timestamp/1e6;
                 t = std::gmtime(&temp);
                 strftime (timestampStr,80,"%Y/%m/%d %H:%M:%S", t);
@@ -406,7 +406,6 @@ void storage_worker_cv::run()
                         break;
                      }
                 }
-
                 if (movingPixel  || firstImage)
                      {
                         borderColor = ( 0 );
@@ -425,7 +424,6 @@ void storage_worker_cv::run()
                     }
                 cv::copyMakeBorder(image.MatImage, imgWithMeta, frameborder, 0, 0, 0, cv::BORDER_CONSTANT, borderColor );
                 
-
                 cv::putText(imgWithMeta, 
                         textImg,
                         cv::Point(20,40), // Coordinates
@@ -436,14 +434,12 @@ void storage_worker_cv::run()
                         cv::LINE_AA); // Anti-alias (Optional)
 
 
-
                 if (firstImage || image.newFile)
                 {
 
 
-
                     close_files(last_timestamp);
-                    open_files(image.timestamp);
+                    open_files(image.timestamp, imgWithMeta.size());
 
                     if (storeVideo) {
                         cv::imwrite(filename_final_+".jpg", imgWithMeta );
@@ -464,7 +460,6 @@ void storage_worker_cv::run()
                 }
                 if (writeallframes || movingPixel  || firstImage || image.newFile || statusFrame )
                      {
-
                         if (storeVideo) { 
                             // writer_.write(imgWithMeta);
                             size_t sizeInBytes = imgWithMeta.step[0] * imgWithMeta.rows;
@@ -485,9 +480,7 @@ void storage_worker_cv::run()
                             
                             fMeta_ << message;
                         }
-
                 }
-
                 if (frame_count % (int)fps_ == 0) {
 
                     message =  "STATUS" + std::to_string(id_) +" | " + get_timestamp() + 
@@ -507,9 +500,7 @@ void storage_worker_cv::run()
                     }
                     PrintThread{} << message<<std::endl;
                     std::cout << std::flush;
-
-
-                }    
+                }
                 if ( (id_ == 0) && showPreview && (frame_count % (live_window_frame_ratio_ / nStorageThreads) == 0))
                 {
                     
@@ -519,13 +510,10 @@ void storage_worker_cv::run()
                     }
  
 
-
-                imgOld = image.MatImage.clone();
                 firstImage = false;
                 ++frame_count;
                 ++framesSinceLastStatus;
                 last_timestamp = image.timestamp; 
-
 
                 high_resolution_clock::time_point t2(high_resolution_clock::now());
                 double dt_us(static_cast<double>(duration_cast<microseconds>(t2 - t1).count()));
@@ -548,76 +536,5 @@ void storage_worker_cv::run()
     }
 }
 
-
-// https://superuser.com/questions/1296374/best-settings-for-ffmpeg-with-nvenc
-// https://stackoverflow.com/questions/65342914/why-opencv-videowriter-is-so-slow
-
-
-// void storage_worker_cv::run()
-// {
-
-// // https://stackoverflow.com/questions/40454019/opencv-to-ffplay-from-named-pipe-fifo
-//     char const * myFIFO = "/tmp/myfifo";
-//     int status;
-//     if ((status = mkfifo(myFIFO, 0666)) < 0) { 
-//         printf("Fifo mkfifo error: %s\n", strerror(errno)); 
-//         exit(EXIT_FAILURE);
-//     } else {
-//         PrintThread{} << "Made a named pipe at: " << myFIFO << std::endl;
-//     }
-
-//     // ffplay raw video
-//     printf("Run command:\n\ncat /tmp/myfifo | ffplay -f rawvideo -pixel_format bgr24 -video_size %.0fx%.0f -framerate %4.2f -i pipe:\n"
-//         ,1280.
-//         ,1024.
-//         ,200.
-//         );  
-//     printf("Run command:\n\ncat /tmp/myfifo | cvlc --demux=rawvideo --rawvid-fps=%4.2f --rawvid-width=%.0f --rawvid-height=%.0f  --rawvid-chroma=RV24 - --sout \"#transcode{vcodec=h264,vb=200,fps=30,width=320,height=240}:std{access=http{mime=video/x-flv},mux=ffmpeg{mux=flv},dst=:8081/stream.flv}\""
-//         ,200.
-//         ,1280.
-//         ,1024.
-//         );  
-
-//     int fd;
-//     if ((fd = open(myFIFO,O_WRONLY)) < 0) {
-//         printf("Fifo open error: %s\n", strerror(errno));
-//         exit(EXIT_FAILURE);
-//     }   
-
-
-//     try {
-//         int32_t frame_count(0);
-//         for (;;) {
-//             cv::Mat image(queue_.pop());
-            
-//             if (!image.empty()) {
-//                 high_resolution_clock::time_point t1(high_resolution_clock::now());
-
-//                 ++frame_count;
-
-//                 // // image.convertTo(image_rgb, cv::CV_8UC3);
-//                 // cv::Mat image_rgb;
-//                 // cv::cvtColor(image, image_rgb, cv::COLOR_GRAY2RGB);
-//                 // method: named pipe as matrix writes data to the named pipe, but image has glitch
-//                 size_t bytes = image.total() * image.elemSize();
-
-//                 if (write(fd, image.data, bytes) < 0) {
-//                     printf("Error in write: %s \n", strerror(errno)); 
-//                 }            
-
-//                 high_resolution_clock::time_point t2(high_resolution_clock::now());
-//                 double dt_us(static_cast<double>(duration_cast<microseconds>(t2 - t1).count()));
-//                 total_time_ += dt_us;
-
-//                 // PrintThread{} << "Worker " << id_ << " stored image #" << frame_count
-//                 //     << " in " << (dt_us / 1000.0) << " ms" << std::endl;
-//             }
-//         }
-//     } catch (frame_queue::cancelled& /*e*/) {
-//         // Nothing more to process, we're done
-//         close(fd);
-//         PrintThread{} << "Queue " << id_ << " cancelled, worker finished." << std::endl;
-//     }
-// }
 
 
