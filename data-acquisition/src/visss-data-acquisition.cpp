@@ -40,7 +40,7 @@ const char* params
     = "{ help h            |                   | Print usage }"
       "{ output o          | ./                | Output Path }"
       "{ site s            | none              | site string }"
-      "{ encoding e        | -c:v libx264      | ffmpeg encoding options }"
+      "{ encoding e        | -c:v@libx264      | ffmpeg encoding options with '@' replacing ' '}"
       "{ liveratio l       | 70                | every Xth frame will be displayed in the live window }"
       "{ fps f             | 140               | frames per seconds of output }"
       "{ newfileinterval i | 300               | write new file very ?s. Set to 0 to deactivate}"
@@ -280,7 +280,7 @@ void *ImageCaptureThread( void *context)
             GEV_STATUS status = 0;
             // Wait for images to be received
             status = GevWaitForNextImage(captureContext->camHandle, &img, 1000);
-            // fet time for recordtime timestamp
+            // get time for recordtime timestamp
             high_resolution_clock::time_point tr(high_resolution_clock::now());
 
             if ((img != NULL) && (status == GEVLIB_OK))
