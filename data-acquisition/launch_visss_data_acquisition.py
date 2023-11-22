@@ -49,6 +49,10 @@ DEFAULTSETTINGS = {
     'configFile': None,
     'autopilot': False,
 }
+DEFAULTCAMERA = {
+    'rotateimage': False,
+}
+
 LOGFORMAT = '%(asctime)s: %(levelname)s: %(name)s:%(message)s'
 TRIGGERINTERVALLFACTOR = 2  # data can be factor 2 older than interval
 
@@ -202,6 +206,7 @@ class runCpp:
             f" --NEWFILEINTERVAL={self.configuration['newfileinterval']}"
             f" --STOREALLFRAMES={int(self.configuration['storeallframes'])}"
             f" --QUERYGAIN={int(self.configuration['querygain'])}"
+            f" --ROTATEIMAGE={int(self.configuration['rotateimage'])}"
             f" --MINBRIGHT={self.configuration['minBrightchange']}"
         )
 
@@ -566,9 +571,8 @@ class GUI(object):
         status = ttk.Label(config, text=statusStr)
         status.pack(side=tk.LEFT, pady=6, padx=(6, 0))
 
-        self.configuration = self.read_settings(self.settings['configFile'])
-
-
+        self.configuration = deepcopy(DEFAULTCAMERA)
+        self.configuration.update(self.read_settings(self.settings['configFile']))
 
         self.autopilot = tk.IntVar()
         self.apps = []
@@ -684,7 +688,7 @@ class GUI(object):
             messagebox.showerror(title=None, message='File %s not found'%fname)
             settings = {}
         else:
-            for k in ['storeallframes', 'autopilot', 'querygain']:
+            for k in ['storeallframes', 'autopilot', 'querygain', 'rotateimage']:
                 if k in settings.keys():
                     settings[k] = convert2bool(settings[k])
 
