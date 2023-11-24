@@ -46,7 +46,7 @@ const char* params
       "{ newfileinterval i | 300               | write new file very ?s. Set to 0 to deactivate}"
       "{ maxframes m       | -1                | stop after this many frames (for debugging) }"
       "{ writeallframes w  | 0                 | write all frames whether sth is moving or not (for debugging) }"
-      "{ rotateimage r     | 0                 | rotate image clockwise [0,1] }"
+      "{ rotateimage r     | 0                 | rotate image counterclockwise [0,1] }"
       "{ followermode d    | 0                 | do not complain about camera timeouts }"
       "{ nopreview         |                   | no preview window }"
       "{ minBrightChange b | 20                | minimum brightnes change to start recording [20,30] }"

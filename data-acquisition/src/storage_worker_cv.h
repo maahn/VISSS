@@ -375,7 +375,7 @@ void storage_worker_cv::run()
                 imgOld = image.MatImage.clone();
                 //rotate image if required
                 if (rotateImage) {
-                    cv::rotate(image.MatImage, image.MatImage, cv::ROTATE_90_CLOCKWISE);
+                    cv::rotate(image.MatImage, image.MatImage, cv::ROTATE_90_COUNTERCLOCKWISE);
                 }
                 //for (int tt : thresholds) {
                 //    nPixel[tt] = cv::sum(imgDiff > thresholds[tt])[0];
