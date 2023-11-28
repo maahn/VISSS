@@ -274,7 +274,7 @@ void storage_worker_cv::run()
     
 
     int result;
-    result = nice(-25);
+    result = nice(10); // realtive to main thread!
 
     unsigned long  last_timestamp = 0;
     long int frame_count_new_file = 0;

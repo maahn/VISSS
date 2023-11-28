@@ -25,7 +25,7 @@
 #define MAX_CHUNK_BYTES 256
 
 // Enable/disable transfer tuning (buffering, timeouts, thread affinity).
-#define TUNE_STREAMING_THREADS 0
+#define TUNE_STREAMING_THREADS 1
 
 #define NUM_BUF 8
 
@@ -1166,13 +1166,10 @@ int main(int argc, char *argv[])
 #if TUNE_STREAMING_THREADS
             // Some tuning can be done here. (see the manual)
             camOptions.streamFrame_timeout_ms = 2001;               // Internal timeout for frame reception.
-            camOptions.streamNumFramesBuffered = 4;             // Buffer frames internally.
-            camOptions.streamNumFramesBuffered = 20;             // Buffer frames internally.
-            camOptions.streamMemoryLimitMax = 64 * 1024 * 1024;     // Adjust packet memory buffering limit.
-            camOptions.streamMemoryLimitMax =  2 * 20 * 8 * 2064 * 1544;     // Adjust packet memory buffering limit.
-            camOptions.streamPktSize = 8960;                            // Adjust the GVSP packet size.
-            camOptions.streamPktSize = 8960-1;                            // Adjust the GVSP packet size.
-            camOptions.streamPktDelay = 10;                         // Add usecs between packets to pace arrival at NIC.
+            camOptions.streamNumFramesBuffered = 200;             // Buffer frames internally.
+            camOptions.streamMemoryLimitMax =  100 * 8 * 2064 * 1544;     // Adjust packet memory buffering limit.
+            //camOptions.streamPktSize = 8960;                            // Adjust the GVSP packet size.
+            //camOptions.streamPktSize = 8960-1;                            // Adjust the GVSP packet size.
             camOptions.streamPktDelay = 0;                         // Add usecs between packets to pace arrival at NIC.
             // Assign specific CPUs to threads (affinity) - if required for better performance.
             {
