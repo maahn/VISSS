@@ -1,6 +1,7 @@
-# visss
-
-Video In Situ Snowfall Sensor data acquisition software
+# VISSS Video In Situ Snowfall Sensor
+This repository contains the VISSS data acquisition software. Please see also
+* VISSS data processing library https://github.com/maahn/VISSSlib
+* VISSS2 hardware plans https://zenodo.org/doi/10.5281/zenodo.7640820
 
 ## Version history
 
@@ -46,7 +47,7 @@ Video In Situ Snowfall Sensor data acquisition software
 
 
 ### 0.3
- * For deployments in 22/23
+ * For deployments in 22/23 and after
  * changed from mov to mkv files to handle crashes better
  * write last timestamp to ascii file when closing (actually first time stamp of next file...)
  * restart data acqusition when reset clock fails
