@@ -50,6 +50,11 @@ using std::chrono::microseconds;
 
 char DeviceID[TELEDYNEDALSA_CHUNK_SIZE_DEVICEID];
 std::string DeviceIDMeta;
+std::string cameraTemperature = "nan";
+float cameraTemperatureF;
+int transferQueueCurrentBlockCount = -99;
+float transferMaxBlockSize = -99;
+
 char hostname[HOST_NAME_MAX];
 int n_timeouts = 0;
 int max_n_timeouts = 30;

@@ -315,6 +315,26 @@ void *ImageCaptureThread( void *context)
                     t_reset_uint_ = t_reset.time_since_epoch().count()/1000;
                     timeStart = static_cast<long int> (time(NULL));
                     waiting_for_clock_reset = true;
+
+                    // read temperature
+
+                    statusF = GevGetFeatureValue(captureContext->camHandle, "DeviceTemperature", &type, sizeof(cameraTemperatureF), &cameraTemperatureF);
+                    cameraTemperature = std::to_string(cameraTemperatureF);
+
+                    // // network statistics
+                    statusF += GevGetFeatureValue(captureContext->camHandle, "transferQueueCurrentBlockCount", &type, sizeof(transferQueueCurrentBlockCount), &transferQueueCurrentBlockCount); 
+                    statusF += GevGetFeatureValue(captureContext->camHandle, "transferMaxBlockSize", &type, sizeof(transferMaxBlockSize), &transferMaxBlockSize); 
+                    if (statusF == GEVLIB_OK) {
+                        PrintThread{} << "INFO | " << get_timestamp() << " | Temperature "<< cameraTemperature << 
+                            ", transferMaxBlockSize MB " << std::to_string(transferMaxBlockSize) << 
+                            ", transferQueueCurrentBlockCount "<< transferQueueCurrentBlockCount << std::endl;
+                    } else {
+                        // if it does not work it typically indicates a larger problem, so better exit (and restart)
+                        std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to read temperature and other status information" << statusF << std::endl;
+                        global_error = true;
+
+                    }
+
                 }
 
 
@@ -466,17 +486,6 @@ void *ImageCaptureThread( void *context)
                         total_read_time += dt_us;
 
 
-
-                        // std::cout << "Captured image #" << frame_count << " in "
-                        //     << (dt_us / 1000.0) << " ms" << std::endl;
-
-                        // // fflush(stdout);
-                        // if (framesInFile == 0) {
-                        //     GevGetFeatureValue( captureContext->camHandle, "maxSustainedFrameRate",  &type, sizeof(valF), &valF);
-                        //     std::cout << "INFO | " << get_timestamp() << " | maxSustainedFrameRate " << valF << " fps"  << " ";
-                        //     GevGetFeatureValue( captureContext->camHandle, "transferQueueCurrentBlockCount",  &type, sizeof(valI), &valI);
-                        //     std::cout << " transferQueueCurrentBlockCount " << valI << " blocks"  << " ";
-                        // }
 
                         last_id = exportImgMeta.id;
                         last_cameratimestamp = img->timestamp;
@@ -893,6 +902,10 @@ int main(int argc, char *argv[])
     GenApi::CNodeMapRef Camera; // The GenICam XML-based feature node map.
     GEV_CAMERA_HANDLE handle = NULL;
 
+    char DeviceFirmwareVersion[64] = {0};
+
+
+
     //====================================================================
     // Open the camera.
     status = GevOpenCameraByAddress( camIPl, GevExclusiveMode, &handle);
@@ -1056,6 +1069,11 @@ int main(int argc, char *argv[])
             error_count << " Features had errors " << std::endl;
             global_error = true;
         }
+
+
+        GevGetFeatureValue(handle, "DeviceFirmwareVersion", &type, sizeof(DeviceFirmwareVersion), &DeviceFirmwareVersion);
+        std::cout << "INFO | " << get_timestamp() << "| DeviceFirmwareVersion " << DeviceFirmwareVersion << std::endl;
+
 
 
 // get ALL settings to dump the to file

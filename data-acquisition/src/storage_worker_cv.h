@@ -103,6 +103,7 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp)
     //0.2 with mean and standard deviation
     //0.3 with number of changing pixels
     //0.4 with last capture time
+    //0.5 with camera temperature and frame count
 
     std::time_t temp = timestamp/1e6;
     std::tm* t = std::gmtime(&temp);
@@ -111,7 +112,7 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp)
     strftime (timestampStr,80,"%Y%m%d-%H%M%S", t);
 
 
-    fMeta_ << "# VISSS file format version: 0.4"<< "\n";
+    fMeta_ << "# VISSS file format version: 0.5"<< "\n";
     fMeta_ << "# VISSS git tag: " << GIT_TAG
           <<  "\n";
     fMeta_ << "# VISSS git branch: " << GIT_BRANCH
@@ -125,7 +126,12 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp)
           <<  configFile.substr(configFile.find_last_of("/\\") + 1)<< "\n";
     fMeta_ << "# Hostname: "
           <<  hostname<< "\n";
-     
+    fMeta_ << "# Camera Temperature: "
+          <<  cameraTemperature<< "\n";
+    fMeta_ << "# transferQueueCurrentBlockCount: "
+          <<  transferQueueCurrentBlockCount<< "\n";
+    fMeta_ << "# transferMaxBlockSize MB: "
+          <<  transferMaxBlockSize<< "\n";
     fMeta_ << "# Capture time, Record time, Frame id, Queue Length";
 
 
