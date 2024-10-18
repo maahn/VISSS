@@ -2,6 +2,7 @@
 This repository contains the VISSS data acquisition software. Please see also
 * VISSS data processing library https://github.com/maahn/VISSSlib
 * VISSS2 hardware plans https://zenodo.org/doi/10.5281/zenodo.7640820
+* VISSS3 hardware plans https://zenodo.org/doi/10.5281/zenodo.10526898
 
 ## Version history
 
