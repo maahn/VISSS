@@ -61,16 +61,6 @@ mkdir -p ~/.config/autostart
 ln -s /home/visss/VISSS/scripts/visss_gui.desktop /home/visss/.config/autostart/
 
 
-***** fix gev_nettweak
-
-sometimes gev_nettweak does not work if the interface name is too long
-
-in this case hardcode /home/visss/DALSA/GigeV/bin/gev_nettweak
-
-something like at line 33:
-available_netif="enp35s0f0 enp35s0f1"
-
-
 ********* autologin without Password
 make sure lightdm is the used display manager with:
 

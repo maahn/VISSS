@@ -111,7 +111,7 @@ cd $ROOTPATH
 MTU=$(/bin/cat /sys/class/net/$INTERFACE/mtu)
 if [[ "$MTU" != "$MAXMTU" ]]
 then
-	/usr/bin/sudo /home/visss/DALSA/GigeV/bin/gev_nettweak $INTERFACE
+	/usr/bin/sudo /home/$USER/VISSS/scripts/gev_nettweak $INTERFACE
 	/bin/echo "BASH It takes some time for the camera to come online... Sleep 25"
 	/bin/sleep 25
 fi
