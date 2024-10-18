@@ -58,3 +58,7 @@ This repository contains the VISSS data acquisition software. Please see also
 
 #### known bugs
 * C++ restart after camera failure not reported in status file leading to capture_id reset no beeing handled properly (fixed on 14 April 2023)
+
+#### 0.3.2
+* For deployments in 24/25 and after
+* Store internal camera temperature as status information
