@@ -1,0 +1,13 @@
+# https://bbs.archlinux.org/viewtopic.php?id=262075
+
+[Unit]
+Description=ethtool configuration to enable 5000mbps speed for the  card 4np9s0 
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/sbin/ethtool -s enp4s0 advertise 0x1000000000000
+Type=oneshot
+
+[Install]
+WantedBy=multi-user.target
