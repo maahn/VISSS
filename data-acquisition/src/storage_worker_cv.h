@@ -217,7 +217,7 @@ void storage_worker_cv::create_filename(unsigned long timestamp) {
     // char timestamp2 [80];
     // strftime (timestamp2,80,"%Y%m%d-%H%M%S", now_tm);
 
-    std::time_t temp = timestamp/1e6;
+    std::time_t temp = (timestamp+1e5)/1e6;
     std::tm* t = std::gmtime(&temp);
 
     char timestamp1 [80];
