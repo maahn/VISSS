@@ -217,7 +217,7 @@ void storage_worker_cv::create_filename(unsigned long timestamp) {
     // char timestamp2 [80];
     // strftime (timestamp2,80,"%Y%m%d-%H%M%S", now_tm);
 
-    std::time_t temp = timestamp/1e6;
+    std::time_t temp = (timestamp+1e5)/1e6;
     std::tm* t = std::gmtime(&temp);
 
     char timestamp1 [80];
@@ -283,7 +283,6 @@ void storage_worker_cv::run()
     result = nice(10); // realtive to main thread!
 
     unsigned long  last_timestamp = 0;
-    long int frame_count_new_file = 0;
 
     firstImage = true;
     std::string message;
@@ -307,7 +306,16 @@ void storage_worker_cv::run()
     bool movingPixel = false;
     int tt = 0;
     cv::Scalar borderColor;
-    
+
+    int frame_count = 0;
+    int frame_count_infile = 0;
+    int frame_count_moving = 0;
+    int framesSinceLastStatus = 0;
+    float movePercent;
+    std::string  movePercentStr;
+
+
+
     PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | Thread Running!" << std::endl;
     PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | path " << path_ << std::endl;
     PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | fourcc " << fourcc_ << std::endl;
@@ -320,9 +328,8 @@ void storage_worker_cv::run()
         cv::namedWindow( "VISSS Live Image | "+ name +" | "+std::to_string(id_), cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
     }
 
+
     try {
-        int32_t frame_count(0);
-        int32_t framesSinceLastStatus(0);
         
         for (;;) {
 
@@ -401,7 +408,7 @@ void storage_worker_cv::run()
                     tempStr = tempStr.insert(0, number_of_zeros, '0');
                     }
                 textImg = textImg + timestampStr + '.'+ tempStr +" | " + name + 
-                    " | Q:" + std::to_string(queue_.size()) + " | M: ";
+                    " | Q:" + std::to_string(queue_.size()) + " | H: ";
                 for (int jj = histSize; jj --> 0; )
                 {
                      if (movingPixels[jj]) 
@@ -420,9 +427,12 @@ void storage_worker_cv::run()
                  else
                      {
                         borderColor = ( 100 );
-                        textImg = textImg + "NOT RECORDING";
+                        textImg = textImg + "N.R.";
                      }
 
+                 movePercent = frame_count_moving * 100 / (frame_count_infile+1);
+                 movePercentStr = cv::format("%3.1f", movePercent);
+                 textImg = textImg+ " | M: " + movePercentStr + "%";
                  textImg = textImg+ " | " + std::to_string(id_);
                  if (queryGain) {
                      textImg = textImg + " | E" + std::to_string((int)image.ExposureTime);
@@ -454,7 +464,8 @@ void storage_worker_cv::run()
                         PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Written "<< filename_final_+".jpg"<< std::endl;
                         }
 
-                    frame_count_new_file = frame_count;
+                    frame_count_infile = 0;
+                    frame_count_moving = 0;
 
                 }
 
@@ -486,6 +497,8 @@ void storage_worker_cv::run()
                             
                             fMeta_ << message;
                         }
+                    ++frame_count_moving;
+
                 }
                 if (frame_count % (int)fps_ == 0) {
 
@@ -500,6 +513,7 @@ void storage_worker_cv::run()
                             break;
                          }
                     }
+                    message = message + " | M: " + movePercentStr + "%";
                     if (queryGain) {
                         message = message + " | E: " + std::to_string((int)image.ExposureTime);
                         message = message + " | G: " + std::to_string((int)image.Gain);
@@ -518,6 +532,7 @@ void storage_worker_cv::run()
 
                 firstImage = false;
                 ++frame_count;
+                ++frame_count_infile;
                 ++framesSinceLastStatus;
                 last_timestamp = image.timestamp; 
 

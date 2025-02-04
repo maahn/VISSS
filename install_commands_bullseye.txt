@@ -46,6 +46,8 @@ sudo cp /home/visss/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
 
 make
 
+If make fails, try "source /etc/profile"
+
 
 mkdir -p /home/visss/.local/share/applications/
 ln -s /home/visss/VISSS/scripts/visss_gui.desktop /home/visss/.local/share/applications/
