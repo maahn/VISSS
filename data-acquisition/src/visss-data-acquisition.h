@@ -73,6 +73,7 @@ bool storeMeta = true;
 bool showPreview = true;
 bool rotateImage = false;
 bool queryGain = false;
+bool resetDHCP = false;
 int nStorageThreads = 1;
 std::string encoding;
 std::chrono::time_point<std::chrono::system_clock> t_reset;

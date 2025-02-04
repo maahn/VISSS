@@ -53,6 +53,7 @@ const char* params
       "{ querygain q       | 0                 | query gain and bightness [0,1]}"
       "{ novideo           |                   | do not store video data }"
       "{ nometadata        |                   | do not store meta data }"
+      "{ resetDHCP         |                   | reset camera DHCP and exit. Config file must be present but does not matter }"
       "{ name n            | VISSS             | camera name }"
       "{ threads t         | 1                 | number of storage threads }"
       "{ @config           | <none>            | camera configuration file }"
@@ -668,6 +669,7 @@ int main(int argc, char *argv[])
 {
     //GEV_DEVICE_INTERFACE  pCamera[MAX_CAMERAS] = {0};
     GEV_STATUS status;
+    GEV_STATUS status2;
     int numCamera = 0;
     MY_CONTEXT context = {0};
     pthread_t  tid;
@@ -742,6 +744,10 @@ int main(int argc, char *argv[])
     maxframes = parser.get<int>("maxframes");
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: maxframes "<< maxframes << std::endl;
 
+
+
+
+
     writeallframes1 = parser.get<int>("writeallframes");
     if (writeallframes1 == 0) {
         writeallframes = false;
@@ -813,6 +819,11 @@ int main(int argc, char *argv[])
         global_error = true;
     }
     std::cout << "DEBUG | " << get_timestamp() << " | PARSER: queryGain "<< queryGain << std::endl;
+
+    resetDHCP = parser.has("resetDHCP");
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: reset "<< resetDHCP << std::endl;
+
+
 
     gethostname(hostname, HOST_NAME_MAX);
 
@@ -946,14 +957,33 @@ int main(int argc, char *argv[])
             // Catch all possible exceptions from a node access.
             CATCH_GENAPI_ERROR(status);
         }
+
+
               
 
         std::cout << "DEBUG | " << get_timestamp() << " | Loading settings"<< std::endl;
         std::cout << "**************************************************************************" << std::endl;
 
 
+        //handle resets
+        if (( status == 0 ) and (resetDHCP)) {
+            status2 = GevSetFeatureValueAsString(handle, "GevCurrentIPConfigurationDHCP", "1");
+            status2 += GevSetFeatureValueAsString(handle, "GevCurrentIPConfigurationPersistentIP", "0");
+
+            if (status2 != 0) {
+                std::cerr << "FATAL ERROR | " << get_timestamp() <<" | Error resetting camera" <<std::endl;
+            }
+            else {
+               std::cout << "INFO | " << get_timestamp() << "| " << "Reset CameraDHCP. Exiting" <<std::endl;
+
+            }
+         global_error = true;
+
+        }
+
+
         // Read the file as { feature value } pairs and write them to the camera.
-        if ( status == 0 )
+        else if ( status == 0 )
         {
             char feature_name[MAX_GEVSTRING_LENGTH+1] = {0};
             char value_str[MAX_GEVSTRING_LENGTH+1] = {0};
@@ -1292,6 +1322,7 @@ int main(int argc, char *argv[])
                 context.camHandle = handle;
                 context.base_name = output;
                 context.exit = false;
+
                 pthread_create(&tid, NULL, ImageCaptureThread, &context);
 
                 // Call the main command loop or the example.
