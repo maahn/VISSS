@@ -124,7 +124,7 @@ finally remove (ie set it to blank) the password of the login key ring (using se
 ##### apache2 web server for minitoring #####
 
 change directory in /etc/apache2/sites-enabled/000-default.conf
-DokumentRoot=/data
+        DocumentRoot /data
 
 add to /etc/apache2/apache2.conf
 --
