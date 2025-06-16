@@ -192,9 +192,56 @@ on the trigger "sudo nano /etc/chrony/chrony.conf"
 # Allow NTP client access from local network.
 allow ADD.FOLLOWER.IP.ADDRESS
 
-on both "sudo systemctl restart chronyd"
+on both "sudo systemctl enable chrony"
 
 check clock status with "chronyc sources", ^* in the beginning means that clock is mainly used.
+
+#### PTP clocks
+
+The cameras can get their time via PTP. For this creeate a service to start PTP
+
+/etc/systemd/system/ptp4l.service :
+[Unit]
+Description=PTP IEEE 1588 Daemon (ptp4l)
+After=network.target
+
+[Service]
+ExecStart=/usr/sbin/ptp4l -i enp4s0 -m
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
+
+and another service to sync the NIC clock with teh system clock
+
+/etc/systemd/system/phc2sys.service :
+[Unit]
+Description=Synchronize PHC with system clock using phc2sys
+After=network.target
+Requires=ptp4l.service
+
+[Service]
+ExecStart=/usr/sbin/phc2sys -s CLOCK_REALTIME -c enp4s0 -O 0 -m
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+
+sudo systemctl daemon-reexec
+sudo systemctl enable ptp4l.service
+sudo systemctl start ptp4l.service
+sudo systemctl status ptp4l.service
+sudo systemctl enable phc2sys.service
+sudo systemctl start phc2sys.service
+sudo systemctl status phc2sys.service
+
+check offset between camera image and system time!
+
 
 
 ##### git access

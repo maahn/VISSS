@@ -54,6 +54,7 @@ std::string cameraTemperature = "nan";
 float cameraTemperatureF;
 int transferQueueCurrentBlockCount = -99;
 float transferMaxBlockSize = -99;
+char ptp_status[64] = {0};
 
 char hostname[HOST_NAME_MAX];
 int n_timeouts = 0;
@@ -74,13 +75,12 @@ bool showPreview = true;
 bool rotateImage = false;
 bool queryGain = false;
 bool resetDHCP = false;
+bool useptp = true;
 int nStorageThreads = 1;
 std::string encoding;
 std::chrono::time_point<std::chrono::system_clock> t_reset;
 unsigned long t_reset_uint_ = 0;
 unsigned long t_reset_uint_applied = 0;
-unsigned long  timestamp_s = 0;
-unsigned long  timestamp_us = 0;
 
 unsigned long id_offset = 0;
 
