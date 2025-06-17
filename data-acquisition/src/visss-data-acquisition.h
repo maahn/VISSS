@@ -39,6 +39,10 @@
 #include <stdlib.h>
 #include <iomanip>
 
+#include <ctime>
+#include <sstream>
+
+
 // ============================================================================
 using std::chrono::high_resolution_clock;
 using std::chrono::duration_cast;
@@ -310,3 +314,24 @@ std::string serializeTimePoint( const time_point& time, const std::string& forma
 
 
 
+
+std::string formatUnixTimeMicros(int64_t unixTimeMicros) {
+    using namespace std::chrono;
+
+    // Convert microseconds to system_clock::time_point
+    auto micros = microseconds(unixTimeMicros);
+    auto tp = system_clock::time_point(micros);
+
+    // Extract milliseconds part (3 digits)
+    auto ms_part = duration_cast<milliseconds>(micros % seconds(1)).count();
+
+    // Convert to time_t for formatting
+    std::time_t tt = system_clock::to_time_t(tp);
+    std::tm tm = *std::localtime(&tt);
+
+    // Format time and append milliseconds
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y/%m/%d %H:%M:%S") << '.' << std::setfill('0') << std::setw(3) << ms_part;
+
+    return oss.str();
+}
