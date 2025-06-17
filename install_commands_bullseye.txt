@@ -198,7 +198,7 @@ check clock status with "chronyc sources", ^* in the beginning means that clock 
 
 #### PTP clocks
 
-The cameras can get their time via PTP. For this creeate a service to start PTP
+The cameras can get their time via PTP. For this, create a service to start PTP (replace enp4s0 with the interface)
 
 /etc/systemd/system/ptp4l.service :
 [Unit]
@@ -213,7 +213,7 @@ Restart=on-failure
 WantedBy=multi-user.target
 
 
-and another service to sync the NIC clock with teh system clock
+and another service to sync the NIC clock with the system clock (replace enp4s0 with the interface)
 
 /etc/systemd/system/phc2sys.service :
 [Unit]
@@ -228,8 +228,6 @@ RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-
-
 
 
 sudo systemctl daemon-reexec
