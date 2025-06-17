@@ -51,6 +51,7 @@ DEFAULTSETTINGS = {
 }
 DEFAULTCAMERA = {
     'rotateimage': False,
+    'noptp': False
 }
 
 LOGFORMAT = '%(asctime)s: %(levelname)s: %(name)s:%(message)s'
@@ -205,6 +206,7 @@ class runCpp:
             f" --NTHREADS={self.configuration['storagethreads']}"
             f" --NEWFILEINTERVAL={self.configuration['newfileinterval']}"
             f" --STOREALLFRAMES={int(self.configuration['storeallframes'])}"
+            f" --NOPTP={int(self.configuration['noptp'])}"
             f" --QUERYGAIN={int(self.configuration['querygain'])}"
             f" --ROTATEIMAGE={int(self.configuration['rotateimage'])}"
             f" --MINBRIGHT={self.configuration['minBrightchange']}"
@@ -688,7 +690,7 @@ class GUI(object):
             messagebox.showerror(title=None, message='File %s not found'%fname)
             settings = {}
         else:
-            for k in ['storeallframes', 'autopilot', 'querygain', 'rotateimage']:
+            for k in ['storeallframes', 'autopilot', 'querygain', 'rotateimage','noptp']:
                 if k in settings.keys():
                     settings[k] = convert2bool(settings[k])
 
