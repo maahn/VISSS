@@ -413,16 +413,19 @@ void storage_worker_cv::run()
                 } else {
                     textImg = site + " | ";
                 }
-                temp = timestamp_s;
-                t = std::gmtime(&temp);
-                strftime (timestampStr,80,"%Y/%m/%d %H:%M:%S", t);
-                temp = std::round((timestamp_s) / 1e4);
-                tempStr = std::to_string((int)temp);
-                number_of_zeros = 2 - tempStr.length();
-                if (number_of_zeros > 0) {
-                    tempStr = tempStr.insert(0, number_of_zeros, '0');
-                    }
-                textImg = textImg + timestampStr + '.'+ tempStr +" | " + name + 
+
+                // temp = timestamp_s;
+                // t = std::gmtime(&temp);
+                // strftime (timestampStr,80,"%Y/%m/%d %H:%M:%S", t);
+                // temp = std::round((timestamp_us) / 1e4);
+                // tempStr = std::to_string((int)temp);
+                // number_of_zeros = 2 - tempStr.length();
+                // if (number_of_zeros > 0) {
+                //     tempStr = tempStr.insert(0, number_of_zeros, '0');
+                //     }
+                //+ '.'+ tempStr
+                tempStr = formatUnixTimeMicros(timestamp_us);
+                textImg = textImg + tempStr  +" | " + name + 
                     " | Q:" + std::to_string(queue_.size()) + " | H: ";
                 for (int jj = histSize; jj --> 0; )
                 {
