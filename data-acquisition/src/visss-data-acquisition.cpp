@@ -49,6 +49,7 @@ const char* params
       "{ rotateimage r     | 0                 | rotate image counterclockwise [0,1] }"
       "{ followermode d    | 0                 | do not complain about camera timeouts }"
       "{ nopreview         |                   | no preview window }"
+      "{ noptp p           | 0                 | no not use ptp for clock synchronization [0,1] }"
       "{ minBrightChange b | 20                | minimum brightnes change to start recording [20,30] }"
       "{ querygain q       | 0                 | query gain and bightness [0,1]}"
       "{ novideo           |                   | do not store video data }"
@@ -274,6 +275,7 @@ void *ImageCaptureThread( void *context)
         std::cout << "DEBUG | " << get_timestamp() << "| " << "Capture Loop ready" << std::endl;
         timeStart = static_cast<long int> (time(NULL));
 
+
         // While we are still running.
         while(!captureContext->exit)
         {
@@ -295,7 +297,7 @@ void *ImageCaptureThread( void *context)
 
                 // handle clock reset
                 timeNow = static_cast<long int> (time(NULL));
-                if (useptp) {
+                if (!noptp) {
                     timestamp_s = (img->timestamp)/1e9;
                     timestamp_us = (img->timestamp)/1e3;
                 }
@@ -310,7 +312,7 @@ void *ImageCaptureThread( void *context)
                     ) ;
 
                 if (do_housekeeping || first_image) { 
-                    if (useptp) {
+                    if (!noptp) {
                         framesInFile = 0; // required to trigger new file generation
                     }
                     else {
@@ -352,6 +354,12 @@ void *ImageCaptureThread( void *context)
 
                     }
 
+                    if ((!noptp) && (std::string(ptp_status) != "Slave")) {
+                        std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Lost PTP clock synchronization: " << ptp_status << std::endl;
+                        global_error = true;
+
+                    }
+
                 }
 
 
@@ -366,7 +374,7 @@ void *ImageCaptureThread( void *context)
 
 
                     // if clock jumps back by at least 1 second, we assume the camera clock was reset
-                    if ((!useptp) && (last_cameratimestamp>=0) && ((((signed long) img->timestamp) - last_cameratimestamp) < -1e6) ){
+                    if ((noptp) && (last_cameratimestamp>=0) && ((((signed long) img->timestamp) - last_cameratimestamp) < -1e6) ){
                         std::cout << std::endl << "INFO | " << get_timestamp() << " | detected clock reset between "  << 
                         (img->timestamp) << " and " << last_cameratimestamp << ". ID " << img->id << std::endl;
                         reset_clock_detected = true;
@@ -692,6 +700,7 @@ int main(int argc, char *argv[])
     char c;
     int res = 0;
     int writeallframes1;
+    int noptp1;
     int rotateImage1;
     int queryGain1;
     int followermode1;
@@ -780,6 +789,15 @@ int main(int argc, char *argv[])
         max_n_timeouts1 = max_n_timeouts * 10; //tolerate more timeouts as a follower
     } else {
         std::cerr << "FATAL ERROR | " << get_timestamp() << "| followermode must be 0 or 1 " << followermode1<< std::endl;
+        global_error = true;
+    }
+    noptp1 = parser.get<int>("noptp");
+    if (noptp1 == 0) {
+        noptp = false;
+    } else if (noptp1 == 1) {
+        noptp = true;
+    } else {
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| noptp must be 0 or 1 " << noptp1<< std::endl;
         global_error = true;
     }
 
@@ -1290,6 +1308,37 @@ int main(int argc, char *argv[])
             //
             // End frame info
             //============================================================
+
+
+            if (!noptp) {
+                status = GevGetFeatureValueAsString( handle, "ptpStatus", &type, sizeof(ptp_status), ptp_status);
+                if (status != GEVLIB_OK) {
+                    // if it does not work it typically indicates a larger problem, so better exit (and restart)
+                    std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to read ptp statusnformation" << status << std::endl;
+                    global_error = true;
+                }
+                int ptpcounter = 0;
+                while (std::string(ptp_status) != "Slave") {
+                    std::cout << "INFO | " << get_timestamp() << "| " << "Waiting for PTP: "<< std::string(ptp_status) << std::endl;
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                    status = GevGetFeatureValueAsString( handle, "ptpStatus", &type, sizeof(ptp_status), ptp_status);
+                    if (status != GEVLIB_OK) {
+                        // if it does not work it typically indicates a larger problem, so better exit (and restart)
+                        std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to read ptp statusnformation" << status << std::endl;
+                        global_error = true;
+                        break;
+                    }
+                    if (ptpcounter > 30) {
+                        // if it does not work it typically indicates a larger problem, so better exit (and restart)
+                        std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to synchronize PTP clock: " << std::string(ptp_status) << std::endl;
+                        global_error = true;
+                        break;
+                    }
+
+                    ++ptpcounter;
+                }
+            }
+
 
             if ((not global_error) && (status == 0))
             {
