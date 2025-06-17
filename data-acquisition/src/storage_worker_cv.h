@@ -345,13 +345,12 @@ void storage_worker_cv::run()
 
                 // t_record = t1.time_since_epoch().count()/1000;
 
-                if (useptp) {
+                if (noptp) {
+                    timestamp_s = (image.timestamp )/1e6;
+                    timestamp_us = (image.timestamp );                }
+                else {
                     timestamp_s = (image.timestamp)/1e9;
                     timestamp_us = (image.timestamp)/1e3;
-                }
-                else {
-                    timestamp_s = (image.timestamp )/1e6;
-                    timestamp_us = (image.timestamp );
                 }
 
 
