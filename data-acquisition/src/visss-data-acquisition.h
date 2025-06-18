@@ -39,6 +39,10 @@
 #include <stdlib.h>
 #include <iomanip>
 
+#include <ctime>
+#include <sstream>
+
+
 // ============================================================================
 using std::chrono::high_resolution_clock;
 using std::chrono::duration_cast;
@@ -54,6 +58,7 @@ std::string cameraTemperature = "nan";
 float cameraTemperatureF;
 int transferQueueCurrentBlockCount = -99;
 float transferMaxBlockSize = -99;
+char ptp_status[64] = {0};
 
 char hostname[HOST_NAME_MAX];
 int n_timeouts = 0;
@@ -74,13 +79,12 @@ bool showPreview = true;
 bool rotateImage = false;
 bool queryGain = false;
 bool resetDHCP = false;
+bool noptp = false;
 int nStorageThreads = 1;
 std::string encoding;
 std::chrono::time_point<std::chrono::system_clock> t_reset;
 unsigned long t_reset_uint_ = 0;
 unsigned long t_reset_uint_applied = 0;
-unsigned long  timestamp_s = 0;
-unsigned long  timestamp_us = 0;
 
 unsigned long id_offset = 0;
 
@@ -310,3 +314,24 @@ std::string serializeTimePoint( const time_point& time, const std::string& forma
 
 
 
+
+std::string formatUnixTimeMicros(int64_t unixTimeMicros) {
+    using namespace std::chrono;
+
+    // Convert microseconds to system_clock::time_point
+    auto micros = microseconds(unixTimeMicros);
+    auto tp = system_clock::time_point(micros);
+
+    // Extract milliseconds part (3 digits)
+    auto ms_part = duration_cast<milliseconds>(micros % seconds(1)).count();
+
+    // Convert to time_t for formatting
+    std::time_t tt = system_clock::to_time_t(tp);
+    std::tm tm = *std::localtime(&tt);
+
+    // Format time and append milliseconds
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y/%m/%d %H:%M:%S") << '.' << std::setfill('0') << std::setw(3) << ms_part;
+
+    return oss.str();
+}

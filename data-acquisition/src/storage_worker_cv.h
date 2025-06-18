@@ -48,6 +48,8 @@ private:
     bool firstImage;
     bool fileUsed;
     bool statusFrame;
+    unsigned long  timestamp_s = 0;
+    unsigned long  timestamp_us = 0;
 
     // cv::VideoWriter writer_;
     FILE *pipeout;
@@ -104,6 +106,7 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp)
     //0.3 with number of changing pixels
     //0.4 with last capture time
     //0.5 with camera temperature and frame count
+    //0.6 with ptp status
 
     std::time_t temp = timestamp/1e6;
     std::tm* t = std::gmtime(&temp);
@@ -112,7 +115,7 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp)
     strftime (timestampStr,80,"%Y%m%d-%H%M%S", t);
 
 
-    fMeta_ << "# VISSS file format version: 0.5"<< "\n";
+    fMeta_ << "# VISSS file format version: 0.6"<< "\n";
     fMeta_ << "# VISSS git tag: " << GIT_TAG
           <<  "\n";
     fMeta_ << "# VISSS git branch: " << GIT_BRANCH
@@ -132,6 +135,8 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp)
           <<  transferQueueCurrentBlockCount<< "\n";
     fMeta_ << "# transferMaxBlockSize MB: "
           <<  transferMaxBlockSize<< "\n";
+    fMeta_ << "# PTP Status: "
+          <<  std::string(ptp_status)<< "\n";
     fMeta_ << "# Capture time, Record time, Frame id, Queue Length";
 
 
@@ -340,6 +345,15 @@ void storage_worker_cv::run()
 
                 // t_record = t1.time_since_epoch().count()/1000;
 
+                if (noptp) {
+                    timestamp_s = (image.timestamp )/1e6;
+                    timestamp_us = (image.timestamp );                }
+                else {
+                    timestamp_s = (image.timestamp)/1e9;
+                    timestamp_us = (image.timestamp)/1e3;
+                }
+
+
                 if (firstImage)  { 
                     imgOld = image.MatImage * 0;
                 }   
@@ -398,16 +412,19 @@ void storage_worker_cv::run()
                 } else {
                     textImg = site + " | ";
                 }
-                temp = image.timestamp/1e6;
-                t = std::gmtime(&temp);
-                strftime (timestampStr,80,"%Y/%m/%d %H:%M:%S", t);
-                temp = std::round((image.timestamp%1000000) / 1e4);
-                tempStr = std::to_string((int)temp);
-                number_of_zeros = 2 - tempStr.length();
-                if (number_of_zeros > 0) {
-                    tempStr = tempStr.insert(0, number_of_zeros, '0');
-                    }
-                textImg = textImg + timestampStr + '.'+ tempStr +" | " + name + 
+
+                // temp = timestamp_s;
+                // t = std::gmtime(&temp);
+                // strftime (timestampStr,80,"%Y/%m/%d %H:%M:%S", t);
+                // temp = std::round((timestamp_us) / 1e4);
+                // tempStr = std::to_string((int)temp);
+                // number_of_zeros = 2 - tempStr.length();
+                // if (number_of_zeros > 0) {
+                //     tempStr = tempStr.insert(0, number_of_zeros, '0');
+                //     }
+                //+ '.'+ tempStr
+                tempStr = formatUnixTimeMicros(timestamp_us);
+                textImg = textImg + tempStr  +" | " + name + 
                     " | Q:" + std::to_string(queue_.size()) + " | H: ";
                 for (int jj = histSize; jj --> 0; )
                 {
@@ -455,7 +472,7 @@ void storage_worker_cv::run()
 
 
                     close_files(last_timestamp);
-                    open_files(image.timestamp, imgWithMeta.size());
+                    open_files(timestamp_us, imgWithMeta.size());
 
                     if (storeVideo) {
                         cv::imwrite(filename_final_+".jpg", imgWithMeta );
@@ -471,7 +488,7 @@ void storage_worker_cv::run()
 
                 // store a frame every 10 s in thread 0 to have data about clock and capture_id drifts
                 //statusFrame = (frame_count % ((int)fps_ *10) == 0) && (id_ == 0);
-                statusFrame = ((image.timestamp/(int)1e6)%10 == 0) && (framesSinceLastStatus > (1.5*fps_))  && (id_ == 0);
+                statusFrame = ((timestamp_s)%10 == 0) && (framesSinceLastStatus > (1.5*fps_))  && (id_ == 0);
                 if (statusFrame) {
                     framesSinceLastStatus = 0;
                 }
@@ -484,7 +501,7 @@ void storage_worker_cv::run()
                             fileUsed = true;
                             }
                         if (storeMeta) {
-                            message = std::to_string(image.timestamp)
+                            message = std::to_string(timestamp_us)
                                 + ", " + std::to_string(image.recordtime)
                                 + ", " + std::to_string(image.id)
                                 + ", " + std::to_string(queue_.size()) ;
@@ -534,7 +551,7 @@ void storage_worker_cv::run()
                 ++frame_count;
                 ++frame_count_infile;
                 ++framesSinceLastStatus;
-                last_timestamp = image.timestamp; 
+                last_timestamp = timestamp_s; 
 
                 high_resolution_clock::time_point t2(high_resolution_clock::now());
                 double dt_us(static_cast<double>(duration_cast<microseconds>(t2 - t1).count()));

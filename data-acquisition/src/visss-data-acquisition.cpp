@@ -49,6 +49,7 @@ const char* params
       "{ rotateimage r     | 0                 | rotate image counterclockwise [0,1] }"
       "{ followermode d    | 0                 | do not complain about camera timeouts }"
       "{ nopreview         |                   | no preview window }"
+      "{ noptp p           | 0                 | no not use ptp for clock synchronization [0,1] }"
       "{ minBrightChange b | 20                | minimum brightnes change to start recording [20,30] }"
       "{ querygain q       | 0                 | query gain and bightness [0,1]}"
       "{ novideo           |                   | do not store video data }"
@@ -214,11 +215,13 @@ void *ImageCaptureThread( void *context)
 {
     MY_CONTEXT *captureContext = (MY_CONTEXT *)context;
     bool was_active = false;
-    bool reset_clock = true;
+    bool do_housekeeping = true;
     bool reset_clock_detected = false;
     bool first_image = true;
     bool after_first_reset = false;
     bool waiting_for_clock_reset = false;
+    unsigned long  timestamp_s = 0;
+    unsigned long  timestamp_us = 0;
 
     long int timeNow = 0;
     long int timeStart = 0;
@@ -272,6 +275,7 @@ void *ImageCaptureThread( void *context)
         std::cout << "DEBUG | " << get_timestamp() << "| " << "Capture Loop ready" << std::endl;
         timeStart = static_cast<long int> (time(NULL));
 
+
         // While we are still running.
         while(!captureContext->exit)
         {
@@ -293,30 +297,40 @@ void *ImageCaptureThread( void *context)
 
                 // handle clock reset
                 timeNow = static_cast<long int> (time(NULL));
-                timestamp_s = (img->timestamp + t_reset_uint_applied)/1e6;
-                timestamp_us = (img->timestamp + t_reset_uint_applied);
-                reset_clock  = (
+                if (!noptp) {
+                    timestamp_s = (img->timestamp)/1e9;
+                    timestamp_us = (img->timestamp)/1e3;
+                }
+                else {
+                    timestamp_s = (img->timestamp + t_reset_uint_applied)/1e6;
+                    timestamp_us = (img->timestamp + t_reset_uint_applied);
+                }
+                do_housekeeping  = (
                     (new_file_interval > 0) && 
                     (timestamp_s % new_file_interval == 0) && 
                     ((timeNow - timeStart) > 10)
                     ) ;
 
-                if (reset_clock || first_image) { 
-                    t_reset = std::chrono::system_clock::now();
-                    statusF = GevSetFeatureValueAsString(captureContext->camHandle, "timestampControlReset", "1");
-                    if (statusF == GEVLIB_OK) {
-                        std::cout << std::endl << "INFO | " << get_timestamp() << " | Reset clock to " << 
-                        t_reset.time_since_epoch().count()/1000 << ". ID " << img->id << std::endl;
-                    } else {
-                        // if the clock rest does not work it typically indicates a larger problem, so better exit (and restart)
-                        std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to reset clock, error " << statusF << std::endl;
-                        global_error = true;
-
+                if (do_housekeeping || first_image) { 
+                    if (!noptp) {
+                        framesInFile = 0; // required to trigger new file generation
                     }
-                    t_reset_uint_ = t_reset.time_since_epoch().count()/1000;
-                    timeStart = static_cast<long int> (time(NULL));
-                    waiting_for_clock_reset = true;
+                    else {
+                        t_reset = std::chrono::system_clock::now();
+                        statusF = GevSetFeatureValueAsString(captureContext->camHandle, "timestampControlReset", "1");
+                        if (statusF == GEVLIB_OK) {
+                            std::cout << std::endl << "INFO | " << get_timestamp() << " | Reset clock to " << 
+                            t_reset.time_since_epoch().count()/1000 << ". ID " << img->id << std::endl;
+                        } else {
+                            // if the clock rest does not work it typically indicates a larger problem, so better exit (and restart)
+                            std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to reset clock, error " << statusF << std::endl;
+                            global_error = true;
 
+                        }
+                        t_reset_uint_ = t_reset.time_since_epoch().count()/1000;
+                        waiting_for_clock_reset = true;
+                    }
+                    timeStart = static_cast<long int> (time(NULL));
                     // read temperature
 
                     statusF = GevGetFeatureValue(captureContext->camHandle, "DeviceTemperature", &type, sizeof(cameraTemperatureF), &cameraTemperatureF);
@@ -325,13 +339,23 @@ void *ImageCaptureThread( void *context)
                     // // network statistics
                     statusF += GevGetFeatureValue(captureContext->camHandle, "transferQueueCurrentBlockCount", &type, sizeof(transferQueueCurrentBlockCount), &transferQueueCurrentBlockCount); 
                     statusF += GevGetFeatureValue(captureContext->camHandle, "transferMaxBlockSize", &type, sizeof(transferMaxBlockSize), &transferMaxBlockSize); 
+                    statusF += GevGetFeatureValueAsString( captureContext->camHandle, "ptpStatus", &type, sizeof(ptp_status), ptp_status);
+
+
                     if (statusF == GEVLIB_OK) {
                         PrintThread{} << "INFO | " << get_timestamp() << " | Temperature "<< cameraTemperature << 
                             ", transferMaxBlockSize MB " << std::to_string(transferMaxBlockSize) << 
-                            ", transferQueueCurrentBlockCount "<< transferQueueCurrentBlockCount << std::endl;
+                            ", transferQueueCurrentBlockCount "<< transferQueueCurrentBlockCount << 
+                            ", ptpStatus " << std::string(ptp_status) << std::endl;
                     } else {
                         // if it does not work it typically indicates a larger problem, so better exit (and restart)
                         std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to read temperature and other status information" << statusF << std::endl;
+                        global_error = true;
+
+                    }
+
+                    if ((!noptp) && (std::string(ptp_status) != "Slave")) {
+                        std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Lost PTP clock synchronization: " << ptp_status << std::endl;
                         global_error = true;
 
                     }
@@ -350,7 +374,7 @@ void *ImageCaptureThread( void *context)
 
 
                     // if clock jumps back by at least 1 second, we assume the camera clock was reset
-                    if ((last_cameratimestamp>=0) && ((((signed long) img->timestamp) - last_cameratimestamp) < -1e6) ){
+                    if ((noptp) && (last_cameratimestamp>=0) && ((((signed long) img->timestamp) - last_cameratimestamp) < -1e6) ){
                         std::cout << std::endl << "INFO | " << get_timestamp() << " | detected clock reset between "  << 
                         (img->timestamp) << " and " << last_cameratimestamp << ". ID " << img->id << std::endl;
                         reset_clock_detected = true;
@@ -676,6 +700,7 @@ int main(int argc, char *argv[])
     char c;
     int res = 0;
     int writeallframes1;
+    int noptp1;
     int rotateImage1;
     int queryGain1;
     int followermode1;
@@ -764,6 +789,15 @@ int main(int argc, char *argv[])
         max_n_timeouts1 = max_n_timeouts * 10; //tolerate more timeouts as a follower
     } else {
         std::cerr << "FATAL ERROR | " << get_timestamp() << "| followermode must be 0 or 1 " << followermode1<< std::endl;
+        global_error = true;
+    }
+    noptp1 = parser.get<int>("noptp");
+    if (noptp1 == 0) {
+        noptp = false;
+    } else if (noptp1 == 1) {
+        noptp = true;
+    } else {
+        std::cerr << "FATAL ERROR | " << get_timestamp() << "| noptp must be 0 or 1 " << noptp1<< std::endl;
         global_error = true;
     }
 
@@ -1274,6 +1308,37 @@ int main(int argc, char *argv[])
             //
             // End frame info
             //============================================================
+
+
+            if (!noptp) {
+                status = GevGetFeatureValueAsString( handle, "ptpStatus", &type, sizeof(ptp_status), ptp_status);
+                if (status != GEVLIB_OK) {
+                    // if it does not work it typically indicates a larger problem, so better exit (and restart)
+                    std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to read ptp statusnformation" << status << std::endl;
+                    global_error = true;
+                }
+                int ptpcounter = 0;
+                while (std::string(ptp_status) != "Slave") {
+                    std::cout << "INFO | " << get_timestamp() << "| " << "Waiting for PTP: "<< std::string(ptp_status) << std::endl;
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                    status = GevGetFeatureValueAsString( handle, "ptpStatus", &type, sizeof(ptp_status), ptp_status);
+                    if (status != GEVLIB_OK) {
+                        // if it does not work it typically indicates a larger problem, so better exit (and restart)
+                        std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to read ptp statusnformation" << status << std::endl;
+                        global_error = true;
+                        break;
+                    }
+                    if (ptpcounter > 30) {
+                        // if it does not work it typically indicates a larger problem, so better exit (and restart)
+                        std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to synchronize PTP clock: " << std::string(ptp_status) << std::endl;
+                        global_error = true;
+                        break;
+                    }
+
+                    ++ptpcounter;
+                }
+            }
+
 
             if ((not global_error) && (status == 0))
             {

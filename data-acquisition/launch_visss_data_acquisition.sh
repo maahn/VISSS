@@ -46,6 +46,9 @@ while [ $# -gt 0 ]; do
     --STOREALLFRAMES=*)
       STOREALLFRAMES="${1#*=}"
       ;;
+    --NOPTP=*)
+      NOPTP="${1#*=}"
+      ;;
     --NEWFILEINTERVAL=*)
       NEWFILEINTERVAL="${1#*=}"
       ;;
@@ -130,7 +133,7 @@ for (( ; ; ))
 do
 
 	timestamp=$(/bin/date +%FT%T)
-	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT $CAMERACONFIG $IP"
+	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -p=$NOPTP -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT $CAMERACONFIG $IP"
 	/bin/echo "BASH $COMMAND"
 	if $COMMAND
 			then
