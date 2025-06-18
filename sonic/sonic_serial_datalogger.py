@@ -17,7 +17,7 @@ fsuffix = "txt"
 if len(glob.glob('/dev/ttyUSB0'))==1:
   com_port ='/dev/ttyUSB0'
 else:
-  com_port ='/dev/ttyF0'
+  com_port ='/dev/ttyS0'
 
 
 errorFname="/data/sonic_errors.txt"
