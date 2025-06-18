@@ -207,7 +207,8 @@ After=network.target
 
 [Service]
 ExecStart=/usr/sbin/ptp4l -i enp4s0 -m
-Restart=on-failure
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -223,7 +224,7 @@ Requires=ptp4l.service
 
 [Service]
 ExecStart=/usr/sbin/phc2sys -s CLOCK_REALTIME -c enp4s0 -O 0 -m
-Restart=on-failure
+Restart=always
 RestartSec=5
 
 [Install]
