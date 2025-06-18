@@ -16,4 +16,18 @@ echo "**************************************************************************
 echo df -h / /data
 df -h / /data
 
+echo "********************************************************************************"
+echo chronyc sources -v
+chronyc sources -v
+
+echo "********************************************************************************"
+echo systemctl status phc2sys.service
+systemctl status phc2sys.service
+
+echo "********************************************************************************"
+echo systemctl status ptp4l.service
+systemctl status ptp4l.service
+
+
+
 echo "</pre></html>"
