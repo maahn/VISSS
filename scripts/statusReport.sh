@@ -26,8 +26,8 @@ echo systemctl status ptp4l.service
 systemctl status ptp4l.service
 
 echo "********************************************************************************"
-echo chronyc sources -v
-chronyc sources -v
+echo chronyc sources
+chronyc sources
 
 
 echo "</pre></html>"
