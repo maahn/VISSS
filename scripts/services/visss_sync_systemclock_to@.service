@@ -1,0 +1,12 @@
+[Unit]
+Description=Synchronize system clock to %i using phc2sys
+After=network.target
+
+[Service]
+EnvironmentFile=/home/visss/VISSS_INTERFACES.env
+ExecStart=/usr/sbin/phc2sys -s CLOCK_REALTIME -c $%i -O 0 -m
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
