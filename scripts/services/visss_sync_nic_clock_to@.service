@@ -1,0 +1,13 @@
+[Unit]
+Description=Synchronize FOLLOWER_NIC_INTERNET to %i using phc2sys
+After=network.target
+Requires=ptp4l.service
+
+[Service]
+EnvironmentFile=/home/visss/VISSS_INTERFACES.env
+ExecStart=/usr/sbin/phc2sys  -s $FOLLOWER_NIC_INTERNET -c $%i -O 0 -m -w
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.targe

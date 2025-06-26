@@ -1,0 +1,12 @@
+[Unit]
+Description=Master PTP IEEE 1588 Daemon (ptp4l) for %i
+After=network.target
+
+[Service]
+EnvironmentFile=/home/visss/VISSS_INTERFACES.env
+ExecStart=/usr/sbin/ptp4l -i $%i -m
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

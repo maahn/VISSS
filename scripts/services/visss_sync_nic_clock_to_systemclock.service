@@ -1,0 +1,13 @@
+[Unit]
+Description=Synchronize FOLLOWER_NIC_INTERNET to system clock using phc2sys
+After=network.target
+Requires=ptp4l.service
+
+[Service]
+EnvironmentFile=/home/visss/VISSS_INTERFACES.env
+ExecStart=/usr/sbin/phc2sys -s $FOLLOWER_NIC_INTERNET -c CLOCK_REALTIME -O 0 -m -w -E ntpshm
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.targe
