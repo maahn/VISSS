@@ -1,7 +1,7 @@
 [Unit]
 Description=Synchronize FOLLOWER_NIC_INTERNET to system clock using phc2sys
 After=network.target
-Requires=ptp4l.service
+Requires=visss_ptp_slave@FOLLOWER_NIC_INTERNET
 
 [Service]
 EnvironmentFile=/home/visss/VISSS_INTERFACES.env
@@ -10,4 +10,4 @@ Restart=always
 RestartSec=5
 
 [Install]
-WantedBy=multi-user.targe
+WantedBy=multi-user.target
