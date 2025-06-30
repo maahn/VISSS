@@ -181,20 +181,6 @@ leader system clock -> leader NIC Internet clock -> follower NIC Internet clock 
 ln -s /home/visss/visss_config/visss2/VISSS_INTERFACES.env VISSS_INTERFACES.env
 # This is crucial, otherwise nothing will work!
 
-<<<<<<< HEAD
-#### clock
- *** only needed when two computers record data of cameras **
-
-add trigger as a clock for the follower, open "sudo nano /etc/chrony/chrony.conf"
-server ADD.TRIGGER.IP.ADDRESS iburst prefer
-
-on the trigger "sudo nano /etc/chrony/chrony.conf"
-# Allow NTP client access from local network.
-allow ADD.FOLLOWER.IP.ADDRESS
-
-on both "sudo systemctl enable chrony"
-
-check clock status with "chronyc sources", ^* in the beginning means that clock is mainly used.
 
 #### Services
 # for setting up PTP clocks and making sure 5gbit is advertised by NIC 
@@ -204,10 +190,11 @@ ln -s /home/visss/visss_config/visss3/VISSS_INTERFACES.env VISSS_INTERFACES.env
 # this is very important, otherwise nothing works
 
 #install service scripts with:
-sudo cp -v VISSS/scripts/services/* /etc/systemd/system/
+sudo cp -v ~/VISSS/scripts/services/* /etc/systemd/system/
 sudo systemctl daemon-reexec
 
-
+#make sure visss user can see logs:
+sudo usermod -aG systemd-journal visss
 
 #for single combined leader&follower:
 sudo systemctl enable --now visss_ptp_master@LEADER_NIC_VISSS
