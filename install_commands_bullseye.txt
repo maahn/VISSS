@@ -196,7 +196,32 @@ on both "sudo systemctl enable chrony"
 
 check clock status with "chronyc sources", ^* in the beginning means that clock is mainly used.
 
-#### PTP clocks
+#### Services
+
+#link config file, e.g.:
+ln -s /home/visss/visss_config/visss3/VISSS_INTERFACES.env VISSS_INTERFACES.env
+
+install services with:
+sudo cp -v VISSS/scripts/services/* /etc/systemd/system/
+sudo systemctl daemon-reexec
+
+
+on combined leader follower computer:
+
+
+
+
+on leader:
+
+
+
+
+on follower:
+
+
+
+
+####PTP clocks
 
 The cameras can get their time via PTP. For this, create a service to start PTP (replace enp4s0 with the interface)
 
@@ -231,7 +256,7 @@ RestartSec=5
 WantedBy=multi-user.target
 
 
-sudo systemctl daemon-reexec
+
 sudo systemctl enable ptp4l.service
 sudo systemctl start ptp4l.service
 sudo systemctl status ptp4l.service
