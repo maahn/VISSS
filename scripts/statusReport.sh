@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-
 echo "<html><pre>"
 hostname
 date
@@ -18,12 +16,12 @@ df -h / /data
 
 
 echo "********************************************************************************"
-echo systemctl status phc2sys.service
-systemctl status phc2sys.service
+echo systemctl status visss_sync*
+systemctl status visss_sync*
 
 echo "********************************************************************************"
-echo systemctl status ptp4l.service
-systemctl status ptp4l.service
+echo systemctl status visss_ptp*
+systemctl status visss_ptp*
 
 echo "********************************************************************************"
 echo chronyc sources
@@ -31,3 +29,4 @@ chronyc sources
 
 
 echo "</pre></html>"
+
