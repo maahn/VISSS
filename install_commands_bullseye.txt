@@ -197,33 +197,11 @@ on both "sudo systemctl enable chrony"
 check clock status with "chronyc sources", ^* in the beginning means that clock is mainly used.
 
 #### Services
+# for setting up PTP clocks and making sure 5gbit is advertised by NIC 
 
-#link config file, e.g.:
+#adapt and link config file, e.g.:
 ln -s /home/visss/visss_config/visss3/VISSS_INTERFACES.env VISSS_INTERFACES.env
-
-install services with:
-sudo cp -v VISSS/scripts/services/* /etc/systemd/system/
-sudo systemctl daemon-reexec
-
-
-on combined leader follower computer:
-
-
-
-
-on leader:
-
-
-
-
-on follower:
-
-
-
-
-####PTP clocks
-
-The cameras can get their time via PTP. For this, create a service to start PTP (replace enp4s0 with the interface)
+# this is very important, otherwise nothing works
 
 #install service scripts with:
 sudo cp -v VISSS/scripts/services/* /etc/systemd/system/
@@ -240,7 +218,7 @@ sudo systemctl enable --now visss_sync_systemclock_to@FOLLOWER_NIC_VISSS
 sudo apt install chrony #make sure sytem time is alway right
 
 
-#for leader:
+###for leader:
 sudo systemctl enable --now visss_sync_systemclock_to@LEADER_NIC_VISSS
 sudo systemctl enable --now visss_sync_systemclock_to@LEADER_NIC_INTERNET
 sudo systemctl enable --now visss_ptp_master@LEADER_NIC_VISSS
@@ -252,13 +230,13 @@ sudo systemctl status visss_ptp_master@LEADER_NIC_VISSS
 sudo systemctl status visss_ptp_master@LEADER_NIC_INTERNET
 
 #for Nano 5G camera only, runs every minute
-sudo systemctl enable --now visss_check-5gbit@$LEADER_NIC_VISSS.timer
-sudo systemctl status visss_check-5gbit@$LEADER_NIC_VISSS.service
+sudo systemctl enable --now visss_check-5gbit@LEADER_NIC_VISSS.timer
+sudo systemctl status visss_check-5gbit@LEADER_NIC_VISSS.service
 
 #make sure sytem time is always right
 sudo apt install chrony
 
-#for follower:
+###for follower:
 sudo systemctl enable --now visss_ptp_master@FOLLOWER_NIC_VISSS
 sudo systemctl enable --now visss_ptp_slave@FOLLOWER_NIC_INTERNET
 sudo systemctl enable --now visss_sync_nic_clock_to@FOLLOWER_NIC_VISSS
@@ -270,8 +248,8 @@ sudo systemctl status visss_sync_nic_clock_to@FOLLOWER_NIC_VISSS
 sudo systemctl status visss_sync_nic_clock_to_systemclock
 
 #for Nano 5G camera only, runs every minute
-sudo systemctl enable --now visss_check-5gbit@$FOLLOWER_NIC_VISSS.timer
-sudo systemctl status visss_check-5gbit@$FOLLOWER_NIC_VISSS.service
+sudo systemctl enable --now visss_check-5gbit@FOLLOWER_NIC_VISSS.timer
+sudo systemctl status visss_check-5gbit@FOLLOWER_NIC_VISSS.service
 
 
 #make sure chrony and ntp are not running

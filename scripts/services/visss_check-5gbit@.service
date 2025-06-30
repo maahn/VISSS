@@ -6,4 +6,4 @@ Wants=network-online.target
 [Service]
 EnvironmentFile=/home/visss/VISSS_INTERFACES.env
 Type=oneshot
-ExecStart=/home/visss/VISSS/scripts/check_5gbit.sh %i
+ExecStart=/home/visss/VISSS/scripts/check_5gbit.sh $%i
