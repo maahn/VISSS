@@ -1,0 +1,9 @@
+[Unit]
+Description=Check and Set 5Gbit Link Mode on NIC %i 
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/home/visss/VISSS_INTERFACES.env
+Type=oneshot
+ExecStart=/home/visss/VISSS/scripts/check_5gbit.sh %i
