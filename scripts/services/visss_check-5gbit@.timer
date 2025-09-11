@@ -1,9 +1,8 @@
 [Unit]
-Description=Run 5Gbit NIC check every 5 minutes for %i
+Description=Run 5Gbit NIC check every 1 minutes for %i
 
 [Timer]
-OnBootSec=5s
-OnUnitActiveSec=1min
+OnCalendar=*:0/1
 Persistent=true
 Unit=visss_check-5gbit@%i.service
 
