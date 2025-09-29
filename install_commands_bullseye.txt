@@ -229,13 +229,13 @@ sudo systemctl status visss_ptp_slave@FOLLOWER_NIC_INTERNET
 sudo systemctl status visss_sync_nic_clock_to@FOLLOWER_NIC_VISSS
 sudo systemctl status visss_sync_nic_clock_to_systemclock
 
+#for the follower only, make sure chrony and ntp are not running
+ps -ef | grep -E 'chronyd|ntpd|timesyncd'
+
 #for Nano 5G camera only, runs every minute
 sudo systemctl enable --now visss_check-5gbit@FOLLOWER_NIC_VISSS.timer
 sudo systemctl status visss_check-5gbit@FOLLOWER_NIC_VISSS.service
 
-
-#make sure chrony and ntp are not running
-ps -ef | grep -E 'chronyd|ntpd|timesyncd'
 
 
 ##### git access
