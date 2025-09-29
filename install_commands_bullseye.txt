@@ -83,12 +83,7 @@ sudo timedatectl set-timezone UTC
 
 ####### AUTOSSH
 
-Copy SSH Key visss_ftpserver.key to VISSS
-
-add to crontab:
-@reboot screen -S 'autossh'  -d -m bash -c 'autossh -N -M 0 -p 22 -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3"  -i visss_ftpserver.key visss@ftp.meteo.uni-leipzig.de -R 0.0.0.0:2201:localhost:22'
-
-Replace 2201 by apppropiate port number
+If required for data transfer, see Monsun wiki for service script
 
 ###### VPN (DEPRECEATED USE AUTOSSH)
 
