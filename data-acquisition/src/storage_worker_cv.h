@@ -168,7 +168,7 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize)
         pipeout = popen(ffmpegCommand.data(), "w");
         // writer_.open(filename_ + ".mkv", cv::CAP_FFMPEG, fourcc_, fps_, frame_size_, is_color_);
         PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Started "<< ffmpegCommand<< std::endl;
-        PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
+        //PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Opened "<< filename_<< std::endl;
     }
     //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=veryfast mb-tree=true me=dia analyse=i8x8 rc-lookahead=20 subme=1 ! queue ! qtmux !  filesink location=video-h264_lookahead20.mkv",
     //writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc speed-preset=superfast rc-lookahead=80 subme=2 ! queue ! qtmux !  filesink location=video-h264_lookahead80a_subme2.mkv",
@@ -180,7 +180,7 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize)
         // Open the text file.
         fMeta_.open(filename_+".txt");
         add_meta_data(timestamp);
-        PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Opened "<< filename_+".txt"<< std::endl;
+        //PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Opened "<< filename_+".txt"<< std::endl;
     }
 
     return;
@@ -321,13 +321,13 @@ void storage_worker_cv::run()
 
 
 
-    PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | Thread Running!" << std::endl;
-    PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | path " << path_ << std::endl;
-    PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | fourcc " << fourcc_ << std::endl;
-    PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | fps " << fps_ << std::endl;
-    PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | frame_size " << frame_size_ << std::endl;
-    PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | is_color " << is_color_ << std::endl;
-    PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | live_window_frame_ratio " << live_window_frame_ratio_ << std::endl;
+    // PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | Thread Running!" << std::endl;
+    // PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | path " << path_ << std::endl;
+    // PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | fourcc " << fourcc_ << std::endl;
+    // PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | fps " << fps_ << std::endl;
+    // PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | frame_size " << frame_size_ << std::endl;
+    // PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | is_color " << is_color_ << std::endl;
+    // PrintThread{} << "DEBUG-"<< id_ << " | " << get_timestamp() << " | live_window_frame_ratio " << live_window_frame_ratio_ << std::endl;
 
     if ((id_ == 0) && showPreview) {
         cv::namedWindow( "VISSS Live Image | "+ name +" | "+std::to_string(id_), cv::WINDOW_AUTOSIZE | cv :: WINDOW_KEEPRATIO  );
@@ -477,8 +477,8 @@ void storage_worker_cv::run()
                     if (storeVideo) {
                         cv::imwrite(filename_final_+".jpg", imgWithMeta );
                         create_symlink(filename_final_+".jpg",  filename_latest_+".jpg");
-                        PrintThread{} ;
-                        PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Written "<< filename_final_+".jpg"<< std::endl;
+                        // PrintThread{} ;
+                        // PrintThread{} << "DEBUG-" << id_ << " | " << get_timestamp() << " | Written "<< filename_final_+".jpg"<< std::endl;
                         }
 
                     frame_count_infile = 0;
@@ -541,7 +541,7 @@ void storage_worker_cv::run()
                 if ( (id_ == 0) && showPreview && (frame_count % (live_window_frame_ratio_ / nStorageThreads) == 0))
                 {
                     
-                    cv::resize(imgWithMeta, imgSmall, cv::Size(), 0.5, 0.5);
+                    cv::resize(imgWithMeta, imgSmall, cv::Size(), 0.4, 0.4);
                     cv::imshow( "VISSS Live Image | "+ name +" | "+std::to_string(id_), imgSmall );
                     cv::waitKey(1);
                     }

@@ -43,6 +43,7 @@ import argparse
 import logging
 
 
+
 SETTINGSFILE = "%s/.visss.yaml" % str(Path.home())
 DEFAULTSETTINGS = {
     'geometry': "%dx%d" % (300, 300),
@@ -179,39 +180,40 @@ class runCpp:
             raise ValueError("cameraConfig['follower'] must be True or False,"
                 " got %s"%cameraConfig['follower'])
 
-        self.command = f""
+        self.command = []
         if (('sshForwarding' in self.cameraConfig.keys()) and
          (self.cameraConfig['sshForwarding'] != "None")):
-            self.command += (
-                f"ssh -o ServerAliveInterval=60 -tt"
-                f" {self.cameraConfig['sshForwarding']} DISPLAY=:0 "
-                )
+            raise ValueError("sshForwarding not supported any more")
+            # self.command += (
+            #     f"ssh -o ServerAliveInterval=60 -tt"
+            #     f" {self.cameraConfig['sshForwarding']} DISPLAY=:0 "
+            #     )
 
-        self.command += (
-            f"/usr/bin/env bash"
-            f" {self.rootpath}/launch_visss_data_acquisition.sh"
-            f" --IP={self.cameraConfig['ip']}"
-            f" --MAC={self.cameraConfig['mac']}"
-            f" --FOLLOWERMODE={self.cameraConfig['follower']}"
-            f" --INTERFACE={self.cameraConfig['interface']}"
-            f" --MAXMTU={self.configuration['maxmtu']}"
-            f" --LIVERATIO={self.configuration['liveratio']}"
-            f" --ENCODING={self.configuration['encoding'].replace(' ','@')}"
-            f" --CAMERACONFIG={self.configFName}"
-            f" --ROOTPATH={self.rootpath}"
-            f" --OUTDIR={self.configuration['outdir']}"
-            f" --SITE={self.configuration['site']}"
-            f" --NAME={self.name}"
-            f" --FPS={self.configuration['fps']}"
-            f" --NTHREADS={self.configuration['storagethreads']}"
-            f" --NEWFILEINTERVAL={self.configuration['newfileinterval']}"
-            f" --STOREALLFRAMES={int(self.configuration['storeallframes'])}"
-            f" --NOPTP={int(self.configuration['noptp'])}"
-            f" --QUERYGAIN={int(self.configuration['querygain'])}"
-            f" --ROTATEIMAGE={int(self.configuration['rotateimage'])}"
-            f" --MINBRIGHT={self.configuration['minBrightchange']}"
-        )
-
+        self.command += [
+            #'systemd-run', '--user', '--scope', #'--property=CPUQuota=100%',
+            f"{self.rootpath}/launch_visss_data_acquisition.sh",
+            f"--IP={self.cameraConfig['ip']}",
+            f"--MAC={self.cameraConfig['mac']}",
+            f"--FOLLOWERMODE={self.cameraConfig['follower']}",
+            f"--INTERFACE={self.cameraConfig['interface']}",
+            f"--MAXMTU={self.configuration['maxmtu']}",
+            f"--LIVERATIO={self.configuration['liveratio']}",
+            f"--ENCODING={self.configuration['encoding'].replace(' ','@')}",
+            f"--CAMERACONFIG={self.configFName}",
+            f"--ROOTPATH={self.rootpath}",
+            f"--OUTDIR={self.configuration['outdir']}",
+            f"--SITE={self.configuration['site']}",
+            f"--NAME={self.name}",
+            f"--FPS={self.configuration['fps']}",
+            f"--NTHREADS={self.configuration['storagethreads']}",
+            f"--NEWFILEINTERVAL={self.configuration['newfileinterval']}",
+            f"--STOREALLFRAMES={int(self.configuration['storeallframes'])}",
+            f"--NOPTP={int(self.configuration['noptp'])}",
+            f"--QUERYGAIN={int(self.configuration['querygain'])}",
+            f"--ROTATEIMAGE={int(self.configuration['rotateimage'])}",
+            f"--MINBRIGHT={self.configuration['minBrightchange']}",
+        ]
+        print(self.command)
         frame1 = ttk.Frame(self.parent.mainframe)
         frame1.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -359,38 +361,29 @@ class runCpp:
                              list(map(list, self.parent.externalTriggerStatus)))
             self.startStopButton.state(["disabled"])
 
-    def start(self, command):
-        self.running.set('Running: %s' % self.name)
-        self.logger.info('Start camera with %s' %command)
+    def start(self, command): 
+        self.running.set('Running: %s' % self.name) 
+        self.logger.info('Start camera with %s' %command) 
+        self.witeParamFile() 
+        # myEnv = os.environ.copy() 
+        # myEnv["TERM"] = "xterm" 
+        self.process = Popen(command, stdout=PIPE, 
+        stderr=STDOUT, preexec_fn=os.setsid) 
+        # launch thread to read the subprocess output 
+        # (put the subprocess output into the queue in a background thread, # get output from the queue in the GUI thread. # Output chain: process.readline -> queue -> label) # limit output buffering (may stall subprocess) 
+        q = Queue() 
+        t = Thread(target=self.reader_thread, args=[q]) 
+        t.daemon = True # close pipe if GUI process exits 
+        t.start() 
+        self.update(q) # start update loop 
 
-        self.witeParamFile()
-
-        # myEnv = os.environ.copy()
-        # myEnv["TERM"] = "xterm"
-
-        # start dummy subprocess to generate some output
-        self.process = Popen(command, stdout=PIPE,
-                             stderr=STDOUT, preexec_fn=os.setsid, shell=True)
-
-        # launch thread to read the subprocess output
-        #   (put the subprocess output into the queue in a background thread,
-        #    get output from the queue in the GUI thread.
-        #    Output chain: process.readline -> queue -> label)
-        # limit output buffering (may stall subprocess)
-        q = Queue(maxsize=1024)
-        t = Thread(target=self.reader_thread, args=[q])
-        t.daemon = True  # close pipe if GUI process exits
-        t.start()
-
-        self.update(q)  # start update loop
-
-    def reader_thread(self, q):
-        """Read subprocess output and put it into the queue."""
-        try:
+    def reader_thread(self, q): 
+        """Read subprocess output and put it into the queue.""" 
+        try: 
             with self.process.stdout as pipe:
                 for line in iter(pipe.readline, b''):
-                    q.put(line)
-        finally:
+                    q.put(line) 
+        finally: 
             q.put(None)
 
     def update(self, q):
