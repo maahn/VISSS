@@ -1252,14 +1252,14 @@ int main(int argc, char *argv[])
             camOptions.streamMemoryLimitMax =  100 * 8 * 2064 * 1544;     // Adjust packet memory buffering limit.
             //camOptions.streamPktSize = 8960;                            // Adjust the GVSP packet size.
             //camOptions.streamPktSize = 8960-1;                            // Adjust the GVSP packet size.
-            camOptions.streamPktDelay = 0;                         // Add usecs between packets to pace arrival at NIC.
+            camOptions.streamPktDelay = 10;                         // Add usecs between packets to pace arrival at NIC.
             // Assign specific CPUs to threads (affinity) - if required for better performance.
             {
                 int numCpus = _GetNumCpus();
                 if (numCpus > 1)
                 {
-                    //camOptions.streamThreadAffinity = numCpus - 1;
-                    camOptions.serverThreadAffinity = 4;
+                    camOptions.streamThreadAffinity = 2*followermode1;
+                    camOptions.serverThreadAffinity = 2*followermode1+1;
                 }
             }
 #endif
