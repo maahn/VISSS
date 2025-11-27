@@ -384,6 +384,13 @@ class runCpp:
     def start(self, command): 
         self.running.set('Running: %s' % self.name) 
         self.logger.info('Start camera with %s' %command) 
+
+        #start with a clean
+        if self.serialPortWiper is not None:
+            self.logger.info('Clean camera using port %s' %self.serialPortWiper) 
+            y = Thread(target=doClean, args=(self.serialPortWiper,), daemon=True)
+            y.start()
+
         self.witeParamFile() 
         # myEnv = os.environ.copy() 
         # myEnv["TERM"] = "xterm" 
@@ -573,13 +580,14 @@ class runCpp:
     def clean(self):
         self.startStopButton.state(["disabled"])
         self.CleanButton.state(["disabled"])
-        self.logger.info('Cleaning camera...')
+        self.logger.info('Cleaning camera using port %s' %self.serialPortWiper) 
+
 
         if self.running.get().startswith('Running'):
             self.quit()
             y = Thread(target=doClean, args=(self.serialPortWiper,), daemon=True)
             y.start()
-            self.parent.root.after(10*1000, self.endClean)  # schedule restart
+            self.parent.root.after(5*1000, self.endClean)  # schedule restart
 
     def endClean(self):
         self.logger.info('Done cleaning camera')
@@ -594,8 +602,6 @@ def doClean(com_port):
     sendString = sendString+"\r\n"
     sendString = sendString.encode('utf-8')
     with serial.Serial(com_port, baudrate, timeout=10800, rtscts=False, dsrdtr=False, xonxoff=True,bytesize=serial.EIGHTBITS,parity=serial.PARITY_NONE) as serialPort:
-        serialPort.write(sendString)
-        time.sleep(3)
         serialPort.write(sendString)
     return
 
