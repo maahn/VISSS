@@ -259,6 +259,7 @@ void *ImageCaptureThread( void *context)
         int codec = cv:: VideoWriter::fourcc('a', 'v', 'c', '1'); // select desired codec (must be available at runtime)
         bool isColor = false;
         int tt = 0;
+        long skipCounter = 0;
 
         // The synchronized queues, one per video source/storage worker pair
         std::vector<frame_queue> queue(nStorageThreads);
@@ -280,6 +281,7 @@ void *ImageCaptureThread( void *context)
         while(!captureContext->exit)
         {
 
+            skipCounter++;
 
             GEV_BUFFER_OBJECT *img = NULL;
             GEV_STATUS status = 0;
@@ -289,289 +291,293 @@ void *ImageCaptureThread( void *context)
             high_resolution_clock::time_point tr(high_resolution_clock::now());
 
             if ((img != NULL) && (status == GEVLIB_OK))
-            {
-                if (img->status == 0)
+            {    
+                // skip first second
+                if (skipCounter>captureContext->fps)
                 {
-                    was_active = true;
+                    if (img->status == 0)
+                    {
+                        was_active = true;
 
 
-                // handle clock reset
-                timeNow = static_cast<long int> (time(NULL));
-                if (!noptp) {
-                    timestamp_s = (img->timestamp)/1e9;
-                    timestamp_us = (img->timestamp)/1e3;
-                }
-                else {
-                    timestamp_s = (img->timestamp + t_reset_uint_applied)/1e6;
-                    timestamp_us = (img->timestamp + t_reset_uint_applied);
-                }
-                do_housekeeping  = (
-                    (new_file_interval > 0) && 
-                    (timestamp_s % new_file_interval == 0) && 
-                    ((timeNow - timeStart) > 10)
-                    ) ;
-
-                if (do_housekeeping || first_image) { 
+                    // handle clock reset
+                    timeNow = static_cast<long int> (time(NULL));
                     if (!noptp) {
-                        framesInFile = 0; // required to trigger new file generation
+                        timestamp_s = (img->timestamp)/1e9;
+                        timestamp_us = (img->timestamp)/1e3;
                     }
                     else {
-                        t_reset = std::chrono::system_clock::now();
-                        statusF = GevSetFeatureValueAsString(captureContext->camHandle, "timestampControlReset", "1");
+                        timestamp_s = (img->timestamp + t_reset_uint_applied)/1e6;
+                        timestamp_us = (img->timestamp + t_reset_uint_applied);
+                    }
+                    do_housekeeping  = (
+                        (new_file_interval > 0) && 
+                        (timestamp_s % new_file_interval == 0) && 
+                        ((timeNow - timeStart) > 10)
+                        ) ;
+
+                    if (do_housekeeping || first_image) { 
+                        if (!noptp) {
+                            framesInFile = 0; // required to trigger new file generation
+                        }
+                        else {
+                            t_reset = std::chrono::system_clock::now();
+                            statusF = GevSetFeatureValueAsString(captureContext->camHandle, "timestampControlReset", "1");
+                            if (statusF == GEVLIB_OK) {
+                                std::cout << std::endl << "INFO | " << get_timestamp() << " | Reset clock to " << 
+                                t_reset.time_since_epoch().count()/1000 << ". ID " << img->id << std::endl;
+                            } else {
+                                // if the clock rest does not work it typically indicates a larger problem, so better exit (and restart)
+                                std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to reset clock, error " << statusF << std::endl;
+                                global_error = true;
+
+                            }
+                            t_reset_uint_ = t_reset.time_since_epoch().count()/1000;
+                            waiting_for_clock_reset = true;
+                        }
+                        timeStart = static_cast<long int> (time(NULL));
+                        // read temperature
+
+                        statusF = GevGetFeatureValue(captureContext->camHandle, "DeviceTemperature", &type, sizeof(cameraTemperatureF), &cameraTemperatureF);
+                        cameraTemperature = std::to_string(cameraTemperatureF);
+
+                        // // network statistics
+                        statusF += GevGetFeatureValue(captureContext->camHandle, "transferQueueCurrentBlockCount", &type, sizeof(transferQueueCurrentBlockCount), &transferQueueCurrentBlockCount); 
+                        statusF += GevGetFeatureValue(captureContext->camHandle, "transferMaxBlockSize", &type, sizeof(transferMaxBlockSize), &transferMaxBlockSize); 
+                        statusF += GevGetFeatureValueAsString( captureContext->camHandle, "ptpStatus", &type, sizeof(ptp_status), ptp_status);
+
+
                         if (statusF == GEVLIB_OK) {
-                            std::cout << std::endl << "INFO | " << get_timestamp() << " | Reset clock to " << 
-                            t_reset.time_since_epoch().count()/1000 << ". ID " << img->id << std::endl;
+                            PrintThread{} << "INFO | " << get_timestamp() << " | Temperature "<< cameraTemperature << 
+                                ", transferMaxBlockSize MB " << std::to_string(transferMaxBlockSize) << 
+                                ", transferQueueCurrentBlockCount "<< transferQueueCurrentBlockCount << 
+                                ", ptpStatus " << std::string(ptp_status) << std::endl;
                         } else {
-                            // if the clock rest does not work it typically indicates a larger problem, so better exit (and restart)
-                            std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to reset clock, error " << statusF << std::endl;
+                            // if it does not work it typically indicates a larger problem, so better exit (and restart)
+                            std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to read temperature and other status information" << statusF << std::endl;
                             global_error = true;
 
                         }
-                        t_reset_uint_ = t_reset.time_since_epoch().count()/1000;
-                        waiting_for_clock_reset = true;
-                    }
-                    timeStart = static_cast<long int> (time(NULL));
-                    // read temperature
 
-                    statusF = GevGetFeatureValue(captureContext->camHandle, "DeviceTemperature", &type, sizeof(cameraTemperatureF), &cameraTemperatureF);
-                    cameraTemperature = std::to_string(cameraTemperatureF);
+                        if ((!noptp) && (std::string(ptp_status) != "Slave")) {
+                            std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Lost PTP clock synchronization: " << ptp_status << std::endl;
+                            global_error = true;
 
-                    // // network statistics
-                    statusF += GevGetFeatureValue(captureContext->camHandle, "transferQueueCurrentBlockCount", &type, sizeof(transferQueueCurrentBlockCount), &transferQueueCurrentBlockCount); 
-                    statusF += GevGetFeatureValue(captureContext->camHandle, "transferMaxBlockSize", &type, sizeof(transferMaxBlockSize), &transferMaxBlockSize); 
-                    statusF += GevGetFeatureValueAsString( captureContext->camHandle, "ptpStatus", &type, sizeof(ptp_status), ptp_status);
-
-
-                    if (statusF == GEVLIB_OK) {
-                        PrintThread{} << "INFO | " << get_timestamp() << " | Temperature "<< cameraTemperature << 
-                            ", transferMaxBlockSize MB " << std::to_string(transferMaxBlockSize) << 
-                            ", transferQueueCurrentBlockCount "<< transferQueueCurrentBlockCount << 
-                            ", ptpStatus " << std::string(ptp_status) << std::endl;
-                    } else {
-                        // if it does not work it typically indicates a larger problem, so better exit (and restart)
-                        std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Unable to read temperature and other status information" << statusF << std::endl;
-                        global_error = true;
-
-                    }
-
-                    if ((!noptp) && (std::string(ptp_status) != "Slave")) {
-                        std::cout << std::endl << "FATAL ERROR | " << get_timestamp() << " | Lost PTP clock synchronization: " << ptp_status << std::endl;
-                        global_error = true;
-
-                    }
-
-                }
-
-
-
-                    m_latestBuffer = img->address;
-
-                    // img->id max number is 65535 for m1280 cammera
-                    if ((((signed long)img->id + id_offset)- (signed long)last_id) < - 1000) { // do not use 65535 in case frames are missed
-                        id_offset = id_offset + 65535;
-                        std::cout << std::endl << "INFO | " << get_timestamp() << " | frame id overflow detected " << img->id << " offset " << id_offset << std::endl;
-                    }
-
-
-                    // if clock jumps back by at least 1 second, we assume the camera clock was reset
-                    if ((noptp) && (last_cameratimestamp>=0) && ((((signed long) img->timestamp) - last_cameratimestamp) < -1e6) ){
-                        std::cout << std::endl << "INFO | " << get_timestamp() << " | detected clock reset between "  << 
-                        (img->timestamp) << " and " << last_cameratimestamp << ". ID " << img->id << std::endl;
-                        reset_clock_detected = true;
-                        after_first_reset = true;
-                        waiting_for_clock_reset = false;
-
-                        t_reset_uint_applied = t_reset_uint_;
-                    } else if (first_image){
-                         t_reset_uint_applied = t_reset_uint_;
-
-                    } else {
-                        reset_clock_detected = false;
-                    }
-
-                    // creates new file!
-                    if (reset_clock_detected || first_image) { 
-                        framesInFile = 0; 
-                    }
-                    first_image = false; // applies only to very first image
-
-
-
-
-                    // UINT32 TotalBuffers ;
-                    // UINT32 NumUsed ;
-                    // UINT32 NumFree;
-                    // UINT32 NumTrashed;
-                    // GevBufferCyclingMode Mode;
-                    // UINT32 pTotalBuffers  ;
-                    // UINT32 pNumUsed  ;
-                    // UINT32 pNumFree  ;
-                    // UINT32 pNumTrashed;  
-                    // GevBufferCyclingMode *pMode ;
-                    // status = GevQueryTransferStatus (captureContext->camHandle,
-                    // &pTotalBuffers, &pNumUsed,
-                    // &pNumFree, &pNumTrashed,
-                    //  pMode);
-// if (pNumUsed>0) {
-//                     printf("%d ",pTotalBuffers);
-//                     printf("%d ",pNumUsed);
-//                     printf("%d ",pNumFree);
-//                     printf("%d ",pNumTrashed);
-//                     printf("%d ",pMode);
-//                     printf("%d ",img->id);
-// }
-
-
-
-                    if ((captureContext->enable_sequence) || (sequence_init == 1))
-                    {
-
-                            high_resolution_clock::time_point t1(high_resolution_clock::now());
-
-                        // Export to OpenCV Mat object using SapBuffer data directly
-                        cv::Mat exportImg(  img->h, img->w, OpenCV_Type, m_latestBuffer );
-                        cv::Size imgSize( img->w, img->h + frameborder);
-
-                        //cv::Size imgSize = exportImg.size();
-                        //std:: cout << "STATUS | " << get_timestamp() << "| " << imgSize  << std::endl;
-
-                        MatMeta exportImgMeta;
-                        if (!sequence_init)
-                        {
-                        // init
-                            //--- INITIALIZE VIDEOWRITER
-                            for (int ss=0; ss<nStorageThreads; ++ss) {
-                                storage.emplace_back(
-                                    std::ref(queue[ss])
-                                    , ss
-                                    , captureContext->base_name
-                                    , codec
-                                    , captureContext->fps
-                                    , imgSize
-                                    , isColor
-                                    , captureContext->live_window_frame_ratio
-                                    );
-                            }
-                            for (int uu=0; uu<nStorageThreads; ++uu) {
-                                // And start the worker threads for each storage worker
-                                storage_thread.emplace_back(&storage_worker_cv::run, &storage[uu]);
-                            }
-     // std::cout << "INFOmain 4: "  << std::endl;
-
-                            sequence_init = 1;
-                            sequence_count = 0;
-                            // }
                         }
-                        // Insert a copy into all queues
-                        // for (auto& q : queue) {
+
+                    }
 
 
-                        // Now the main capture loop
-                        exportImgMeta.MatImage = exportImg.clone();
-                        exportImgMeta.timestamp = img->timestamp + t_reset_uint_applied;
-                        exportImgMeta.recordtime = tr.time_since_epoch().count()/1000;
 
-                        exportImgMeta.id = img->id + id_offset;
+                        m_latestBuffer = img->address;
 
-                        // img->id max number is 65535
-                        if ((last_id>=0) && (exportImgMeta.id != last_id+1) ){
-                            std::cout << std::endl << "ERROR | " << get_timestamp() << " | missed frames between " << last_id << " and " << exportImgMeta.id << std::endl;
+                        // img->id max number is 65535 for m1280 cammera
+                        if ((((signed long)img->id + id_offset)- (signed long)last_id) < - 1000) { // do not use 65535 in case frames are missed
+                            id_offset = id_offset + 65535;
+                            std::cout << std::endl << "INFO | " << get_timestamp() << " | frame id overflow detected " << img->id << " offset " << id_offset << std::endl;
                         }
 
 
-                        if (queryGain) {
-                            GevGetFeatureValue( captureContext->camHandle, "ExposureTime",  &type, sizeof(valF), &valF);
-                            exportImgMeta.ExposureTime = valF;
-                            GevGetFeatureValue( captureContext->camHandle, "Gain",  &type, sizeof(valF), &valF);
-                            exportImgMeta.Gain = valF;
-                        }
-                        // we need new files in every thread
-                        if (framesInFile < nStorageThreads) {
-                            exportImgMeta.newFile = true; 
+                        // if clock jumps back by at least 1 second, we assume the camera clock was reset
+                        if ((noptp) && (last_cameratimestamp>=0) && ((((signed long) img->timestamp) - last_cameratimestamp) < -1e6) ){
+                            std::cout << std::endl << "INFO | " << get_timestamp() << " | detected clock reset between "  << 
+                            (img->timestamp) << " and " << last_cameratimestamp << ". ID " << img->id << std::endl;
+                            reset_clock_detected = true;
+                            after_first_reset = true;
+                            waiting_for_clock_reset = false;
 
-                            // GevGetFeatureValue( captureContext->camHandle, "transferQueueMemorySize",  &type, sizeof(valF), &valF);
-                            // std::cout << " transferQueueMemorySize " << valF << " MB" << type << " ";
-                            std::cout << std::endl;
+                            t_reset_uint_applied = t_reset_uint_;
+                        } else if (first_image){
+                             t_reset_uint_applied = t_reset_uint_;
 
                         } else {
-                            exportImgMeta.newFile = false; 
-                        }
-                        tt = exportImgMeta.id % nStorageThreads; 
- // std::cout << "INFOmain 5: "<< tt <<" "<< exportImgMeta.id << " "<< nStorageThreads << std::endl;
-
-                        // only process data after clock reset has been confirmed, otherwise timestamps are wrong
-                        if (!waiting_for_clock_reset) {
-                            queue[tt].push(exportImgMeta);
-                        } 
-                        // }        
- // std::cout << "INFOmain 6: "  << queue[tt].size() << std::endl;
-
-                        high_resolution_clock::time_point t2(high_resolution_clock::now());
-                         double dt_us(static_cast<double>(duration_cast<microseconds>(t2 - t1).count()));
-                        total_read_time += dt_us;
-
-
-
-                        last_id = exportImgMeta.id;
-                        last_cameratimestamp = img->timestamp;
-                        //last_utctimestamp_s = exportImgMeta.timestamp/1e6;
-
-
-                        ++frame_count;
-                        sequence_count++;
-                        framesInFile++;
-                        //rest n_timeout after success
-                        n_timeouts = 0;
-
-                        if ((maxframes>0) && (frame_count >=maxframes)) {
-                            std::cout << "FATAL ERROR | " << get_timestamp() << " | Reached maximum number of frames" << std::endl;
-                            global_error = true;
+                            reset_clock_detected = false;
                         }
 
-                        // See if we  are done.
-                        if ( !captureContext->enable_sequence )
+                        // creates new file!
+                        if (reset_clock_detected || first_image) { 
+                            framesInFile = 0; 
+                        }
+                        first_image = false; // applies only to very first image
+
+
+
+
+                        // UINT32 TotalBuffers ;
+                        // UINT32 NumUsed ;
+                        // UINT32 NumFree;
+                        // UINT32 NumTrashed;
+                        // GevBufferCyclingMode Mode;
+                        // UINT32 pTotalBuffers  ;
+                        // UINT32 pNumUsed  ;
+                        // UINT32 pNumFree  ;
+                        // UINT32 pNumTrashed;  
+                        // GevBufferCyclingMode *pMode ;
+                        // status = GevQueryTransferStatus (captureContext->camHandle,
+                        // &pTotalBuffers, &pNumUsed,
+                        // &pNumFree, &pNumTrashed,
+                        //  pMode);
+    // if (pNumUsed>0) {
+    //                     printf("%d ",pTotalBuffers);
+    //                     printf("%d ",pNumUsed);
+    //                     printf("%d ",pNumFree);
+    //                     printf("%d ",pNumTrashed);
+    //                     printf("%d ",pMode);
+    //                     printf("%d ",img->id);
+    // }
+
+
+
+                        if ((captureContext->enable_sequence) || (sequence_init == 1))
                         {
-                            // GEVBUFFILE_Close( seqFP, sequence_count );
-                            std::cout << "INFO | " << get_timestamp() << " | Complete sequence has " << sequence_count << " frames" << std::endl;
-                            sequence_count = 0;
-                            sequence_init = 0;
 
-                            // writer.release();
+                                high_resolution_clock::time_point t1(high_resolution_clock::now());
 
+                            // Export to OpenCV Mat object using SapBuffer data directly
+                            cv::Mat exportImg(  img->h, img->w, OpenCV_Type, m_latestBuffer );
+                            cv::Size imgSize( img->w, img->h + frameborder);
+
+                            //cv::Size imgSize = exportImg.size();
+                            //std:: cout << "STATUS | " << get_timestamp() << "| " << imgSize  << std::endl;
+
+                            MatMeta exportImgMeta;
+                            if (!sequence_init)
+                            {
+                            // init
+                                //--- INITIALIZE VIDEOWRITER
+                                for (int ss=0; ss<nStorageThreads; ++ss) {
+                                    storage.emplace_back(
+                                        std::ref(queue[ss])
+                                        , ss
+                                        , captureContext->base_name
+                                        , codec
+                                        , captureContext->fps
+                                        , imgSize
+                                        , isColor
+                                        , captureContext->live_window_frame_ratio
+                                        );
+                                }
+                                for (int uu=0; uu<nStorageThreads; ++uu) {
+                                    // And start the worker threads for each storage worker
+                                    storage_thread.emplace_back(&storage_worker_cv::run, &storage[uu]);
+                                }
+         // std::cout << "INFOmain 4: "  << std::endl;
+
+                                sequence_init = 1;
+                                sequence_count = 0;
+                                // }
+                            }
+                            // Insert a copy into all queues
+                            // for (auto& q : queue) {
+
+
+                            // Now the main capture loop
+                            exportImgMeta.MatImage = exportImg.clone();
+                            exportImgMeta.timestamp = img->timestamp + t_reset_uint_applied;
+                            exportImgMeta.recordtime = tr.time_since_epoch().count()/1000;
+
+                            exportImgMeta.id = img->id + id_offset;
+
+                            // img->id max number is 65535
+                            if ((last_id>=0) && (exportImgMeta.id != last_id+1) ){
+                                std::cout << std::endl << "ERROR | " << get_timestamp() << " | missed frames between " << last_id << " and " << exportImgMeta.id << std::endl;
+                            }
+
+
+                            if (queryGain) {
+                                GevGetFeatureValue( captureContext->camHandle, "ExposureTime",  &type, sizeof(valF), &valF);
+                                exportImgMeta.ExposureTime = valF;
+                                GevGetFeatureValue( captureContext->camHandle, "Gain",  &type, sizeof(valF), &valF);
+                                exportImgMeta.Gain = valF;
+                            }
+                            // we need new files in every thread
+                            if (framesInFile < nStorageThreads) {
+                                exportImgMeta.newFile = true; 
+
+                                // GevGetFeatureValue( captureContext->camHandle, "transferQueueMemorySize",  &type, sizeof(valF), &valF);
+                                // std::cout << " transferQueueMemorySize " << valF << " MB" << type << " ";
+                                std::cout << std::endl;
+
+                            } else {
+                                exportImgMeta.newFile = false; 
+                            }
+                            tt = exportImgMeta.id % nStorageThreads; 
+     // std::cout << "INFOmain 5: "<< tt <<" "<< exportImgMeta.id << " "<< nStorageThreads << std::endl;
+
+                            // only process data after clock reset has been confirmed, otherwise timestamps are wrong
+                            if (!waiting_for_clock_reset) {
+                                queue[tt].push(exportImgMeta);
+                            } 
+                            // }        
+     // std::cout << "INFOmain 6: "  << queue[tt].size() << std::endl;
+
+                            high_resolution_clock::time_point t2(high_resolution_clock::now());
+                             double dt_us(static_cast<double>(duration_cast<microseconds>(t2 - t1).count()));
+                            total_read_time += dt_us;
+
+
+
+                            last_id = exportImgMeta.id;
+                            last_cameratimestamp = img->timestamp;
+                            //last_utctimestamp_s = exportImgMeta.timestamp/1e6;
+
+
+                            ++frame_count;
+                            sequence_count++;
+                            framesInFile++;
+                            //rest n_timeout after success
+                            n_timeouts = 0;
+
+                            if ((maxframes>0) && (frame_count >=maxframes)) {
+                                std::cout << "FATAL ERROR | " << get_timestamp() << " | Reached maximum number of frames" << std::endl;
+                                global_error = true;
+                            }
+
+                            // See if we  are done.
+                            if ( !captureContext->enable_sequence )
+                            {
+                                // GEVBUFFILE_Close( seqFP, sequence_count );
+                                std::cout << "INFO | " << get_timestamp() << " | Complete sequence has " << sequence_count << " frames" << std::endl;
+                                sequence_count = 0;
+                                sequence_init = 0;
+
+                                // writer.release();
+
+                            }
+                        }
+
+                        else
+                        {
+                            //printf("chunk_data = %p  : chunk_size = %d\n", img->chunk_data, img->chunk_size); //???????????
+                            printf("STATUS | WAITING Frame %llu\n", (unsigned long long)img->id);
+                            fflush(stdout);
                         }
                     }
-
                     else
                     {
-                        //printf("chunk_data = %p  : chunk_size = %d\n", img->chunk_data, img->chunk_size); //???????????
-                        printf("STATUS | WAITING Frame %llu\n", (unsigned long long)img->id);
-                        fflush(stdout);
+                        // Image had an error (incomplete (timeout/overflow/lost)).
+                        // Do any handling of this condition necessary.
+                        std::cerr << "ERROR | " << get_timestamp() <<" | Frame " << img->id << " Status = " <<  img->status << std::endl;
                     }
                 }
-                else
+                else if (status  == GEVLIB_ERROR_TIME_OUT)
                 {
-                    // Image had an error (incomplete (timeout/overflow/lost)).
-                    // Do any handling of this condition necessary.
-                    std::cerr << "ERROR | " << get_timestamp() <<" | Frame " << img->id << " Status = " <<  img->status << std::endl;
-                }
-            }
-            else if (status  == GEVLIB_ERROR_TIME_OUT)
-            {
-                if (captureContext->enable_sequence) {
-                    // if (followermode) {
-                    //     if ((new_file_interval == 0) || (timeNow % new_file_interval == 0)) {
-                    //         std::cerr << "INFO | " << get_timestamp() <<" | Waiting for trigger camera"
-                    //         << std::endl;
-                    //     } else {
-                    //         std::cerr << "STATUS | " << get_timestamp() <<" | Waiting for trigger camera"
-                    //         << std::endl;
-                    //     }
-                    // }
-                    // else {
-                        n_timeouts += 1;
-                        std::cerr << "ERROR | " << get_timestamp() <<" | Camera time out"
-                        << " #" << n_timeouts << std::endl;
-                    // }
+                    if (captureContext->enable_sequence) {
+                        // if (followermode) {
+                        //     if ((new_file_interval == 0) || (timeNow % new_file_interval == 0)) {
+                        //         std::cerr << "INFO | " << get_timestamp() <<" | Waiting for trigger camera"
+                        //         << std::endl;
+                        //     } else {
+                        //         std::cerr << "STATUS | " << get_timestamp() <<" | Waiting for trigger camera"
+                        //         << std::endl;
+                        //     }
+                        // }
+                        // else {
+                            n_timeouts += 1;
+                            std::cerr << "ERROR | " << get_timestamp() <<" | Camera time out"
+                            << " #" << n_timeouts << std::endl;
+                        // }
+                    }
                 }
             }
             else {

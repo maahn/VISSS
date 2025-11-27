@@ -17,6 +17,7 @@ import shlex
 import signal
 import string
 import sys
+import serial
 import time
 import tkinter as tk
 import urllib.request
@@ -32,6 +33,7 @@ from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
 from pysolar import solar
 from filelock import Timeout, FileLock
+from PIL import Image
 
 from urllib.error import HTTPError, URLError
 
@@ -128,6 +130,9 @@ class runCpp:
         self.logDir = (f"{self.configuration['outdir']}/{self.hostname}_"
                        f"{self.cameraConfig['name']}_"
                        f"{self.cameraConfig['serialnumber']}/logs")
+        self.lastImage = (f"{self.configuration['outdir']}/"
+                       f"{self.cameraConfig['name']}_latest_0.jpg"
+                       )
         try:
             pathlib.Path(self.logDir).mkdir( parents=True, exist_ok=True )
         except FileExistsError:
@@ -224,7 +229,17 @@ class runCpp:
         config.pack(side=tk.TOP, fill=tk.X, pady=6, padx=(6, 6))
         self.startStopButton = ttk.Button(
             config, text="Start/Stop", command=self.clickStartStop)
-        self.startStopButton.pack(side=tk.LEFT, anchor=tk.NW)
+
+        self.startStopButton.pack(side=tk.RIGHT, anchor=tk.NW)
+
+        self.CleanButton = ttk.Button(config, text="Clean",
+                            command=self.clean)
+        self.CleanButton.pack(side=tk.RIGHT, anchor=tk.NW, pady=0, padx=(6, 0))
+        self.CleanButton.state(["disabled"])
+        if "wiper" in self.cameraConfig.keys():
+            self.serialPortWiper = self.cameraConfig['wiper']
+        else:
+            self.serialPortWiper = None
 
         self.runningWidget = ttk.Label(config, textvariable=self.running)
         self.runningWidget.pack(
@@ -254,6 +269,11 @@ class runCpp:
         if self.settings['autopilot'] in [True, 'true', 'True', 1]:
             self.clickStartStop(autopilot=True)
             self.startStopButton.state(["disabled"])
+
+        if "wiper" in self.cameraConfig.keys():
+            self.cleanThread = Thread(target=self.checkCleaniness, args=(), kwargs={}, daemon=True)
+            self.cleanThread.start()
+
 
     def writeToStatusFile(self, status):
         now = time.time()
@@ -409,6 +429,8 @@ class runCpp:
                     self.status.set(string)
                     self.statusWidget.config(background="green")
                     writeHTML(self.statusHtmlFile, string, 'green')
+                    if self.serialPortWiper is not None:
+                        self.CleanButton.state(["!disabled"])
                 else:
                     if line.startswith(b'ERROR') or line.startswith(b'FATAL'):
                         
@@ -494,6 +516,7 @@ class runCpp:
         self.status.set(string)
         self.statusWidget.config(background="yellow")
         writeHTML(self.statusHtmlFile, string, 'yellow')
+        self.CleanButton.state(["disabled"])
 
     def kill(self):
         try:
@@ -508,7 +531,73 @@ class runCpp:
         self.status.set(string)
         self.statusWidget.config(background="yellow")
         writeHTML(self.statusHtmlFile, string, 'yellow')
+        self.CleanButton.state(["disabled"])
 
+    def checkCleaniness(self):
+        revisitTime = 60
+        while True:
+            time.sleep(revisitTime)
+            if not self.running.get().startswith('Running'):
+                continue
+
+            if not os.path.isfile(self.lastImage):
+                self.logger.error(f'Did not find {self.lastImage}!')
+                continue
+
+            # Get modification time of file
+            file_mtime = os.path.getmtime(self.lastImage)
+            current_time = time.time()
+            age = (current_time - file_mtime)
+            if age > self.configuration['newfileinterval']:
+                self.logger.error(f'Last image too old: {age}s!')
+                continue
+    
+            img = Image.open(self.lastImage).convert("L")
+            height_offset = 64
+            brightnessThreshold = 50
+            darkThreshold = 0.1
+            arr = np.array(img)[height_offset:]
+            nPixel = arr.shape[0] * arr.shape[1]
+            dark_ratio = np.sum(arr < brightnessThreshold)/nPixel
+            if dark_ratio < darkThreshold:
+                self.logger.info(f'Image is not blocked: {dark_ratio*100}%')
+                continue
+
+            self.logger.info(f'Image is blocked: {dark_ratio*100}%. Cleaning!')
+            self.clean()
+            #wait longer after cleaning to avoid cleaning too often!
+            time.sleep(revisitTime)
+
+        return
+
+    def clean(self):
+        self.startStopButton.state(["disabled"])
+        self.CleanButton.state(["disabled"])
+        self.logger.info('Cleaning camera...')
+
+        if self.running.get().startswith('Running'):
+            self.quit()
+            y = Thread(target=doClean, args=(self.serialPortWiper,), daemon=True)
+            y.start()
+            self.parent.root.after(10*1000, self.endClean)  # schedule restart
+
+    def endClean(self):
+        self.logger.info('Done cleaning camera')
+        if self.running.get().startswith('Idle'):
+            self.start(self.command)
+        self.startStopButton.state(["!disabled"])
+        self.CleanButton.state(["!disabled"])
+
+def doClean(com_port):
+    sendString= 'wipe'
+    baudrate = 115200
+    sendString = sendString+"\r\n"
+    sendString = sendString.encode('utf-8')
+    with serial.Serial(com_port, baudrate, timeout=10800, rtscts=False, dsrdtr=False, xonxoff=True,bytesize=serial.EIGHTBITS,parity=serial.PARITY_NONE) as serialPort:
+        serialPort.write(sendString)
+        time.sleep(3)
+        serialPort.write(sendString)
+    return
 
 class GUI(object):
     def __init__(self, loglevel):
@@ -559,6 +648,7 @@ class GUI(object):
                             command=lambda: self.askopenfile())
 
         button.pack(side=tk.LEFT, anchor=tk.NW, pady=6, padx=(6, 0))
+
         try:
             statusStr = self.settings['configFile'].split('/')[-1]
         except AttributeError:
@@ -571,6 +661,8 @@ class GUI(object):
 
         self.autopilot = tk.IntVar()
         self.apps = []
+
+
         if 'camera' in self.configuration.keys():
             for cameraConfig in self.configuration['camera']:
               
@@ -622,8 +714,8 @@ class GUI(object):
                 x = Thread(target=self.queryExternalTrigger, args=(
                     ee, trigger, triggerWidget,), kwargs=externalTrigger, daemon=True)
                 x.start()
-        return
 
+        return
 
 
 
