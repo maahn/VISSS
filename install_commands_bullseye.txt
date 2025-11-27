@@ -243,6 +243,12 @@ sudo systemctl status visss_check-5gbit@FOLLOWER_NIC_VISSS.service
 
 ##### git access
 
-create git token and enable using it with
+create git access with
+ssh-keygen -t ed25519 -C "your email"
+cat /home/visss/.ssh/github_id_ed25519.pub
 
-git config --global credential.helper store
+add key to repo → Settings → Deploy keys
+
+git remote set-url origin git@github.com:maahn/VISSS.git
+
+
