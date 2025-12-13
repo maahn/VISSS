@@ -562,11 +562,10 @@ class runCpp:
             img = Image.open(self.lastImage).convert("L")
             height_offset = 64
             brightnessThreshold = 50
-            darkThreshold = 0.1
             arr = np.array(img)[height_offset:]
             nPixel = arr.shape[0] * arr.shape[1]
             dark_ratio = np.sum(arr < brightnessThreshold)/nPixel
-            if dark_ratio < darkThreshold:
+            if dark_ratio < (self.configuration["wiperThreshold"] /100):
                 self.logger.info(f'Image is not blocked: {dark_ratio*100}%')
                 continue
 
