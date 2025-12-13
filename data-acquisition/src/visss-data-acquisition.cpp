@@ -889,8 +889,8 @@ int main(int argc, char *argv[])
     if (1)
     {
         //int policy = SCHED_FIFO;
-        //int policy = SCHED_RR;
-        int policy = SCHED_OTHER;
+        int policy = SCHED_RR;
+        //int policy = SCHED_OTHER;
         pthread_attr_t attrib;
         int inherit_sched = 0;
         struct sched_param param = {0};
