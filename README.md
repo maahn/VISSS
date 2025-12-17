@@ -63,3 +63,7 @@ This repository contains the VISSS data acquisition software. Please see also
 #### 0.3.2
 * For deployments in 24/25 and after
 * Store internal camera temperature as status information
+
+### 0.4
+* Use PTP time for camera time sync
+* For deployments in 25/26 and after
