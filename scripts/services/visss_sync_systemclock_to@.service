@@ -4,7 +4,9 @@ After=network.target
 
 [Service]
 EnvironmentFile=/home/visss/VISSS_INTERFACES.env
-ExecStart=/usr/sbin/phc2sys -s CLOCK_REALTIME -c $%i -O 0 -m
+# -S 0.001: Step the clock if the offset is > 1ms (at any time)
+# -w:       Wait for ptp4l to be fully initialized
+ExecStart=/usr/sbin/phc2sys -s CLOCK_REALTIME -c $%i -O 0 -S 0.001 -w -m
 Restart=always
 RestartSec=5
 

@@ -5,7 +5,7 @@ Requires=visss_ptp_slave@FOLLOWER_NIC_INTERNET
 
 [Service]
 EnvironmentFile=/home/visss/VISSS_INTERFACES.env
-ExecStart=/usr/sbin/phc2sys -s $FOLLOWER_NIC_INTERNET -c CLOCK_REALTIME -O 0 -m -w
+ExecStart=/usr/sbin/phc2sys -s $FOLLOWER_NIC_INTERNET -c CLOCK_REALTIME -O 0 -S 0.001 -m -w
 Restart=always
 RestartSec=5
 
