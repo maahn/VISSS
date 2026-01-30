@@ -131,8 +131,7 @@ fi
 
 for (( ; ; ))
 do
-
-	timestamp=$(/bin/date +%FT%T)
+  /bin/sleep 1
 	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -p=$NOPTP -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT $CAMERACONFIG $IP"
 	/bin/echo "BASH $COMMAND"
 	if $COMMAND

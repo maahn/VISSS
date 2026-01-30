@@ -1,6 +1,9 @@
 
 Install Debian Bullseye with MATE desktop, ssh server, webserver and user visss
 ***********
+Make sure automatic reboot after power failure is enabled in EFI. Look for "Restore on AC Power Loss" or  "Power On After Power Loss" or "AC Recovery"
+
+**********
 
 add visss user to sudoer:
 su
@@ -15,7 +18,7 @@ network card for follower fixed ip 192.168.200.1
 
 sudo apt-get update
 sudo apt-get upgrade
-sudo apt install make  gcc  libx11-dev libxext-dev libgtk-3-dev libglade2-0 libglade2-dev libpcap0.8 libcap2 ethtool  net-tools  git gitk libcanberra-gtk-module libcanberra-gtk3-module libtiff-dev libboost-all-dev ffmpeg vlc apt-transport-https intltool  libges-1.0-dev libges-1.0-dev gstreamer1.0-plugins-bad libnotify-bin libnotify-dev ipython3 cmake-data librhash0 libuv1 cmake-qt-gui  libavcodec-dev libavformat-dev libswscale-dev libdc1394-22-dev libxine2-dev libv4l-dev libgtk2.0-dev libtbb-dev libatlas-base-dev libmp3lame-dev libtheora-dev libvorbis-dev libxvidcore-dev libopencore-amrnb-dev libopencore-amrwb-dev x264 v4l-utils  python3-numpy python3-dev python3-pip htop openssh-server mdm mdadm  samba cifs-utils  chrome-gnome-shell apache2 certbot  libpcap-dev python3-tk unattended-upgrades net-tools libopencv-dev gnome-disk-utility gnome-system-tools software-properties-gtk network-manager-openconnect-gnome openconnect seahorse rsync x2goserver x2goserver-xsession gtkterm python3-pysolar python3-filelock autossh
+sudo apt install make  gcc  libx11-dev libxext-dev libgtk-3-dev libglade2-0 libglade2-dev libpcap0.8 libcap2 ethtool  net-tools  git gitk libcanberra-gtk-module libcanberra-gtk3-module libtiff-dev libboost-all-dev ffmpeg vlc apt-transport-https intltool  libges-1.0-dev libges-1.0-dev gstreamer1.0-plugins-bad libnotify-bin libnotify-dev ipython3 cmake-data librhash0 libuv1 cmake-qt-gui  libavcodec-dev libavformat-dev libswscale-dev libdc1394-22-dev libxine2-dev libv4l-dev libgtk2.0-dev libtbb-dev libatlas-base-dev libmp3lame-dev libtheora-dev libvorbis-dev libxvidcore-dev libopencore-amrnb-dev libopencore-amrwb-dev x264 v4l-utils  python3-numpy python3-dev python3-pip htop openssh-server mdm mdadm  samba cifs-utils  chrome-gnome-shell apache2 certbot  libpcap-dev python3-tk unattended-upgrades net-tools libopencv-dev gnome-disk-utility gnome-system-tools software-properties-gtk network-manager-openconnect-gnome openconnect seahorse rsync x2goserver x2goserver-xsession gtkterm python3-pysolar python3-filelock autossh python3-pil
 
 wget -qO - https://download.sublimetext.com/sublimehq-pub.gpg | sudo apt-key add -
 echo "deb https://download.sublimetext.com/ apt/stable/" | sudo tee /etc/apt/sources.list.d/sublime-text.list 
@@ -83,12 +86,7 @@ sudo timedatectl set-timezone UTC
 
 ####### AUTOSSH
 
-Copy SSH Key visss_ftpserver.key to VISSS
-
-add to crontab:
-@reboot screen -S 'autossh'  -d -m bash -c 'autossh -N -M 0 -p 22 -o "ServerAliveInterval 30" -o "ServerAliveCountMax 3"  -i visss_ftpserver.key visss@ftp.meteo.uni-leipzig.de -R 0.0.0.0:2201:localhost:22'
-
-Replace 2201 by apppropiate port number
+If required for data transfer, see Monsun wiki for service script
 
 ###### VPN (DEPRECEATED USE AUTOSSH)
 
@@ -234,17 +232,23 @@ sudo systemctl status visss_ptp_slave@FOLLOWER_NIC_INTERNET
 sudo systemctl status visss_sync_nic_clock_to@FOLLOWER_NIC_VISSS
 sudo systemctl status visss_sync_nic_clock_to_systemclock
 
+#for the follower only, make sure chrony and ntp are not running
+ps -ef | grep -E 'chronyd|ntpd|timesyncd'
+
 #for Nano 5G camera only, runs every minute
 sudo systemctl enable --now visss_check-5gbit@FOLLOWER_NIC_VISSS.timer
 sudo systemctl status visss_check-5gbit@FOLLOWER_NIC_VISSS.service
 
 
-#make sure chrony and ntp are not running
-ps -ef | grep -E 'chronyd|ntpd|timesyncd'
-
 
 ##### git access
 
-create git token and enable using it with
+create git access with
+ssh-keygen -t ed25519 -C "your email"
+cat /home/visss/.ssh/github_id_ed25519.pub
 
-git config --global credential.helper store
+add key to repo → Settings → Deploy keys
+
+git remote set-url origin git@github.com:maahn/VISSS.git
+
+
