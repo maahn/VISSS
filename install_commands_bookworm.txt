@@ -1,5 +1,5 @@
 
-Install Debian Bullseye with MATE desktop, ssh server, webserver and user visss
+Install Debian Bullseye with MATE desktop, ssh server, webserver and user visss. Consider partitioning the root drive using LVM to allow for snapshots.
 ***********
 Make sure automatic reboot after power failure is enabled in EFI. Look for "Restore on AC Power Loss" or  "Power On After Power Loss" or "AC Recovery"
 
