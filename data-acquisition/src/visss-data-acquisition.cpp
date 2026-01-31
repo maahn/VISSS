@@ -1264,8 +1264,8 @@ int main(int argc, char *argv[])
                 int numCpus = _GetNumCpus();
                 if (numCpus > 1)
                 {
-                    camOptions.streamThreadAffinity = 2*followermode1;
-                    camOptions.serverThreadAffinity = 2*followermode1+1;
+                    camOptions.streamThreadAffinity = 2*followermode1+2;
+                    camOptions.serverThreadAffinity = 2*followermode1+3;
                 }
             }
 #endif

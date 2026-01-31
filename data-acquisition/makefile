@@ -79,7 +79,7 @@ $(EXE): $(OBJ_DIR)/visss-data-acquisition.o
 	$(CC) -g $^ $(LCLLIBS) -lpcap -L/usr/local/lib -lGevApi  -lCorW32  -lavcodec -lavutil $(openCV)  $(GENICAM_LIBS) -L$(ARCHLIBDIR) -lstdc++ -o $@
 	/usr/bin/sudo /sbin/setcap cap_sys_nice,cap_ipc_lock,cap_net_raw+eip $(EXE)
 	#/usr/bin/sudo /sbin/setcap cap_net_raw+eip $(EXE)
-cap_sys_nice,cap_net_raw,cap_ipc_lock+eip
+
 $(OBJ_DIR)/visss-data-acquisition.o: $(SRC_DIR)/visss-data-acquisition.cpp
 	$(CC) -I. $(INC_PATH) $(openCV) $(CXX_COMPILE_OPTIONS) $(COMMON_OPTIONS)  -c $< -o $@
 
