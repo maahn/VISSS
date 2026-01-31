@@ -62,12 +62,44 @@ TRIGGERINTERVALLFACTOR = 2  # data can be factor 2 older than interval
 
 
 def add_bool(self, node):
+    """
+    Add boolean constructor for YAML parsing.
+
+    Parameters
+    ----------
+    self : SafeConstructor
+        The YAML constructor instance.
+    node : yaml.Node
+        The YAML node to construct.
+
+    Returns
+    -------
+    bool
+        The constructed boolean value.
+    """
     return self.construct_scalar(node)
 SafeConstructor.add_constructor(u'tag:yaml.org,2002:bool', add_bool)
 
 
 def iter_except(function, exception):
-    """Works like builtin 2-argument `iter()`, but stops on `exception`."""
+    """
+    Iterate over a function until an exception occurs.
+
+    This function works like the built-in 2-argument `iter()`, but stops
+    when the specified exception is raised.
+
+    Parameters
+    ----------
+    function : callable
+        The function to call repeatedly.
+    exception : Exception
+        The exception type to catch and stop iteration on.
+
+    Yields
+    ------
+    Any
+        Results from calling the function.
+    """
     try:
         while True:
             yield function()
@@ -75,6 +107,18 @@ def iter_except(function, exception):
         return
 
 def writeHTML(file, status, color):
+    """
+    Write HTML status page.
+
+    Parameters
+    ----------
+    file : str
+        Path to the HTML file to write.
+    status : str
+        Status message to include in the HTML.
+    color : str
+        Background color for the HTML page.
+    """
     html = f"""
     <html>
     <meta http-equiv='refresh' content='60' />
@@ -87,6 +131,24 @@ def writeHTML(file, status, color):
         f.write(html)
 
 def convert2bool(var):
+    """
+    Convert various input types to boolean.
+
+    Parameters
+    ----------
+    var : str, int, bool
+        Value to convert to boolean.
+
+    Returns
+    -------
+    bool
+        Converted boolean value.
+
+    Raises
+    ------
+    ValueError
+        If the input cannot be converted to a boolean.
+    """
     if var in ['true', 'True', 1]:
         var = True
     elif var in ['false', 'False', 0]:
@@ -97,24 +159,120 @@ def convert2bool(var):
 
 
 class QueueHandler(logging.Handler):
-    """Class to send logging records to a queue
+    """
+    A logging handler that sends records to a queue.
 
-    It can be used from different threads
-    The ConsoleUi class polls this queue to display records in a ScrolledText widget
-    https://github.com/beenje/tkinter-logging-text-widget
+    This handler can be used from different threads. The ConsoleUi class
+    polls this queue to display records in a ScrolledText widget.
+
+    Attributes
+    ----------
+    log_queue : queue.Queue
+        The queue to send log records to.
     """
 
     def __init__(self, log_queue):
+        """
+        Initialize the QueueHandler.
+
+        Parameters
+        ----------
+        log_queue : queue.Queue
+            The queue to send log records to.
+        """
         super().__init__()
         self.log_queue = log_queue
 
     def emit(self, record):
+        """
+        Emit a log record to the queue.
+
+        Parameters
+        ----------
+        record : logging.LogRecord
+            The log record to emit.
+        """
         self.log_queue.put(record)
 
 
 class runCpp:
-    def __init__(self, parent, cameraConfig):
+    """
+    Class to manage a C++ data acquisition process.
 
+    This class handles starting/stopping the C++ process, monitoring its
+    output, and managing configuration files.
+
+    Attributes
+    ----------
+    parent : GUI
+        Reference to the parent GUI object.
+    cameraConfig : dict
+        Configuration dictionary for the camera.
+    configuration : dict
+        Global configuration dictionary.
+    settings : dict
+        Application settings.
+    hostname : str
+        Hostname of the machine.
+    rootpath : str
+        Root path of the application.
+    name : str
+        Name of the camera.
+    logger : logging.Logger
+        Logger for Python components.
+    loggerCpp : logging.Logger
+        Logger for C++ components.
+    logDir : str
+        Directory for log files.
+    lastImage : str
+        Path to the latest image file.
+    statusDir : str
+        Directory for status files.
+    statusHtmlFile : str
+        Path to the status HTML file.
+    log_queue : queue.Queue
+        Queue for log messages.
+    queue_handler : QueueHandler
+        Handler for queue-based logging.
+    log_handler : logging.handlers.TimedRotatingFileHandler
+        File handler for logging.
+    running : tk.StringVar
+        String variable for running status.
+    status : tk.StringVar
+        String variable for status message.
+    configFName : str
+        Path to the configuration file.
+    command : list
+        Command to execute the C++ program.
+    statusWidget : ttk.Label
+        Widget displaying status.
+    startStopButton : ttk.Button
+        Button to start/stop the process.
+    CleanButton : ttk.Button
+        Button to clean the camera.
+    runningWidget : ttk.Label
+        Widget displaying running status.
+    scrolled_text : tk.Text
+        Text widget for displaying process output.
+    serialPortWiper : str
+        Serial port for wiper device.
+    cleanThread : threading.Thread
+        Thread for checking cleanliness.
+    process : subprocess.Popen
+        Process object for the C++ program.
+    """
+
+    def __init__(self, parent, cameraConfig):
+        """
+        Initialize the runCpp class.
+
+        Parameters
+        ----------
+        parent : GUI
+            Reference to the parent GUI object.
+        cameraConfig : dict
+            Configuration dictionary for the camera.
+        """
         self.parent = parent
         self.cameraConfig = cameraConfig
 
@@ -276,6 +434,14 @@ class runCpp:
 
 
     def writeToStatusFile(self, status):
+        """
+        Write status information to a file.
+
+        Parameters
+        ----------
+        status : str
+            Status message to write.
+        """
         now = time.time()
         nowD = datetime.datetime.utcfromtimestamp(now)
         statusDir = (f'{self.statusDir}/{nowD.year}/'
@@ -303,7 +469,14 @@ class runCpp:
         return
 
     def witeParamFile(self):
+        """
+        Write parameter configuration file.
 
+        Returns
+        -------
+        bool
+            True if successful, False otherwise.
+        """
         if (('sshForwarding' in self.cameraConfig.keys()) and
          (self.cameraConfig['sshForwarding'] != "None")):
             fname = "%s4ssh"%self.configFName
@@ -338,6 +511,14 @@ class runCpp:
         return True
 
     def clickStartStop(self, autopilot=False):
+        """
+        Handle start/stop button clicks.
+
+        Parameters
+        ----------
+        autopilot : bool, optional
+            Whether the action was triggered by autopilot, by default False
+        """
         if self.running.get().startswith('Idle'):
             if autopilot:
                 self.logger.info('Autopilot starts camera')
@@ -354,7 +535,9 @@ class runCpp:
             pass
 
     def statusWatcher(self):
-
+        """
+        Watch external trigger status and respond accordingly.
+        """
         if np.any(self.parent.externalTriggerStatus):
             if self.running.get().startswith('Idle'):
                 self.logger.info('External trigger starts camera')
@@ -382,6 +565,14 @@ class runCpp:
             self.startStopButton.state(["disabled"])
 
     def start(self, command): 
+        """
+        Start the C++ data acquisition process.
+
+        Parameters
+        ----------
+        command : list
+            Command to execute the C++ program.
+        """
         self.running.set('Running: %s' % self.name) 
         self.logger.info('Start camera with %s' %command) 
 
@@ -405,7 +596,14 @@ class runCpp:
         self.update(q) # start update loop 
 
     def reader_thread(self, q): 
-        """Read subprocess output and put it into the queue.""" 
+        """
+        Read subprocess output and put it into the queue.
+
+        Parameters
+        ----------
+        q : queue.Queue
+            Queue to put output lines into.
+        """
         try: 
             with self.process.stdout as pipe:
                 for line in iter(pipe.readline, b''):
@@ -414,8 +612,14 @@ class runCpp:
             q.put(None)
 
     def update(self, q):
-        """Update GUI with items from the queue."""
+        """
+        Update GUI with items from the queue.
 
+        Parameters
+        ----------
+        q : queue.Queue
+            Queue containing log messages.
+        """
         for line in iter_except(q.get_nowait, Empty):  # display all content
             if line is None:
                 self.quit()
@@ -481,7 +685,14 @@ class runCpp:
         self.parent.mainframe.after(100, self.update, q)  # schedule next update
 
     def display(self, record):
+        """
+        Display a log record in the GUI.
 
+        Parameters
+        ----------
+        record : logging.LogRecord
+            The log record to display.
+        """
         #capture VISSS restarts
         if "Restarting VISSS" in record.getMessage():
             self.writeToStatusFile('start, cpp')
@@ -500,6 +711,9 @@ class runCpp:
         self.scrolled_text.yview(tk.END)
 
     def poll_log_queue(self):
+        """
+        Poll the log queue for new messages to display.
+        """
         # Check every 100ms if there is a new message in the queue to display
         while True:
             try:
@@ -511,6 +725,9 @@ class runCpp:
         self.parent.mainframe.after(100, self.poll_log_queue)
 
     def quit(self):
+        """
+        Gracefully quit the C++ process.
+        """
         try:
             # self.process.terminate()
             os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
@@ -526,6 +743,9 @@ class runCpp:
         self.CleanButton.state(["disabled"])
 
     def kill(self):
+        """
+        Force kill the C++ process.
+        """
         try:
             # self.process.kill() # exit subprocess if GUI is closed (zombie!)
             os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
@@ -541,6 +761,9 @@ class runCpp:
         self.CleanButton.state(["disabled"])
 
     def checkCleaniness(self):
+        """
+        Periodically check if the camera needs cleaning.
+        """
         revisitTime = 60
         while True:
             time.sleep(revisitTime)
@@ -577,6 +800,9 @@ class runCpp:
         return
 
     def clean(self):
+        """
+        Clean the camera using the wiper device.
+        """
         self.startStopButton.state(["disabled"])
         self.CleanButton.state(["disabled"])
         self.logger.info('Cleaning camera using port %s' %self.serialPortWiper) 
@@ -589,6 +815,9 @@ class runCpp:
             self.parent.root.after(5*1000, self.endClean)  # schedule restart
 
     def endClean(self):
+        """
+        Complete the cleaning process and restart if needed.
+        """
         self.logger.info('Done cleaning camera')
         if self.running.get().startswith('Idle'):
             self.start(self.command)
@@ -596,6 +825,14 @@ class runCpp:
         self.CleanButton.state(["!disabled"])
 
 def doClean(com_port):
+    """
+    Send cleaning command to the wiper device.
+
+    Parameters
+    ----------
+    com_port : str
+        Serial port to communicate with the wiper device.
+    """
     sendString= 'wipe'
     baudrate = 115200
     sendString = sendString+"\r\n"
@@ -605,10 +842,46 @@ def doClean(com_port):
     return
 
 class GUI(object):
-    def __init__(self, loglevel):
-            
-        self.rootpath  = os.path.dirname(os.path.abspath(__file__))
+    """
+    Main GUI class for VISSS data acquisition.
 
+    This class manages the graphical user interface, handles configuration
+    loading, and controls multiple camera processes.
+
+    Attributes
+    ----------
+    rootpath : str
+        Root path of the application.
+    loggerRoot : logging.Logger
+        Root logger for the application.
+    hostname : str
+        Hostname of the machine.
+    externalTriggerStatus : list
+        List of deques tracking external trigger status.
+    settings : dict
+        Application settings.
+    configuration : dict
+        Global configuration.
+    autopilot : tk.IntVar
+        Variable for autopilot state.
+    apps : list
+        List of runCpp instances.
+    root : tkinter.Tk
+        Main Tkinter window.
+    mainframe : ttk.Frame
+        Main frame container.
+    """
+
+    def __init__(self, loglevel):
+        """
+        Initialize the GUI class.
+
+        Parameters
+        ----------
+        loglevel : str
+            Logging level for the application.
+        """
+        self.rootpath  = os.path.dirname(os.path.abspath(__file__))
 
         logging.basicConfig(level=loglevel,
                             format=LOGFORMAT)
@@ -623,7 +896,6 @@ class GUI(object):
         self.settings = deepcopy(DEFAULTSETTINGS)
         self.settings.update(self.read_settings(SETTINGSFILE))
         # reset geometery if broken
-
 
         if self.settings['geometry'].startswith('1x1'):
             self.settings['geometry'] = DEFAULTSETTINGS['geometry']
@@ -667,7 +939,6 @@ class GUI(object):
         self.autopilot = tk.IntVar()
         self.apps = []
 
-
         if 'camera' in self.configuration.keys():
             for cameraConfig in self.configuration['camera']:
               
@@ -695,7 +966,6 @@ class GUI(object):
             
             writeHTML(self.triggerHtmlFile, 'no trigger', 'gray')
 
-
             self.externalTriggerStatus = []
             for ee, externalTrigger in enumerate(self.configuration['externalTrigger']):
 
@@ -714,18 +984,16 @@ class GUI(object):
 
                 self.loggerRoot.info('STARTING thread for %s trigger' % externalTrigger)
 
-
-
                 x = Thread(target=self.queryExternalTrigger, args=(
                     ee, trigger, triggerWidget,), kwargs=externalTrigger, daemon=True)
                 x.start()
 
         return
 
-
-
-
     def getSerialNumbers(self):
+        """
+        Get serial numbers of connected cameras.
+        """
         self.loggerRoot.debug('getting serial numbers')
 
         self.serialNumbers = {}
@@ -741,9 +1009,10 @@ class GUI(object):
         retval = p.wait()
         self.loggerRoot.info('got serial numbers: %s' % self.serialNumbers)
 
-
     def click_autopilot(self):
-
+        """
+        Handle autopilot checkbox toggle.
+        """
         self.save_settings(None)
         self.loggerRoot.info('Autopilot set to %s' % bool(self.autopilot.get()))
         for app in self.apps:
@@ -758,6 +1027,9 @@ class GUI(object):
                         self.externalTriggerStatus[0].append(True)
 
     def askopenfile(self):
+        """
+        Open file dialog to select configuration file.
+        """
         file = filedialog.askopenfilename(filetypes=[("YAML files", ".yaml")])
         if file is not None:
             self.settings['configFile'] = file
@@ -768,6 +1040,19 @@ class GUI(object):
             messagebox.showerror(title=None, message='File not found')
 
     def read_settings(self, fname):
+        """
+        Read settings from a YAML file.
+
+        Parameters
+        ----------
+        fname : str
+            Path to the settings file.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the settings.
+        """
         self.loggerRoot.info('read_settings: %s' % fname)
         if fname is None:
             return {}
@@ -784,11 +1069,18 @@ class GUI(object):
                 if k in settings.keys():
                     settings[k] = convert2bool(settings[k])
 
-
         self.loggerRoot.info('read_settings: %s' % settings)
         return settings
 
     def save_settings(self, event):
+        """
+        Save current settings to file.
+
+        Parameters
+        ----------
+        event : tkinter.Event
+            Tkinter event that triggered the save.
+        """
         # it is called to often event though window size is not changing
         if event is not None:
             if self.settings['geometry'] == self.root.geometry():
@@ -805,6 +1097,9 @@ class GUI(object):
         return
 
     def killall(self):
+        """
+        Kill all running processes and close the GUI.
+        """
         self.loggerRoot.info('Closing GUI')
         for app in self.apps:
             app.writeToStatusFile('terminate, user')
@@ -812,7 +1107,14 @@ class GUI(object):
         self.root.destroy()
 
     def sunIsUp(self):
+        """
+        Check if the sun is currently above the horizon.
 
+        Returns
+        -------
+        bool
+            True if sun altitude is >= 0, False otherwise.
+        """
         now = datetime.datetime.now(datetime.timezone.utc)
         longitude = self.configuration['longitude']
         latitude = self.configuration['latitude']
@@ -828,7 +1130,6 @@ class GUI(object):
 
         return self.sunAltitude >= 0
 
-
     def queryExternalTrigger(
         self,
         nn,
@@ -843,8 +1144,34 @@ class GUI(object):
         nBuffer,
         nightOnly,
     ):
+        """
+        Query external trigger status periodically.
 
-
+        Parameters
+        ----------
+        nn : int
+            Index of the trigger.
+        trigger : tk.StringVar
+            Variable to store trigger status.
+        triggerWidget : ttk.Label
+            Widget to display trigger status.
+        name : str
+            Name of the trigger.
+        address : str
+            Address to query for trigger data.
+        interval : int
+            Interval between queries in seconds.
+        threshold : float
+            Threshold value for trigger condition.
+        minMax : str
+            Comparison operator ('min' or 'max').
+        stopOnTimeout : bool
+            Whether to stop measurement on timeout.
+        nBuffer : int
+            Size of the trigger status buffer.
+        nightOnly : bool
+            Whether to only trigger during nighttime.
+        """
         if not bool(self.autopilot.get()):
             triggerWidget.config(background="gray")
             trigger.set('external trigger disabled')
@@ -888,7 +1215,6 @@ class GUI(object):
                 app.statusWatcher()
 
             return
-
 
         self.root.after(interval*1000, lambda: self.queryExternalTrigger(
             nn,
@@ -999,4 +1325,3 @@ if __name__ == '__main__':
     except Timeout:
         print("lock file error.")
         messagebox.showerror(title=None, message=f'VISSS data acqusition GUI alreaady running! Lock file: {lockfile}')
-
