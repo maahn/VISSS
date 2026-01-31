@@ -1,4 +1,22 @@
 #!/usr/bin/python
+"""
+Serial data logger for Sonic sensors.
+
+This script reads data from a serial port connected to a Sonic sensor and
+writes it to timestamped files in a specified directory.
+
+Attributes
+----------
+fpath : str
+    Directory path where raw data files are stored.
+fsuffix : str
+    File suffix for data files.
+com_port : str
+    Serial port device path.
+errorFname : str
+    Path to error log file.
+"""
+
 import datetime
 import time
 import os
@@ -15,15 +33,27 @@ fsuffix = "txt"
 
 
 if len(glob.glob('/dev/ttyUSB0'))==1:
-  com_port ='/dev/ttyUSB0'
+    com_port ='/dev/ttyUSB0'
 else:
-  com_port ='/dev/ttyS0'
+    com_port ='/dev/ttyS0'
 
 
 errorFname="/data/sonic_errors.txt"
 
-# to do: update checksum for thies sonic
 def checksum(st):
+    """
+    Calculate checksum for a string.
+
+    Parameters
+    ----------
+    st : str
+        Input string to calculate checksum for.
+
+    Returns
+    -------
+    str
+        Hexadecimal checksum string in uppercase.
+    """
     return hex(reduce(lambda x,y:x^y, map(ord, st)))[2:].upper()
 
 #make sure the clock is already set!
@@ -41,10 +71,10 @@ Day = today[6:8]
 
 #create/open file
 try:
-  #os.makedirs(fpath+"/"+yearMonth+"/")
-  os.makedirs(fpath)
+    #os.makedirs(fpath+"/"+yearMonth+"/")
+    os.makedirs(fpath)
 except OSError:
-  pass
+    pass
 
 # count = 0  
 # fname = fpath+"/"+yearMonth+Day+"_"+str(count)+"."+fsuffix
@@ -70,69 +100,63 @@ line = ""
 
 ##read data
 try:         
-  while True:
-    #item = item[1:-5] + "\r\n"
-    #item = "%s\r\n" % (p.stdout.readline()[1:-5],)
-    line = p.stdout.readline()
+    while True:
+        #item = item[1:-5] + "\r\n"
+        #item = "%s\r\n" % (p.stdout.readline()[1:-5],)
+        line = p.stdout.readline()
 
-    line = line.replace('\x02', "").replace('\x03', "")
+        line = line.replace('\x02', "").replace('\x03', "")
 
-    if p.poll() is not None:
-      #print(p.stderr.readline())
-      print(line)
-      raise SystemError("%s stopped"%" ".join(command))
-      break
-    #print(line)
-    
-    #no short lines
-    if len(line) < 5:
-      if len(line)>0: 
-        string =datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f")+"BAD DATA (Line too short):"+ repr(line)
-        print(string)           
-        errorFile.write(string+"\n")
-      continue
-     
-    #check checksum
-    if str(checksum(line[:-3])) != str(line[-3:-1]):
-      string =datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f")+"BAD DATA (wrong checksum):"+ repr(line)
-      print(string)   
-      errorFile.write(string+"\n")
-      continue
-    
-    item = "%s;%s" % (datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f"), line)
+        if p.poll() is not None:
+            #print(p.stderr.readline())
+            print(line)
+            raise SystemError("%s stopped"%" ".join(command))
+            break
+        #print(line)
+        
+        #no short lines
+        if len(line) < 5:
+            if len(line)>0: 
+                string =datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f")+"BAD DATA (Line too short):"+ repr(line)
+                print(string)           
+                errorFile.write(string+"\n")
+            continue
+        
+        #check checksum
+        if str(checksum(line[:-3])) != str(line[-3:-1]):
+            string =datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f")+"BAD DATA (wrong checksum):"+ repr(line)
+            print(string)   
+            errorFile.write(string+"\n")
+            continue
+        
+        item = "%s;%s" % (datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S%f"), line)
 
-    #if new day, first make new file! 
-    now = datetime.datetime.utcnow().strftime("%Y%m%d%H")
-    if now != today:
-      outFile.close()
-      today = now
-      yearMonth = today[:6]
-      Day = today[6:8]
-      try:
-        os.mkdir(fpath+"/")
-      except OSError:
-        pass
+        #if new day, first make new file! 
+        now = datetime.datetime.utcnow().strftime("%Y%m%d%H")
+        if now != today:
+            outFile.close()
+            today = now
+            yearMonth = today[:6]
+            Day = today[6:8]
+            try:
+                os.mkdir(fpath+"/")
+            except OSError:
+                pass
 
-      hour = today[8:10] 
-      fname = fpath+"/"+yearMonth+Day+"_"+hour+"."+fsuffix
+            hour = today[8:10] 
+            fname = fpath+"/"+yearMonth+Day+"_"+hour+"."+fsuffix
 
-      outFile = open(fname,"at+")
-      print(today, fname)
+            outFile = open(fname,"at+")
+            print(today, fname)
 
-    #write data
-    outFile.write(item)
+        #write data
+        outFile.write(item)
 
 except KeyboardInterrupt:
-   print("stopping...")
+    print("stopping...")
 
 finally:
-   #p.terminate()
-   outFile.close()
-   print("file closed")
-   errorFile.close()    
-    
-
-
-
-
-
+    #p.terminate()
+    outFile.close()
+    print("file closed")
+    errorFile.close()    
