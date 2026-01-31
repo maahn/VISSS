@@ -16,11 +16,11 @@ inFiles : list
 """
 
 import datetime
-import time
+import gzip
 import os
 import sys
+import time
 from subprocess import call
-import gzip
 
 ###settings
 fpath_in = "/data/temp/sonic/"
@@ -38,9 +38,9 @@ for inFile in inFiles:
         Name of the input file to process.
     """
     print(inFile)
-    fileopen = call(['lsof',  '-t', fpath_in+inFile])
+    fileopen = call(["lsof", "-t", fpath_in + inFile])
     if fileopen != 0:
-        print('gzipping file ', inFile)
+        print("gzipping file ", inFile)
 
         yearMonth = inFile[0:6]
         year = inFile[0:4]
@@ -48,22 +48,25 @@ for inFile in inFiles:
         day = inFile[6:8]
 
         try:
-            os.makedirs(fpath_out+"/"+year+"/")
+            os.makedirs(fpath_out + "/" + year + "/")
         except OSError:
             pass
         try:
-            os.makedirs(fpath_out+"/"+year+"/"+month)
+            os.makedirs(fpath_out + "/" + year + "/" + month)
         except OSError:
             pass
         try:
-            os.makedirs(fpath_out+"/"+year+"/"+month+"/"+day)
+            os.makedirs(fpath_out + "/" + year + "/" + month + "/" + day)
         except OSError:
             pass
 
-        f_in = open(fpath_in+inFile, 'rb')  
-        f_out = gzip.open(fpath_out + '/' + year + '/' + month + '/' + day + '/' + inFile + '.gz', 'wb')
+        f_in = open(fpath_in + inFile, "rb")
+        f_out = gzip.open(
+            fpath_out + "/" + year + "/" + month + "/" + day + "/" + inFile + ".gz",
+            "wb",
+        )
         f_out.writelines(f_in)
         f_out.close()
-        os.remove(fpath_in+inFile)
+        os.remove(fpath_in + inFile)
     else:
         print(inFile, " still open")
