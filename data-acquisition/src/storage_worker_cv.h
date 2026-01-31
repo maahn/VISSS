@@ -162,8 +162,16 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp) {
   strftime(timestampStr, 80, "%Y%m%d-%H%M%S", t);
 
   fMeta_ << "# VISSS file format version: 0.6" << "\n";
-  fMeta_ << "# VISSS git tag: " << GIT_TAG  << "\n";
+#ifdef GIT_TAG
+  fMeta_ << "# VISSS git tag: " << GIT_TAG << "\n";
+#else
+  fMeta_ << "# VISSS git tag: unknown\n";
+#endif
+#ifdef GIT_BRANCH
   fMeta_ << "# VISSS git branch: " << GIT_BRANCH << "\n";
+#else
+  fMeta_ << "# VISSS git branch: unknown\n";
+#endif
   fMeta_ << "# Camera reset time: " << timestampStr << "\n";
   fMeta_ << "# us since epoche: " << timestamp << "\n";
   fMeta_ << "# Camera serial number: " << DeviceIDMeta << "\n";
