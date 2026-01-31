@@ -1402,12 +1402,11 @@ int main(int argc, char *argv[]) {
       // GVSP packet size.
       camOptions.streamPktDelay =
           10; // Add usecs between packets to pace arrival at NIC.
+#endif
       // Assign specific CPUs to threads (affinity) - if required for better
       // performance.
-      {
-#endif
-      camOptions.streamThreadAffinity = 2 * followermode1 + 2;
-      camOptions.serverThreadAffinity = 2 * followermode1 + 3;
+      camOptions.streamThreadAffinity = cpu_stream;
+      camOptions.serverThreadAffinity = cpu_server;
 
       std::cout << "DEBUG | " << get_timestamp() << "| "
                 << "Configuring Camera " << std::endl;
@@ -1547,7 +1546,29 @@ int main(int argc, char *argv[]) {
         context.base_name = output;
         context.exit = false;
 
-        pthread_create(&tid, NULL, ImageCaptureThread, &context);
+        // Set thread affinity for ImageCaptureThread if cpu_other is specified
+        if (cpu_other > -1) {
+          pthread_attr_t attr;
+          struct sched_param param;
+          
+          pthread_attr_init(&attr);
+          pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
+          
+          param.sched_priority = 0;
+          pthread_attr_setschedparam(&attr, &param);
+          pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+          
+          // Set CPU affinity
+          cpu_set_t cpuset;
+          CPU_ZERO(&cpuset);
+          CPU_SET(cpu_other, &cpuset);
+          pthread_attr_setaffinity_np(&attr, sizeof(cpuset), &cpuset);
+          
+          pthread_create(&tid, &attr, ImageCaptureThread, &context);
+          pthread_attr_destroy(&attr);
+        } else {
+          pthread_create(&tid, NULL, ImageCaptureThread, &context);
+        }
 
         // Call the main command loop or the example.
         PrintMenu();
