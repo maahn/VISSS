@@ -504,3 +504,31 @@ std::string formatUnixTimeMicros(int64_t unixTimeMicros) {
 
   return oss.str();
 }
+
+
+// Initialize with defaults                                                                                                                                                                                    
+int cpu_server = -1;                                                                                                                                                                                           
+int cpu_stream = -1;                                                                                                                                                                                           
+int cpu_other = -1;  
+std::vector<int> cpu_storage_list = {-1,-1};  
+std::vector<int> cpu_ffmpeg_list = {-1,-1};   
+ 
+
+// Add the string-to-list conversion logic:                                                                                                                                                                    
+// Convert string to vector of integers for cpu_storage and cpu_ffmpeg                                                                                                                                         
+auto parse_cpu_list = [](const std::string& str) -> std::vector<int> {                                                                                                                                         
+    std::vector<int> result;                                                                                                                                                                                   
+    if (str.empty() || str == "-1") return result;                                                                                                                                                             
+                                                                                                                                                                                                               
+    std::stringstream ss(str);                                                                                                                                                                                 
+    std::string item;                                                                                                                                                                                          
+    while (std::getline(ss, item, ',')) {                                                                                                                                                                      
+        try {                                                                                                                                                                                                  
+            result.push_back(std::stoi(item));                                                                                                                                                                 
+        } catch (...) {                                                                                                                                                                                        
+            // Handle invalid entries gracefully                                                                                                                                                               
+        }                                                                                                                                                                                                      
+    }                                                                                                                                                                                                          
+    return result;                                                                                                                                                                                             
+};                                                                                                                                                                                                             
+      

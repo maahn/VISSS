@@ -106,7 +106,11 @@ const char *params =
     "Config file must be present but does not matter }"
     "{ name n            | VISSS             | camera name }"
     "{ threads t         | 1                 | number of storage threads }"
-    "{ @config           | <none>            | camera configuration file }"
+    "{ cpuserver         | -1                | CPU server thread affinity }"                                                                                                                                   
+    "{ cpustream         | -1                | CPU stream thread affinity }"                                                                                                                                   
+    "{ cpustorage        | -1,-1             | CPU storage thread affinity }"                                                                                                                                  
+    "{ cpuother          | -1                | CPU other thread affinity }"                                                                                                                                    
+    "{ cpuffmpeg         | -1,-1             | CPU ffmpeg thread affinity }"      "{ @config           | <none>            | camera configuration file }"
     "{ @camera           | <none>            | camera IP }";
 
 // ====================================
@@ -807,6 +811,7 @@ int main(int argc, char *argv[]) {
   int followermode1;
   int rotate1;
   int minBrightnessChange;
+  std::string cpu_storage_str, cpu_ffmpeg_str;
   FILE *fp = NULL;
   FILE *fp2 = NULL;
   // char uniqueName[FILENAME_MAX];
@@ -984,6 +989,27 @@ int main(int argc, char *argv[]) {
   resetDHCP = parser.has("resetDHCP");
   std::cout << "DEBUG | " << get_timestamp() << " | PARSER: reset " << resetDHCP
             << std::endl;
+
+  // Add parsing of the new parameters after the existing parameter parsing:                                                                                                                                     
+  cpu_server = parser.get<int>("cpuserver");                                                                                                                                                                     
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: cpuserver " << cpu_server
+            << std::endl;
+  cpu_stream = parser.get<int>("cpustream");                                                                                                                                                                     
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: cpustream " << cpu_stream
+            << std::endl;
+  cpu_other = parser.get<int>("cpuother");                                                                                                                                                                       
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: cpuother " << cpu_other
+            << std::endl;
+  cpu_storage_str = parser.get<std::string>("cpustorage");                                                                                                                                                       
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: cpustorage " << cpu_storage_str
+            << std::endl;
+  cpu_ffmpeg_str = parser.get<std::string>("cpuffmpeg");                                                                                                                                                         
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: cpuffmpeg " << cpu_ffmpeg_str
+            << std::endl;
+     
+  cpu_storage_list = parse_cpu_list(cpu_storage_str);                                                                                                                                           
+  cpu_ffmpeg_list = parse_cpu_list(cpu_ffmpeg_str);                                                                                                                                             
+ 
 
   gethostname(hostname, HOST_NAME_MAX);
 
@@ -1379,13 +1405,10 @@ int main(int argc, char *argv[]) {
       // Assign specific CPUs to threads (affinity) - if required for better
       // performance.
       {
-        int numCpus = _GetNumCpus();
-        if (numCpus > 1) {
-          camOptions.streamThreadAffinity = 2 * followermode1 + 2;
-          camOptions.serverThreadAffinity = 2 * followermode1 + 3;
-        }
-      }
 #endif
+      camOptions.streamThreadAffinity = 2 * followermode1 + 2;
+      camOptions.serverThreadAffinity = 2 * followermode1 + 3;
+
       std::cout << "DEBUG | " << get_timestamp() << "| "
                 << "Configuring Camera " << std::endl;
       // Write the adjusted interface options back.
