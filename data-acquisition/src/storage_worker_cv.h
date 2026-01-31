@@ -223,9 +223,6 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) {
   // writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc
   // speed-preset=veryfast mb-tree=true me=dia analyse=i8x8 rc-lookahead=20
   // subme=1 ! queue ! qtmux !  filesink location=video-h264_lookahead20.mkv",
-  // writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc
-  // speed-preset=superfast rc-lookahead=80 subme=2 ! queue ! qtmux !  filesink
-  // location=video-h264_lookahead80a_subme2.mkv",
   //                             cv::CAP_GSTREAMER, 0, fps_, frame_size_,
   //                             is_color_);
   //
@@ -366,7 +363,26 @@ void storage_worker_cv::run()
 {
 
   int result;
-  result = nice(10); // realtive to main thread!
+  // Set CPU affinity for storage worker thread if cpu_storage_list is available
+  if (!cpu_storage_list.empty() && cpu_storage_list.size() > id_) {
+    int cpu_id = cpu_storage_list[id_];
+    if (cpu_id >= 0) {
+      cpu_set_t cpuset;
+      CPU_ZERO(&cpuset);
+      CPU_SET(cpu_id, &cpuset);
+      result = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
+      if (result != 0) {
+        PrintThread{} << "WARNING-" << id_ << " | " << get_timestamp()
+                      << " | Failed to set CPU affinity for storage worker "
+                      << id_ << std::endl;
+      } else {
+        PrintThread{} << "INFO-" << id_ << " | " << get_timestamp()
+                      << " | Set CPU affinity for storage worker " << id_
+                      << " to CPU " << cpu_id << std::endl;
+      }
+    }
+  }
+  result = nice(10); // relative to main thread!
 
   unsigned long last_timestamp = 0;
 
