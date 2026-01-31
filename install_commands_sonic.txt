@@ -14,7 +14,7 @@ D) check with:
 dmesg
 
 E) ignore the make install, install with
-sudo cp ax99100.ko /lib/modules/`uname -r`/kernel/drivers/tty/serial
+sudo cp ax99100.ko /lib/modules/$(uname -r)/kernel/drivers/tty/serial
 sudo depmod
 
 F) reboot 
@@ -34,5 +34,5 @@ sudo usermod -a -G dialout visss
 ln -s /home/visss/VISSS/scripts/sonic_logger.desktop /home/visss/.config/autostart/
 
 
-3) add cronjob for gzip cpmpression:
+3) add cronjob for gzip compression:
 2 1 * * * python3 /home/visss/VISSS/sonic/sonic_gzip_files.py /data/sail/sonic
