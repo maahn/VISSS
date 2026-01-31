@@ -201,7 +201,15 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) {
   create_filename(timestamp);
 
   if (storeVideo) {
-    std::string ffmpegCommand = "ffmpeg -loglevel warning -y -f rawvideo ";
+    std::string ffmpegCommand = "";
+    // Add taskset command if CPU affinity is set                                   
+    if (!cpu_ffmpeg_list.empty() && cpu_ffmpeg_list.size() > id_) {                 
+      std::string cpu_id = cpu_ffmpeg_list[id_];   
+      if (cpu_id != "-1") {                   
+        ffmpegCommand += "taskset -c " + cpu_id + " ";              
+      }                                    
+    }        
+    ffmpegCommand += "ffmpeg -loglevel warning -y -f rawvideo ";
     ffmpegCommand += "-vcodec rawvideo -framerate ";
     ffmpegCommand += std::to_string(fps_);
     ffmpegCommand += " -pix_fmt gray -s ";
@@ -365,7 +373,20 @@ void storage_worker_cv::run()
   int result;
   // Set CPU affinity for storage worker thread if cpu_storage_list is available
   if (!cpu_storage_list.empty() && cpu_storage_list.size() > id_) {
-    int cpu_id = cpu_storage_list[id_];
+    std::string cpu_str = cpu_storage_list[id_];                                                                                                                                                                   
+    int cpu_id = -1;                                                                                                                                                                                               
+    if (cpu_str != "-1") {                                                                                                                                                                                         
+        try {                                                                                                                                                                                                      
+            cpu_id = std::stoi(cpu_str);                                                                                                                                                                           
+        } catch (...) {                                                                                                                                                                                            
+            // Handle invalid conversion                                                                                                                                                                           
+            std::cerr << "FATAL ERROR" << id_ << " | " << get_timestamp()
+                      << " | Cannot convert cpu_storage to int"
+                      << std::endl;
+            global_error = true;
+            cpu_id = -1;
+            }                                                                                                                                                                                                          
+    }                                                                                                                                                                                                              
     if (cpu_id >= 0) {
       cpu_set_t cpuset;
       CPU_ZERO(&cpuset);

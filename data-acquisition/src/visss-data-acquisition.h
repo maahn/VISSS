@@ -468,7 +468,7 @@ std::mutex PrintThread::_mutexPrint{};
  */
 using time_point = std::chrono::system_clock::time_point;
 std::string serializeTimePoint(const time_point &time,
-                               const std::string &format) {
+  const std::string &format) {
   std::time_t tt = std::chrono::system_clock::to_time_t(time);
   std::tm tm = *std::gmtime(&tt); // GMT (UTC)
   // std::tm tm = *std::localtime(&tt); //Locale time-zone, usually UTC by
@@ -506,29 +506,23 @@ std::string formatUnixTimeMicros(int64_t unixTimeMicros) {
 }
 
 
-// Initialize with defaults                                                                                                                                                                                    
-int cpu_server = -1;                                                                                                                                                                                           
-int cpu_stream = -1;                                                                                                                                                                                           
+// Initialize with defaults      
+int cpu_server = -1;             
+int cpu_stream = -1;             
 int cpu_other = -1;  
-std::vector<int> cpu_storage_list = {-1,-1};  
-std::vector<int> cpu_ffmpeg_list = {-1,-1};   
- 
+std::vector<std::string> cpu_storage_list = {"-1","-1"};  
+std::vector<std::string> cpu_ffmpeg_list = {"-1","-1"};  
 
-// Add the string-to-list conversion logic:                                                                                                                                                                    
-// Convert string to vector of integers for cpu_storage and cpu_ffmpeg                                                                                                                                         
-auto parse_cpu_list = [](const std::string& str) -> std::vector<int> {                                                                                                                                         
-    std::vector<int> result;                                                                                                                                                                                   
+// Add the string-to-list conversion logic:                   
+// Convert string to vector of integers for cpu_storage and cpu_ffmpeg                     
+auto parse_cpu_list = [](const std::string& str) -> std::vector<std::string> {                                                                                                                                 
+    std::vector<std::string> result;                                                                                                                                                                           
     if (str.empty() || str == "-1") return result;                                                                                                                                                             
                                                                                                                                                                                                                
     std::stringstream ss(str);                                                                                                                                                                                 
     std::string item;                                                                                                                                                                                          
-    while (std::getline(ss, item, ',')) {                                                                                                                                                                      
-        try {                                                                                                                                                                                                  
-            result.push_back(std::stoi(item));                                                                                                                                                                 
-        } catch (...) {                                                                                                                                                                                        
-            // Handle invalid entries gracefully                                                                                                                                                               
-        }                                                                                                                                                                                                      
+    while (std::getline(ss, item, '@')) {                                                                                                                                                                      
+        result.push_back(item);                                                                                                                                                                                
     }                                                                                                                                                                                                          
     return result;                                                                                                                                                                                             
-};                                                                                                                                                                                                             
-      
+};    

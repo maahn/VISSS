@@ -399,9 +399,9 @@ class runCpp:
             f"--CPUNIC={self.cameraConfig['cpunic']}",
             f"--CPUSERVER={self.cameraConfig['cpuserver']}",
             f"--CPUSTREAM={self.cameraConfig['cpustream']}",
-            f"--CPUSTORAGE={','.join(map(str, self.cameraConfig['cpustorage']))}",
+            f"--CPUSTORAGE={'@'.join(map(str, self.cameraConfig['cpustorage']))}",
             f"--CPUOTHER={self.cameraConfig['cpuother']}",
-            f"--CPUFFMPEG={','.join(self.cameraConfig['cpuffmpeg'])}",
+            f"--CPUFFMPEG={'@'.join(self.cameraConfig['cpuffmpeg'])}",
         ]
         print(self.command)
         frame1 = ttk.Frame(self.parent.mainframe)
