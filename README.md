@@ -42,7 +42,7 @@ This repository contains the VISSS data acquisition software. Please see also
   in data acquisition immediately 
 * .mov file sometimes broken if it contains only a single frame
 
-#### 0.2.1
+### 0.2.1
 * Using ffmpeg pipe instead of opencv videowriter. Gives better thread control 
   does not require custom patched opencv version any more. 
 
@@ -60,7 +60,7 @@ This repository contains the VISSS data acquisition software. Please see also
 #### known bugs
 * C++ restart after camera failure not reported in status file leading to capture_id reset no beeing handled properly (fixed on 14 April 2023)
 
-#### 0.3.2
+### 0.3.2
 * For deployments in 24/25 and after
 * Store internal camera temperature as status information
 
