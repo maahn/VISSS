@@ -53,9 +53,9 @@ DEFAULTCAMERA = {
     "cpu_nic": -1,
     "cpu_server": -1,
     "cpu_stream": -1,
-    "cpu_storage": [-1],
+    "cpu_storage": [-1,-1],
     "cpu_other": -1,
-    "cpu_ffmpeg": ["-1"],
+    "cpu_ffmpeg": ["-1", "-1"],
 }
 
 LOGFORMAT = "%(asctime)s: %(levelname)s: %(name)s:%(message)s"
@@ -393,6 +393,12 @@ class runCpp:
             f"--QUERYGAIN={int(self.configuration['querygain'])}",
             f"--ROTATEIMAGE={int(self.configuration['rotateimage'])}",
             f"--MINBRIGHT={self.configuration['minBrightchange']}",
+            f"--CPUNIC={self.cameraConfig['cpu_nic']}",
+            f"--CPUSERVER={self.cameraConfig['cpu_server']}",
+            f"--CPUSTREAM={self.cameraConfig['cpu_stream']}",
+            f"--CPUSTORAGE={','.join(map(str, self.cameraConfig['cpu_storage']))}",
+            f"--CPUOTHER={self.cameraConfig['cpu_other']}",
+            f"--CPUFFMPEG={','.join(self.cameraConfig['cpu_ffmpeg'])}",
         ]
         print(self.command)
         frame1 = ttk.Frame(self.parent.mainframe)

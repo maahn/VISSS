@@ -70,6 +70,24 @@ while [ $# -gt 0 ]; do
     --SETTINGS=*)
       SETTINGS="${1#*=}"
       ;;
+    --CPUNIC=*)
+      CPUNIC="${1#*=}"
+      ;;
+    --CPUSERVER=*)
+      CPUSERVER="${1#*=}"
+      ;;
+    --CPUSTREAM=*)
+      CPUSTREAM="${1#*=}"
+      ;;
+    --CPUSTORAGE=*)
+      CPUSTORAGE="${1#*=}"
+      ;;
+    --CPUOTHER=*)
+      CPUOTHER="${1#*=}"
+      ;;
+    --CPUFFMPEG=*)
+      CPUFFMPEG="${1#*=}"
+      ;;
     *)
       printf "***************************\n"
       printf "* Error: Invalid argument.*\n"
@@ -132,7 +150,7 @@ fi
 for (( ; ; ))
 do
   /bin/sleep 1
-	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -p=$NOPTP -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT $CAMERACONFIG $IP"
+	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -p=$NOPTP -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT -c=$CPUNIC -v=$CPUSERVER -m=$CPUSTREAM -u=$CPUSTORAGE -h=$CPUOTHER -j=$CPUFFMPEG $CAMERACONFIG $IP"
 	/bin/echo "BASH $COMMAND"
 	if $COMMAND
 			then
