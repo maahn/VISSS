@@ -47,7 +47,16 @@ DEFAULTSETTINGS = {
     "configFile": None,
     "autopilot": False,
 }
-DEFAULTCAMERA = {"rotateimage": False, "noptp": False}
+DEFAULTCAMERA = {
+    "rotateimage": False,
+    "noptp": False,
+    "cpu_nic": -1,
+    "cpu_server": -1,
+    "cpu_stream": -1,
+    "cpu_storage": [-1],
+    "cpu_other": -1,
+    "cpu_ffmpeg": ["-1"],
+}
 
 LOGFORMAT = "%(asctime)s: %(levelname)s: %(name)s:%(message)s"
 TRIGGERINTERVALLFACTOR = 2  # data can be factor 2 older than interval
