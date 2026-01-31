@@ -340,6 +340,24 @@ void *ImageCaptureThread(void *context) {
     int tt = 0;
     long skipCounter = 0;
 
+    int result;
+    if (cpu_other >= 0) {
+      cpu_set_t cpuset;
+      CPU_ZERO(&cpuset);
+      CPU_SET(cpu_other, &cpuset);
+      result = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
+      if (result != 0) {
+        PrintThread{} << "WARNING | " << get_timestamp()
+                      << " | Failed to set CPU affinity for ImageCaptureThread "
+                      << std::endl;
+      } else {
+        PrintThread{} << "INFO | " << get_timestamp()
+                      << " | Set CPU affinity for ImageCaptureThread" 
+                      << " to CPU " << cpu_other << std::endl;
+      }
+    }
+
+
     // The synchronized queues, one per video source/storage worker pair
     std::vector<frame_queue> queue(nStorageThreads);
 
@@ -1395,8 +1413,7 @@ int main(int argc, char *argv[]) {
       camOptions.streamFrame_timeout_ms =
           2001; // Internal timeout for frame reception.
       camOptions.streamNumFramesBuffered = 200; // Buffer frames internally.
-      camOptions.streamMemoryLimitMax =
-          100 * 8 * 2064 * 1544; // Adjust packet memory buffering limit.
+      camOptions.streamMemoryLimitMax = 2147483647;  // max int. Adjust packet memory buffering limit.
       // camOptions.streamPktSize = 8960;                            // Adjust
       // the GVSP packet size. camOptions.streamPktSize = 8960-1; // Adjust the
       // GVSP packet size.
@@ -1407,6 +1424,12 @@ int main(int argc, char *argv[]) {
       // performance.
       camOptions.streamThreadAffinity = cpu_stream;
       camOptions.serverThreadAffinity = cpu_server;
+      PrintThread{} << "INFO | " << get_timestamp()
+                    << " | Set CPU affinity for streamThread" 
+                    << " to CPU " << cpu_stream << std::endl;
+      PrintThread{} << "INFO | " << get_timestamp()
+                    << " | Set CPU affinity for serverThread" 
+                    << " to CPU " << cpu_server << std::endl;
 
       std::cout << "DEBUG | " << get_timestamp() << "| "
                 << "Configuring Camera " << std::endl;
@@ -1546,29 +1569,8 @@ int main(int argc, char *argv[]) {
         context.base_name = output;
         context.exit = false;
 
-        // Set thread affinity for ImageCaptureThread if cpu_other is specified
-        if (cpu_other > -1) {
-          pthread_attr_t attr;
-          struct sched_param param;
-          
-          pthread_attr_init(&attr);
-          pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
-          
-          param.sched_priority = 0;
-          pthread_attr_setschedparam(&attr, &param);
-          pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-          
-          // Set CPU affinity
-          cpu_set_t cpuset;
-          CPU_ZERO(&cpuset);
-          CPU_SET(cpu_other, &cpuset);
-          pthread_attr_setaffinity_np(&attr, sizeof(cpuset), &cpuset);
-          
-          pthread_create(&tid, &attr, ImageCaptureThread, &context);
-          pthread_attr_destroy(&attr);
-        } else {
-          pthread_create(&tid, NULL, ImageCaptureThread, &context);
-        }
+        pthread_create(&tid, NULL, ImageCaptureThread, &context);
+
 
         // Call the main command loop or the example.
         PrintMenu();

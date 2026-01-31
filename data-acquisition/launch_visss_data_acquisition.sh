@@ -158,7 +158,7 @@ if [ $CPUNIC -ne -1 ]; then
     for irq in "${IRQs[@]}"; do
         MASK=$(cpu_list_to_mask $CPUNIC)
         echo "BASH Pinning IRQ $irq to CPU $CPUNIC (mask $MASK)"
-        echo $MASK | sudo tee /proc/irq/$irq/smp_affinity
+        echo $MASK | sudo tee /proc/irq/$irq/smp_affinity > /dev/null
     done
 fi
 

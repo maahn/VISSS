@@ -47,6 +47,8 @@
 
 #include <ctime>
 #include <sstream>
+#include <fcntl.h>   // For fcntl and F_SETPIPE_SZ / F_GETPIPE_SZ
+
 
 // ============================================================================
 /**

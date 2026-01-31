@@ -79,7 +79,7 @@ private:
 
   // cv::VideoWriter writer_;
   FILE *pipeout;
-
+  int fd;
   /**
    * @brief Add metadata to output file
    * @param timestamp Timestamp for metadata
@@ -206,7 +206,7 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) {
     if (!cpu_ffmpeg_list.empty() && cpu_ffmpeg_list.size() > id_) {                 
       std::string cpu_id = cpu_ffmpeg_list[id_];   
       if (cpu_id != "-1") {                   
-        ffmpegCommand += "taskset -c " + cpu_id + " ";              
+        ffmpegCommand += "chrt -r 1 taskset -c " + cpu_id + " ";              
       }                                    
     }        
     ffmpegCommand += "ffmpeg -loglevel warning -y -f rawvideo ";
@@ -221,6 +221,16 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) {
     ffmpegCommand += " " + filename_ + ".mkv";
 
     pipeout = popen(ffmpegCommand.data(), "w");
+    fd = fileno(pipeout);
+    if (pipeout) {
+    int fd = fileno(pipeout);
+    // Set pipe to 128MB. If this returns < 0, check errno.
+    if (fcntl(fd, F_SETPIPE_SZ, 134217728) < 0) {
+        PrintThread{} << "ERROR-" << id_ << " | " << get_timestamp() << " | Could "
+                  << "not set pipe size" << std::endl;
+                  global_error = true;
+    }
+    }
     // writer_.open(filename_ + ".mkv", cv::CAP_FFMPEG, fourcc_, fps_,
     // frame_size_, is_color_);
     PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Started "
@@ -614,7 +624,7 @@ void storage_worker_cv::run()
           if (storeVideo) {
             // writer_.write(imgWithMeta);
             size_t sizeInBytes = imgWithMeta.step[0] * imgWithMeta.rows;
-            fwrite(imgWithMeta.data, 1, sizeInBytes, pipeout);
+            write(fd,imgWithMeta.data, sizeInBytes);
             fileUsed = true;
           }
           if (storeMeta) {
