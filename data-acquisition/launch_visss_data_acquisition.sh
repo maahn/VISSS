@@ -137,6 +137,31 @@ then
 	/bin/sleep 25
 fi
 
+# Pin NIC IRQs if CPUNIC is set
+if [ $CPUNIC -ne -1 ]; then
+    echo "BASH Pinning NIC $INTERFACE IRQs to CPU $CPUNIC"
+    
+    # Function to convert CPU list to hex mask
+    cpu_list_to_mask() {
+        local cpus=("$@")
+        local mask=0
+        for cpu in "${cpus[@]}"; do
+            mask=$((mask | (1 << cpu)))
+        done
+        printf "%x" $mask
+    }
+
+    # Get all IRQs for the interface
+    IRQs=($(grep -w "$INTERFACE" /proc/interrupts | awk -F: '{print $1}' | tr -d ' '))
+    
+    # Pin each IRQ to the specified CPU core
+    for irq in "${IRQs[@]}"; do
+        MASK=$(cpu_list_to_mask $CPUNIC)
+        echo "BASH Pinning IRQ $irq to CPU $CPUNIC (mask $MASK)"
+        echo $MASK | sudo tee /proc/irq/$irq/smp_affinity
+    done
+fi
+
 if ping -c 1 $IP > /dev/null
 	then
 	:
@@ -146,11 +171,10 @@ else
 	/usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0
 fi
 
-
 for (( ; ; ))
 do
   /bin/sleep 1
-	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -p=$NOPTP -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT -c=$CPUNIC -v=$CPUSERVER -m=$CPUSTREAM -u=$CPUSTORAGE -h=$CPUOTHER -j=$CPUFFMPEG $CAMERACONFIG $IP"
+	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -p=$NOPTP -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT  $CAMERACONFIG $IP"
 	/bin/echo "BASH $COMMAND"
 	if $COMMAND
 			then
