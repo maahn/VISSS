@@ -1,5 +1,14 @@
 //============================================================================
 
+/**
+ * @file visss-data-acquisition-dryrun.cpp
+ * @brief Dry-run data acquisition program for VISSS system
+ * 
+ * This file contains the main implementation for the VISSS data acquisition
+ * system in dry-run mode, which processes video files instead of live camera
+ * data.
+ */
+
 #include "visss-data-acquisition.h"
 //============================================================================
 
@@ -10,8 +19,33 @@
 // using namespace cv;
 // using namespace std;
 
+/**
+ * @brief OpenCV window name for live preview
+ */
 #define OPENCV_WINDOW_NAME "VISSS Live Image"
 
+/**
+ * @brief Command line parameters for the dry-run application
+ * 
+ * Supported parameters:
+ * - help (-h): Print usage
+ * - output (-o): Output Path
+ * - site (-s): Site string
+ * - encoding (-e): ffmpeg encoding options with '@' replacing ' '
+ * - liveratio (-l): Every Xth frame will be displayed in the live window
+ * - fps (-f): Frames per seconds of output
+ * - newfileinterval (-i): Write new file every ?s. Set to 0 to deactivate
+ * - maxframes (-m): Stop after this many frames (for debugging)
+ * - writeallframes (-w): Write all frames whether sth is moving or not (for debugging)
+ * - followermode (-d): Do not complain about camera timeouts
+ * - nopreview: No preview window
+ * - minBrightChange (-b): Minimum brightness change to start recording [20,30]
+ * - querygain (-q): Query gain and brightness [0,1]
+ * - novideo: Do not store video data
+ * - nometadata: Do not store meta data
+ * - threads (-t): Number of storage threads
+ * - videofile: Video input file
+ */
 const char *params =
     "{ help h            |                   | Print usage }"
     "{ output o          | ./                | Output Path }"
@@ -40,6 +74,10 @@ const char *params =
 
 // ====================================
 
+/**
+ * @brief Get a character from standard input
+ * @return Character input from user
+ */
 char GetKey() {
   char key = getchar();
   while ((key == '\r') || (key == '\n')) {
@@ -48,6 +86,9 @@ char GetKey() {
   return key;
 }
 
+/**
+ * @brief Print menu instructions to user
+ */
 void PrintMenu() {
   std::cout << "***************************************************************"
                "***********"
@@ -58,6 +99,9 @@ void PrintMenu() {
             << std::endl;
 }
 
+/**
+ * @brief Context structure for image capture thread
+ */
 typedef struct tagMY_CONTEXT {
   cv::VideoCapture fileHandle;
   std::string csvFile;
@@ -71,6 +115,11 @@ typedef struct tagMY_CONTEXT {
   bool exit;
 } MY_CONTEXT, *PMY_CONTEXT;
 
+/**
+ * @brief Image capture thread function
+ * @param context Pointer to capture context
+ * @return NULL pointer
+ */
 void *ImageCaptureThread(void *context) {
   MY_CONTEXT *captureContext = (MY_CONTEXT *)context;
   bool was_active = false;
@@ -303,6 +352,12 @@ void *ImageCaptureThread(void *context) {
   pthread_exit(0);
 }
 
+/**
+ * @brief Main entry point for the dry-run data acquisition program
+ * @param argc Number of command line arguments
+ * @param argv Array of command line arguments
+ * @return Exit status
+ */
 int main(int argc, char **argv) {
   cv::String videoFileIn;
   std::string videoFileInRaw;

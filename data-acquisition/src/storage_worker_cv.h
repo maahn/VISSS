@@ -1,12 +1,36 @@
-
+/**
+ * @file storage_worker_cv.h
+ * @brief Storage worker class for OpenCV video processing
+ * 
+ * This file contains the declaration and implementation of the storage_worker_cv
+ * class, which handles storing video frames and metadata to disk using FFmpeg
+ * and managing the storage process in a separate thread.
+ */
 
 // ============================================================================
 // https://stackoverflow.com/questions/37140643/how-to-save-two-cameras-data-but-not-influence-their-picture-acquire-speed/37146523
 
 // ============================================================================
 
+/**
+ * @brief Storage worker class for OpenCV video processing
+ * 
+ * This class handles storing video frames and metadata to disk using FFmpeg
+ * and managing the storage process in a separate thread.
+ */
 class storage_worker_cv {
 public:
+  /**
+   * @brief Constructor
+   * @param queue Reference to the frame queue
+   * @param id Worker ID
+   * @param path Output path
+   * @param fourcc Four-character code for video codec
+   * @param fps Frames per second
+   * @param frame_size Size of frames
+   * @param is_color Whether frames are color
+   * @param live_window_frame_ratio Ratio for live window display
+   */
   storage_worker_cv(
       frame_queue &queue, int id, std::string path, int32_t fourcc, double fps,
       cv::Size frame_size,
@@ -16,8 +40,15 @@ public:
       // , std::chrono::time_point<std::chrono::system_clock> t_reset
       ,
       int live_window_frame_ratio);
+  /**
+   * @brief Run method - main execution loop
+   */
   void run();
 
+  /**
+   * @brief Get total time in milliseconds
+   * @return Total time spent in storage operations
+   */
   double total_time_ms() const { return total_time_ / 1000.0; }
 
 private:
@@ -49,12 +80,40 @@ private:
   // cv::VideoWriter writer_;
   FILE *pipeout;
 
+  /**
+   * @brief Add metadata to output file
+   * @param timestamp Timestamp for metadata
+   */
   void add_meta_data(unsigned long timestamp);
+  /**
+   * @brief Close output files
+   * @param timestamp Timestamp for closing
+   */
   void close_files(unsigned long timestamp);
+  /**
+   * @brief Open output files
+   * @param timestamp Timestamp for opening
+   * @param imgSize Size of image
+   */
   void open_files(unsigned long timestamp, cv::Size imgSize);
+  /**
+   * @brief Create filename for output
+   * @param timestamp Timestamp for filename
+   */
   void create_filename(unsigned long timestamp);
 };
 // ----------------------------------------------------------------------------
+/**
+ * @brief Constructor implementation
+ * @param queue Reference to the frame queue
+ * @param id Worker ID
+ * @param path Output path
+ * @param fourcc Four-character code for video codec
+ * @param fps Frames per second
+ * @param frame_size Size of frames
+ * @param is_color Whether frames are color
+ * @param live_window_frame_ratio Ratio for live window display
+ */
 storage_worker_cv::storage_worker_cv(
     frame_queue &queue, int id, std::string path, int32_t fourcc, double fps,
     cv::Size frame_size,
@@ -76,6 +135,10 @@ storage_worker_cv::storage_worker_cv(
 // //
 // ----------------------------------------------------------------------------
 
+/**
+ * @brief Add metadata to output file
+ * @param timestamp Timestamp for metadata
+ */
 void storage_worker_cv::add_meta_data(unsigned long timestamp) {
 
   // std::chrono::milliseconds ms =
@@ -99,7 +162,7 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp) {
   strftime(timestampStr, 80, "%Y%m%d-%H%M%S", t);
 
   fMeta_ << "# VISSS file format version: 0.6" << "\n";
-  fMeta_ << "# VISSS git tag: " << GIT_TAG << "\n";
+  fMeta_ << "# VISSS git tag: " << GIT_TAG  << "\n";
   fMeta_ << "# VISSS git branch: " << GIT_BRANCH << "\n";
   fMeta_ << "# Camera reset time: " << timestampStr << "\n";
   fMeta_ << "# us since epoche: " << timestamp << "\n";
@@ -121,6 +184,11 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp) {
   return;
 }
 
+/**
+ * @brief Open output files
+ * @param timestamp Timestamp for opening
+ * @param imgSize Size of image
+ */
 void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) {
   create_filename(timestamp);
 
@@ -166,6 +234,10 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) {
   return;
 }
 
+/**
+ * @brief Close output files
+ * @param timestamp Timestamp for closing
+ */
 void storage_worker_cv::close_files(unsigned long timestamp) {
 
   if (!firstImage) {
@@ -194,6 +266,10 @@ void storage_worker_cv::close_files(unsigned long timestamp) {
   return;
 }
 
+/**
+ * @brief Create filename for output
+ * @param timestamp Timestamp for filename
+ */
 void storage_worker_cv::create_filename(unsigned long timestamp) {
 
   std::string full_path;
@@ -271,6 +347,12 @@ void storage_worker_cv::create_filename(unsigned long timestamp) {
 // speed-preset=ultraast ! mp4mux ! filesink location=video-h2642.mp4",
 // cv::CAP_GSTREAMER, 0, fps_, frame_size_, is_color_);
 
+/**
+ * @brief Run method - main execution loop
+ * 
+ * This method runs in a separate thread and processes frames from the queue,
+ * storing them to disk and updating metadata.
+ */
 void storage_worker_cv::run()
 
 {

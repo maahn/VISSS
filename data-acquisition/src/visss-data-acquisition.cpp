@@ -1,5 +1,14 @@
 //============================================================================
 
+/**
+ * @file visss-data-acquisition.cpp
+ * @brief Main data acquisition program for VISSS system
+ * 
+ * This file contains the main implementation for the VISSS data acquisition
+ * system, which interfaces with GigE Vision cameras to capture and store
+ * video data.
+ */
+
 #include "visss-data-acquisition.h"
 #include "GenApi/GenApi.h" //!< GenApi lib definitions.
 #include "cordef.h"
@@ -14,8 +23,14 @@
 // using namespace cv;
 // using namespace std;
 
+/**
+ * @brief OpenCV window name for live preview
+ */
 #define OPENCV_WINDOW_NAME "VISSS Live Image"
 
+/**
+ * @brief Maximum number of cameras supported
+ */
 #define MAX_CAMERAS 2
 
 // Set upper limit on chunk data size in case of problems with device
@@ -33,6 +48,33 @@
 // save mean and std images
 #define SAVE_MEAN_STD_IMAGE 0
 
+/**
+ * @brief Command line parameters for the main application
+ * 
+ * Supported parameters:
+ * - help (-h): Print usage
+ * - output (-o): Output Path
+ * - site (-s): Site string
+ * - encoding (-e): ffmpeg encoding options with '@' replacing ' '
+ * - liveratio (-l): Every Xth frame will be displayed in the live window
+ * - fps (-f): Frames per seconds of output
+ * - newfileinterval (-i): Write new file every ?s. Set to 0 to deactivate
+ * - maxframes (-m): Stop after this many frames (for debugging)
+ * - writeallframes (-w): Write all frames whether sth is moving or not (for debugging)
+ * - rotateimage (-r): Rotate image counterclockwise [0,1]
+ * - followermode (-d): Do not complain about camera timeouts
+ * - nopreview: No preview window
+ * - noptp (-p): No not use ptp for clock synchronization [0,1]
+ * - minBrightChange (-b): Minimum brightness change to start recording [20,30]
+ * - querygain (-q): Query gain and brightness [0,1]
+ * - novideo: Do not store video data
+ * - nometadata: Do not store meta data
+ * - resetDHCP: Reset camera DHCP and exit. Config file must be present but does not matter
+ * - name (-n): Camera name
+ * - threads (-t): Number of storage threads
+ * - config: Camera configuration file
+ * - camera: Camera IP
+ */
 const char *params =
     "{ help h            |                   | Print usage }"
     "{ output o          | ./                | Output Path }"
@@ -69,8 +111,14 @@ const char *params =
 
 // ====================================
 
+/**
+ * @brief Global pointer to latest buffer
+ */
 void *m_latestBuffer = NULL;
 
+/**
+ * @brief Context structure for image capture thread
+ */
 typedef struct tagMY_CONTEXT {
   GEV_CAMERA_HANDLE camHandle;
   std::string base_name;
@@ -81,6 +129,12 @@ typedef struct tagMY_CONTEXT {
   bool exit;
 } MY_CONTEXT, *PMY_CONTEXT;
 
+/**
+ * @brief Output feature value pair to file
+ * @param feature_name Name of the feature
+ * @param value_string String representation of the value
+ * @param fp File pointer to write to
+ */
 static void OutputFeatureValuePair(const char *feature_name,
                                    const char *value_string, FILE *fp) {
   if ((feature_name != NULL) && (value_string != NULL)) {
@@ -90,6 +144,11 @@ static void OutputFeatureValuePair(const char *feature_name,
   }
 }
 
+/**
+ * @brief Output feature values to file
+ * @param ptrFeature Node pointer to feature
+ * @param fp File pointer to write to
+ */
 static void OutputFeatureValues(const GenApi::CNodePtr &ptrFeature, FILE *fp) {
 
   GenApi::CCategoryPtr ptrCategory(ptrFeature);
@@ -163,6 +222,10 @@ static void OutputFeatureValues(const GenApi::CNodePtr &ptrFeature, FILE *fp) {
   }
 }
 
+/**
+ * @brief Validate feature values
+ * @param ptrFeature Node pointer to feature
+ */
 static void ValidateFeatureValues(const GenApi::CNodePtr &ptrFeature) {
 
   GenApi::CCategoryPtr ptrCategory(ptrFeature);
@@ -192,6 +255,10 @@ static void ValidateFeatureValues(const GenApi::CNodePtr &ptrFeature) {
   }
 }
 
+/**
+ * @brief Get a character from standard input
+ * @return Character input from user
+ */
 char GetKey() {
   char key = getchar();
   while ((key == '\r') || (key == '\n')) {
@@ -200,6 +267,9 @@ char GetKey() {
   return key;
 }
 
+/**
+ * @brief Print menu instructions to user
+ */
 void PrintMenu() {
   std::cout << "***************************************************************"
                "***********"
@@ -210,6 +280,11 @@ void PrintMenu() {
             << std::endl;
 }
 
+/**
+ * @brief Image capture thread function
+ * @param context Pointer to capture context
+ * @return NULL pointer
+ */
 void *ImageCaptureThread(void *context) {
   MY_CONTEXT *captureContext = (MY_CONTEXT *)context;
   bool was_active = false;
@@ -672,6 +747,11 @@ void *ImageCaptureThread(void *context) {
   pthread_exit(0);
 }
 
+/**
+ * @brief Check if TurboDrive is available for camera
+ * @param handle Camera handle
+ * @return 1 if available, 0 if not
+ */
 int IsTurboDriveAvailable(GEV_CAMERA_HANDLE handle) {
   int type;
   UINT32 val = 0;
@@ -705,6 +785,12 @@ int IsTurboDriveAvailable(GEV_CAMERA_HANDLE handle) {
   return 0;
 }
 
+/**
+ * @brief Main entry point for the data acquisition program
+ * @param argc Number of command line arguments
+ * @param argv Array of command line arguments
+ * @return Exit status
+ */
 int main(int argc, char *argv[]) {
   // GEV_DEVICE_INTERFACE  pCamera[MAX_CAMERAS] = {0};
   GEV_STATUS status;

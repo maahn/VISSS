@@ -1,11 +1,35 @@
+/**
+ * @file processing_worker_cv.h
+ * @brief Processing worker class for OpenCV video processing
+ * 
+ * This file contains the declaration and implementation of the processing_worker_cv
+ * class, which handles processing video frames before storage.
+ */
 
 // ============================================================================
 // https://stackoverflow.com/questions/37140643/how-to-save-two-cameras-data-but-not-influence-their-picture-acquire-speed/37146523
 
 // ============================================================================
 
+/**
+ * @brief Processing worker class for OpenCV video processing
+ * 
+ * This class handles processing video frames before storage, including
+ * preprocessing steps and coordination with storage workers.
+ */
 class processing_worker_cv {
 public:
+  /**
+   * @brief Constructor
+   * @param queue Reference to the frame queue
+   * @param id Worker ID
+   * @param path Output path
+   * @param fourcc Four-character code for video codec
+   * @param fps Frames per second
+   * @param frame_size Size of frames
+   * @param is_color Whether frames are color
+   * @param t_reset Time reset point
+   */
   processing_worker_cv(
       frame_queue &queue, int32_t id, std::string const &path, int32_t fourcc,
       double fps, cv::Size frame_size,
@@ -14,8 +38,15 @@ public:
       //        , double preset
       ,
       std::chrono::time_point<std::chrono::system_clock> t_reset);
+  /**
+   * @brief Run method - main execution loop
+   */
   void run();
 
+  /**
+   * @brief Get total time in milliseconds
+   * @return Total time spent in processing operations
+   */
   double total_time_ms() const { return total_time_ / 1000.0; }
 
   // Let's create our storage workers -- let's have two, to simulate your
@@ -46,12 +77,35 @@ private:
 
   MatMeta processedImage;
 
+  /**
+   * @brief Add metadata to output file
+   */
   void add_meta_data();
+  /**
+   * @brief Close output files
+   */
   void close_files();
+  /**
+   * @brief Open output files
+   */
   void open_files();
+  /**
+   * @brief Create filename for output
+   */
   void create_filename();
 };
 // ----------------------------------------------------------------------------
+/**
+ * @brief Constructor implementation
+ * @param queue Reference to the frame queue
+ * @param id Worker ID
+ * @param path Output path
+ * @param fourcc Four-character code for video codec
+ * @param fps Frames per second
+ * @param frame_size Size of frames
+ * @param is_color Whether frames are color
+ * @param t_reset Time reset point
+ */
 processing_worker_cv::processing_worker_cv(
     frame_queue &queue, int32_t id, std::string const &path, int32_t fourcc,
     double fps, cv::Size frame_size,
@@ -69,6 +123,12 @@ processing_worker_cv::processing_worker_cv(
 // //
 // ----------------------------------------------------------------------------
 
+/**
+ * @brief Run method - main execution loop
+ * 
+ * This method runs in a separate thread and processes frames from the queue,
+ * performing preprocessing before passing them to storage workers.
+ */
 void processing_worker_cv::run()
 
 {
