@@ -174,17 +174,25 @@ fi
 for (( ; ; ))
 do
   /bin/sleep 1
-	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -p=$NOPTP -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT --cpuserver=$CPUSERVER --cpustream=$CPUSTREAM --cpustorage=$CPUSTORAGE --cpuother=$CPUOTHER --cpuffmpeg=$CPUFFMPEG $CAMERACONFIG $IP"
-	/bin/echo "BASH $COMMAND"
-	if $COMMAND
-			then
-				/bin/echo "BASH worked"
-				exit
-	else
-		/bin/echo "BASH Didn't work, trying again in 5s"
-		/bin/sleep 5
-    /bin/echo "BASH Restarting VISSS"
-	fi
+  # Build the command incrementally
+  COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -p=$NOPTP -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT --cpuserver=$CPUSERVER --cpustream=$CPUSTREAM --cpustorage=$CPUSTORAGE --cpuother=$CPUOTHER --cpuffmpeg=$CPUFFMPEG $CAMERACONFIG $IP"
+  
+  # Use taskset to pin the process to CPU if CPUOTHER is set
+  if [ $CPUOTHER -gt -1 ]; then
+    /bin/echo "BASH Pinning $EXE to $CPUOTHER"
+    COMMAND="taskset -c $CPUOTHER $COMMAND"
+  fi
+  
+  echo "BASH $COMMAND"
+  if $COMMAND
+    then
+      echo "BASH worked"
+      exit
+  else
+    echo "BASH Didn't work, trying again in 5s"
+    sleep 5
+    echo "BASH Restarting VISSS"
+  fi
 done
 
 
