@@ -42,21 +42,24 @@ from pysolar import solar
 from yaml.constructor import SafeConstructor
 
 SETTINGSFILE = "%s/.visss.yaml" % str(Path.home())
-DEFAULTSETTINGS = {
+DEFAULTGUI = {
     "geometry": "%dx%d" % (300, 300),
     "configFile": None,
     "autopilot": False,
 }
-DEFAULTCAMERA = {
+DEFAULTGENERAL = {
     "rotateimage": False,
     "noptp": False,
-    "cpu_nic": -1,
-    "cpu_server": -1,
-    "cpu_stream": -1,
-    "cpu_storage": [-1, -1],
-    "cpu_other": -1,
-    "cpu_ffmpeg": [-1, -1],
 }
+DEFAULTCAMERA = {
+    "cpunic": -1,
+    "cpuserver": -1,
+    "cpustream": -1,
+    "cpustorage": ["-1", "-1"],
+    "cpuother": -1,
+    "cpuffmpeg": ["-1", "-1"],
+}
+
 
 LOGFORMAT = "%(asctime)s: %(levelname)s: %(name)s:%(message)s"
 TRIGGERINTERVALLFACTOR = 2  # data can be factor 2 older than interval
@@ -393,6 +396,12 @@ class runCpp:
             f"--QUERYGAIN={int(self.configuration['querygain'])}",
             f"--ROTATEIMAGE={int(self.configuration['rotateimage'])}",
             f"--MINBRIGHT={self.configuration['minBrightchange']}",
+            f"--CPUNIC={self.cameraConfig['cpunic']}",
+            f"--CPUSERVER={self.cameraConfig['cpuserver']}",
+            f"--CPUSTREAM={self.cameraConfig['cpustream']}",
+            f"--CPUSTORAGE={'@'.join(map(str, self.cameraConfig['cpustorage']))}",
+            f"--CPUOTHER={self.cameraConfig['cpuother']}",
+            f"--CPUFFMPEG={'@'.join(self.cameraConfig['cpuffmpeg'])}",
         ]
         print(self.command)
         frame1 = ttk.Frame(self.parent.mainframe)
@@ -919,12 +928,12 @@ class GUI(object):
         # self.getSerialNumbers()
         self.externalTriggerStatus = [[]]
 
-        self.settings = deepcopy(DEFAULTSETTINGS)
+        self.settings = deepcopy(DEFAULTGUI)
         self.settings.update(self.read_settings(SETTINGSFILE))
         # reset geometery if broken
 
         if self.settings["geometry"].startswith("1x1"):
-            self.settings["geometry"] = DEFAULTSETTINGS["geometry"]
+            self.settings["geometry"] = DEFAULTGUI["geometry"]
 
         self.sunAltitude = 999
         self.sunOldAltitude = 999
@@ -959,14 +968,17 @@ class GUI(object):
         status = ttk.Label(config, text=statusStr)
         status.pack(side=tk.LEFT, pady=6, padx=(6, 0))
 
-        self.configuration = deepcopy(DEFAULTCAMERA)
+        self.configuration = deepcopy(DEFAULTGENERAL)
         self.configuration.update(self.read_settings(self.settings["configFile"]))
 
         self.autopilot = tk.IntVar()
         self.apps = []
 
         if "camera" in self.configuration.keys():
-            for cameraConfig in self.configuration["camera"]:
+            for cameraConfig1 in self.configuration["camera"]:
+                cameraConfig = deepcopy(DEFAULTCAMERA)
+                cameraConfig.update(cameraConfig1)
+
                 thisCamera = runCpp(self, cameraConfig)
                 self.apps.append(thisCamera)
 

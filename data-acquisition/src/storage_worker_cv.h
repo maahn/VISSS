@@ -79,7 +79,7 @@ private:
 
   // cv::VideoWriter writer_;
   FILE *pipeout;
-
+  int fd;
   /**
    * @brief Add metadata to output file
    * @param timestamp Timestamp for metadata
@@ -201,7 +201,15 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) {
   create_filename(timestamp);
 
   if (storeVideo) {
-    std::string ffmpegCommand = "ffmpeg -loglevel warning -y -f rawvideo ";
+    std::string ffmpegCommand = "";
+    // Add taskset command if CPU affinity is set                                   
+    if (!cpu_ffmpeg_list.empty() && cpu_ffmpeg_list.size() > id_) {                 
+      std::string cpu_id = cpu_ffmpeg_list[id_];   
+      if (cpu_id != "-1") {                   
+        ffmpegCommand += "chrt -r 1 taskset -c " + cpu_id + " ";              
+      }                                    
+    }        
+    ffmpegCommand += "ffmpeg -loglevel warning -y -f rawvideo ";
     ffmpegCommand += "-vcodec rawvideo -framerate ";
     ffmpegCommand += std::to_string(fps_);
     ffmpegCommand += " -pix_fmt gray -s ";
@@ -213,6 +221,16 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) {
     ffmpegCommand += " " + filename_ + ".mkv";
 
     pipeout = popen(ffmpegCommand.data(), "w");
+    fd = fileno(pipeout);
+    if (pipeout) {
+    int fd = fileno(pipeout);
+    // Set pipe to 128MB. If this returns < 0, check errno.
+    if (fcntl(fd, F_SETPIPE_SZ, 134217728) < 0) {
+        PrintThread{} << "ERROR-" << id_ << " | " << get_timestamp() << " | Could "
+                  << "not set pipe size" << std::endl;
+                  global_error = true;
+    }
+    }
     // writer_.open(filename_ + ".mkv", cv::CAP_FFMPEG, fourcc_, fps_,
     // frame_size_, is_color_);
     PrintThread{} << "INFO-" << id_ << " | " << get_timestamp() << " | Started "
@@ -223,9 +241,6 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) {
   // writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc
   // speed-preset=veryfast mb-tree=true me=dia analyse=i8x8 rc-lookahead=20
   // subme=1 ! queue ! qtmux !  filesink location=video-h264_lookahead20.mkv",
-  // writer_.open("appsrc ! videoconvert  ! timeoverlay ! queue ! x264enc
-  // speed-preset=superfast rc-lookahead=80 subme=2 ! queue ! qtmux !  filesink
-  // location=video-h264_lookahead80a_subme2.mkv",
   //                             cv::CAP_GSTREAMER, 0, fps_, frame_size_,
   //                             is_color_);
   //
@@ -366,7 +381,39 @@ void storage_worker_cv::run()
 {
 
   int result;
-  result = nice(10); // realtive to main thread!
+  // Set CPU affinity for storage worker thread if cpu_storage_list is available
+  if (!cpu_storage_list.empty() && cpu_storage_list.size() > id_) {
+    std::string cpu_str = cpu_storage_list[id_];                                                                                                                                                                   
+    int cpu_id = -1;                                                                                                                                                                                               
+    if (cpu_str != "-1") {                                                                                                                                                                                         
+        try {                                                                                                                                                                                                      
+            cpu_id = std::stoi(cpu_str);                                                                                                                                                                           
+        } catch (...) {                                                                                                                                                                                            
+            // Handle invalid conversion                                                                                                                                                                           
+            std::cerr << "FATAL ERROR" << id_ << " | " << get_timestamp()
+                      << " | Cannot convert cpu_storage to int"
+                      << std::endl;
+            global_error = true;
+            cpu_id = -1;
+            }                                                                                                                                                                                                          
+    }                                                                                                                                                                                                              
+    if (cpu_id >= 0) {
+      cpu_set_t cpuset;
+      CPU_ZERO(&cpuset);
+      CPU_SET(cpu_id, &cpuset);
+      result = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
+      if (result != 0) {
+        PrintThread{} << "WARNING-" << id_ << " | " << get_timestamp()
+                      << " | Failed to set CPU affinity for storage worker "
+                      << id_ << std::endl;
+      } else {
+        PrintThread{} << "INFO-" << id_ << " | " << get_timestamp()
+                      << " | Set CPU affinity for storage worker " << id_
+                      << " to CPU " << cpu_id << std::endl;
+      }
+    }
+  }
+  result = nice(10); // relative to main thread!
 
   unsigned long last_timestamp = 0;
 
@@ -577,7 +624,7 @@ void storage_worker_cv::run()
           if (storeVideo) {
             // writer_.write(imgWithMeta);
             size_t sizeInBytes = imgWithMeta.step[0] * imgWithMeta.rows;
-            fwrite(imgWithMeta.data, 1, sizeInBytes, pipeout);
+            write(fd,imgWithMeta.data, sizeInBytes);
             fileUsed = true;
           }
           if (storeMeta) {

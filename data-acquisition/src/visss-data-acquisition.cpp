@@ -106,7 +106,11 @@ const char *params =
     "Config file must be present but does not matter }"
     "{ name n            | VISSS             | camera name }"
     "{ threads t         | 1                 | number of storage threads }"
-    "{ @config           | <none>            | camera configuration file }"
+    "{ cpuserver         | -1                | CPU server thread affinity }"                                                                                                                                   
+    "{ cpustream         | -1                | CPU stream thread affinity }"                                                                                                                                   
+    "{ cpustorage        | -1,-1             | CPU storage thread affinity }"                                                                                                                                  
+    "{ cpuother          | -1                | CPU other thread affinity }"                                                                                                                                    
+    "{ cpuffmpeg         | -1,-1             | CPU ffmpeg thread affinity }"      "{ @config           | <none>            | camera configuration file }"
     "{ @camera           | <none>            | camera IP }";
 
 // ====================================
@@ -335,6 +339,24 @@ void *ImageCaptureThread(void *context) {
     bool isColor = false;
     int tt = 0;
     long skipCounter = 0;
+
+    int result;
+    if (cpu_other >= 0) {
+      cpu_set_t cpuset;
+      CPU_ZERO(&cpuset);
+      CPU_SET(cpu_other, &cpuset);
+      result = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
+      if (result != 0) {
+        PrintThread{} << "WARNING | " << get_timestamp()
+                      << " | Failed to set CPU affinity for ImageCaptureThread "
+                      << std::endl;
+      } else {
+        PrintThread{} << "INFO | " << get_timestamp()
+                      << " | Set CPU affinity for ImageCaptureThread" 
+                      << " to CPU " << cpu_other << std::endl;
+      }
+    }
+
 
     // The synchronized queues, one per video source/storage worker pair
     std::vector<frame_queue> queue(nStorageThreads);
@@ -807,6 +829,7 @@ int main(int argc, char *argv[]) {
   int followermode1;
   int rotate1;
   int minBrightnessChange;
+  std::string cpu_storage_str, cpu_ffmpeg_str;
   FILE *fp = NULL;
   FILE *fp2 = NULL;
   // char uniqueName[FILENAME_MAX];
@@ -984,6 +1007,27 @@ int main(int argc, char *argv[]) {
   resetDHCP = parser.has("resetDHCP");
   std::cout << "DEBUG | " << get_timestamp() << " | PARSER: reset " << resetDHCP
             << std::endl;
+
+  // Add parsing of the new parameters after the existing parameter parsing:                                                                                                                                     
+  cpu_server = parser.get<int>("cpuserver");                                                                                                                                                                     
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: cpuserver " << cpu_server
+            << std::endl;
+  cpu_stream = parser.get<int>("cpustream");                                                                                                                                                                     
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: cpustream " << cpu_stream
+            << std::endl;
+  cpu_other = parser.get<int>("cpuother");                                                                                                                                                                       
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: cpuother " << cpu_other
+            << std::endl;
+  cpu_storage_str = parser.get<std::string>("cpustorage");                                                                                                                                                       
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: cpustorage " << cpu_storage_str
+            << std::endl;
+  cpu_ffmpeg_str = parser.get<std::string>("cpuffmpeg");                                                                                                                                                         
+    std::cout << "DEBUG | " << get_timestamp() << " | PARSER: cpuffmpeg " << cpu_ffmpeg_str
+            << std::endl;
+     
+  cpu_storage_list = parse_cpu_list(cpu_storage_str);                                                                                                                                           
+  cpu_ffmpeg_list = parse_cpu_list(cpu_ffmpeg_str);                                                                                                                                             
+ 
 
   gethostname(hostname, HOST_NAME_MAX);
 
@@ -1369,23 +1413,24 @@ int main(int argc, char *argv[]) {
       camOptions.streamFrame_timeout_ms =
           2001; // Internal timeout for frame reception.
       camOptions.streamNumFramesBuffered = 200; // Buffer frames internally.
-      camOptions.streamMemoryLimitMax =
-          100 * 8 * 2064 * 1544; // Adjust packet memory buffering limit.
+      camOptions.streamMemoryLimitMax = 2147483647;  // max int. Adjust packet memory buffering limit.
       // camOptions.streamPktSize = 8960;                            // Adjust
       // the GVSP packet size. camOptions.streamPktSize = 8960-1; // Adjust the
       // GVSP packet size.
       camOptions.streamPktDelay =
           10; // Add usecs between packets to pace arrival at NIC.
+#endif
       // Assign specific CPUs to threads (affinity) - if required for better
       // performance.
-      {
-        int numCpus = _GetNumCpus();
-        if (numCpus > 1) {
-          camOptions.streamThreadAffinity = 2 * followermode1 + 2;
-          camOptions.serverThreadAffinity = 2 * followermode1 + 3;
-        }
-      }
-#endif
+      camOptions.streamThreadAffinity = cpu_stream;
+      camOptions.serverThreadAffinity = cpu_server;
+      PrintThread{} << "INFO | " << get_timestamp()
+                    << " | Set CPU affinity for streamThread" 
+                    << " to CPU " << cpu_stream << std::endl;
+      PrintThread{} << "INFO | " << get_timestamp()
+                    << " | Set CPU affinity for serverThread" 
+                    << " to CPU " << cpu_server << std::endl;
+
       std::cout << "DEBUG | " << get_timestamp() << "| "
                 << "Configuring Camera " << std::endl;
       // Write the adjusted interface options back.
@@ -1525,6 +1570,7 @@ int main(int argc, char *argv[]) {
         context.exit = false;
 
         pthread_create(&tid, NULL, ImageCaptureThread, &context);
+
 
         // Call the main command loop or the example.
         PrintMenu();
