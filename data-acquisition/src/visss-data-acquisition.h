@@ -49,7 +49,6 @@
 #include <sstream>
 #include <fcntl.h>   // For fcntl and F_SETPIPE_SZ / F_GETPIPE_SZ
 
-
 // ============================================================================
 /**
  * @brief High resolution clock type alias
@@ -59,6 +58,10 @@ using std::chrono::high_resolution_clock;
 using std::chrono::microseconds;
 
 // ============================================================================
+
+    //int policy = SCHED_FIFO;
+    int policy = SCHED_RR;
+    // int policy = SCHED_OTHER;
 
 /**
  * @brief Device ID buffer for camera

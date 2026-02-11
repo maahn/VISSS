@@ -290,6 +290,20 @@ void PrintMenu() {
  * @return NULL pointer
  */
 void *ImageCaptureThread(void *context) {
+
+  // SET HIGH PRIORITY FOR THE ACTUAL CAPTURE THREAD
+  struct sched_param param_capture;
+  param_capture.sched_priority = 80;  // Highest priority
+  if (pthread_setschedparam(pthread_self(), policy, &param_capture) != 0) {
+    PrintThread{} << "ERROR | " << get_timestamp()
+                  << " | Failed to set capture thread priority: " 
+                  << strerror(errno) << std::endl;
+  } else {
+    PrintThread{} << "INFO | " << get_timestamp()
+                  << " | ImageCaptureThread priority set to " 
+                  << param_capture.sched_priority << std::endl;
+  }
+
   MY_CONTEXT *captureContext = (MY_CONTEXT *)context;
   bool was_active = false;
   bool do_housekeeping = true;
@@ -1050,29 +1064,26 @@ int main(int argc, char *argv[]) {
   // effects. SCHED_RR has fewer side effects. SCHED_OTHER (normal default
   // scheduler) is not too bad afer all.
   if (1) {
-    // int policy = SCHED_FIFO;
-    int policy = SCHED_RR;
-    // int policy = SCHED_OTHER;
     pthread_attr_t attrib;
     int inherit_sched = 0;
     struct sched_param param = {0};
 
-    // Set an average RT priority (increase/decrease to tuner performance).
-    param.sched_priority =
-        (sched_get_priority_max(policy) - sched_get_priority_min(policy)) / 2;
+  // CHANGE THIS - don't calculate, set explicitly HIGH for capture thread
+  param.sched_priority = 80;  // Explicit high priority for capture/main thread
 
-    // Set scheduler policy
-    pthread_setschedparam(
-        pthread_self(), policy,
-        &param); // Don't care if it fails since we can't do anyting about it.
-
+  if (pthread_setschedparam(pthread_self(), policy, &param) != 0) {
+      std::cerr << "ERROR: Failed to set main thread priority: " << strerror(errno) << std::endl;
+  } else {
+      std::cout << "INFO | " << get_timestamp() << " | Main thread priority set to " 
+                << param.sched_priority <<  std::endl;
+  }
     // Make sure all subsequent threads use the same policy.
-    pthread_attr_init(&attrib);
-    pthread_attr_getinheritsched(&attrib, &inherit_sched);
-    if (inherit_sched != PTHREAD_INHERIT_SCHED) {
-      inherit_sched = PTHREAD_INHERIT_SCHED;
-      pthread_attr_setinheritsched(&attrib, inherit_sched);
-    }
+    // pthread_attr_init(&attrib);
+    // pthread_attr_getinheritsched(&attrib, &inherit_sched);
+    // if (inherit_sched != PTHREAD_INHERIT_SCHED) {
+    //   inherit_sched = PTHREAD_INHERIT_SCHED;
+    //   pthread_attr_setinheritsched(&attrib, inherit_sched);
+    // }
   }
 
   //===================================================================================
@@ -1091,6 +1102,9 @@ int main(int argc, char *argv[]) {
   // DISCOVER Cameras
   //
   status = GevApiInitialize();
+
+
+
   // std::cout << "STATUS | " << get_timestamp() << " | " << numCamera << "
   // camera(s) on the network"<< std::endl;
 

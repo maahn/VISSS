@@ -206,7 +206,8 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) {
     if (!cpu_ffmpeg_list.empty() && cpu_ffmpeg_list.size() > id_) {                 
       std::string cpu_id = cpu_ffmpeg_list[id_];   
       if (cpu_id != "-1") {                   
-        ffmpegCommand += "chrt -r 1 taskset -c " + cpu_id + " ";              
+       // for RT kernel: ffmpegCommand += "chrt -r 1 taskset -c " + cpu_id + " ";              
+        ffmpegCommand += "taskset -c " + cpu_id + " ";              
       }                                    
     }        
     ffmpegCommand += "ffmpeg -loglevel warning -y -f rawvideo ";
@@ -380,39 +381,39 @@ void storage_worker_cv::run()
 
 {
 
-  int result;
-  // Set CPU affinity for storage worker thread if cpu_storage_list is available
+  // Set LOWER priority for storage threads (lower than capture thread)
+  struct sched_param param_storage;
+  param_storage.sched_priority = 5;  // Much lower than capture thread's priority
+  if (pthread_setschedparam(pthread_self(), SCHED_RR, &param_storage) != 0) {
+    PrintThread{} << "WARNING-" << id_ << " | " << get_timestamp()
+                  << " | Failed to set storage thread priority: " << strerror(errno) 
+                  << std::endl;
+  } else {
+    PrintThread{} << "INFO-" << id_ << " | " << get_timestamp()
+                  << " | Storage thread priority set to " << param_storage.sched_priority
+                  << std::endl;
+  }
+  
+
+  // Set CPU affinity if configured
   if (!cpu_storage_list.empty() && cpu_storage_list.size() > id_) {
-    std::string cpu_str = cpu_storage_list[id_];                                                                                                                                                                   
-    int cpu_id = -1;                                                                                                                                                                                               
-    if (cpu_str != "-1") {                                                                                                                                                                                         
-        try {                                                                                                                                                                                                      
-            cpu_id = std::stoi(cpu_str);                                                                                                                                                                           
-        } catch (...) {                                                                                                                                                                                            
-            // Handle invalid conversion                                                                                                                                                                           
-            std::cerr << "FATAL ERROR" << id_ << " | " << get_timestamp()
-                      << " | Cannot convert cpu_storage to int"
-                      << std::endl;
-            global_error = true;
-            cpu_id = -1;
-            }                                                                                                                                                                                                          
-    }                                                                                                                                                                                                              
-    if (cpu_id >= 0) {
+    std::string cpu_id = cpu_storage_list[id_];
+    if (cpu_id != "-1") {
       cpu_set_t cpuset;
       CPU_ZERO(&cpuset);
-      CPU_SET(cpu_id, &cpuset);
-      result = pthread_setaffinity_np(pthread_self(), sizeof(cpuset), &cpuset);
-      if (result != 0) {
+      CPU_SET(std::stoi(cpu_id), &cpuset);
+      if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0) {
         PrintThread{} << "WARNING-" << id_ << " | " << get_timestamp()
-                      << " | Failed to set CPU affinity for storage worker "
-                      << id_ << std::endl;
+                      << " | Failed to set CPU affinity to " << cpu_id 
+                      << ": " << strerror(errno) << std::endl;
       } else {
         PrintThread{} << "INFO-" << id_ << " | " << get_timestamp()
-                      << " | Set CPU affinity for storage worker " << id_
-                      << " to CPU " << cpu_id << std::endl;
+                      << " | CPU affinity set to " << cpu_id << std::endl;
       }
     }
   }
+
+  int result;
   result = nice(10); // relative to main thread!
 
   unsigned long last_timestamp = 0;
