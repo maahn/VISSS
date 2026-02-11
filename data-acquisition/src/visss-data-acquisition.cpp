@@ -635,7 +635,7 @@ void *ImageCaptureThread(void *context) {
               // only process data after clock reset has been confirmed,
               // otherwise timestamps are wrong
               if (!waiting_for_clock_reset) {
-                queue[tt].push(exportImgMeta);
+                queue[tt].push(std::move(exportImgMeta));
               }
               // }
               // std::cout << "INFOmain 6: "  << queue[tt].size() << std::endl;
