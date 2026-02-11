@@ -55,7 +55,7 @@ DEFAULTCAMERA = {
     "cpunic": -1,
     "cpuserver": -1,
     "cpustream": -1,
-    "cpustorage": ["-1","-1"],
+    "cpustorage": ["-1", "-1"],
     "cpuother": -1,
     "cpuffmpeg": ["-1", "-1"],
 }

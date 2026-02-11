@@ -34,6 +34,35 @@ Install required packages:
 sudo apt install make gcc libx11-dev libxext-dev libgtk-3-dev libglade2-0 libglade2-dev libpcap0.8 libcap2 ethtool net-tools git gitk libcanberra-gtk-module libcanberra-gtk3-module libtiff-dev libboost-all-dev ffmpeg vlc apt-transport-https intltool libges-1.0-dev gstreamer1.0-plugins-bad libnotify-bin libnotify-dev ipython3 cmake-data librhash0 libuv1 cmake-qt-gui libavcodec-dev libavformat-dev libswscale-dev libdc1394-22-dev libxine2-dev libv4l-dev libgtk2.0-dev libtbb-dev libatlas-base-dev libmp3lame-dev libtheora-dev libvorbis-dev libxvidcore-dev libopencore-amrnb-dev libopencore-amrwb-dev x264 v4l-utils python3-numpy python3-dev python3-pip htop openssh-server mdm mdadm samba cifs-utils chrome-gnome-shell apache2 certbot libpcap-dev python3-tk unattended-upgrades net-tools libopencv-dev gnome-disk-utility gnome-system-tools software-properties-gtk network-manager-openconnect-gnome openconnect seahorse rsync x2goserver x2goserver-xsession gtkterm python3-pysolar python3-filelock autossh python3-pil linux-image-rt-amd64
 ```
 
+Consider disabeling hyper threading "nosmt" and reserving all but 2 cores for VISSS processing (replace 15 by nCpu-1)
+```bash
+sudo nano /etc/default/grub
+```
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet nosmt isolcpus=2-15 nohz_full=2-15 rcu_nocbs=2-15 processor.max_cstate=1 intel_idle.max_cstate=0"
+```
+
+
+Copy sudoers file and allow chrt without sudo:
+```bash
+sudo cp /home/visss/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
+sudo bash -c 'echo "@visss - rtprio 99" >> /etc/security/limits.conf'
+```
+
+Make sure pipes are large enough
+```bash
+sudo bash -c 'echo "fs.pipe-max-size = 134217728" >> /etc/sysctl.conf'
+sudo bash -c 'echo "fs.pipe-user-pages-soft = 524288" >> /etc/sysctl.conf'
+
+
+
+```
+
+
+
+
+logout and login so it can take effect
+
 ### Sublime Text Installation
 ```bash
 wget -qO - https://download.sublimetext.com/sublimehq-pub.gpg | sudo apt-key add -
@@ -60,24 +89,19 @@ git clone https://github.com/maahn/VISSS_configuration
 git clone https://github.com/maahn/VISSS
 ```
 
-2. Copy sudoers file:
-```bash
-sudo cp /home/visss/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
-```
-
-3. Build:
+2. Build:
 ```bash
 cd VISSS/data-acquisition/
 make
 ```
 
-4. Create application shortcuts:
+3. Create application shortcuts:
 ```bash
 mkdir -p /home/visss/.local/share/applications/
 ln -s /home/visss/VISSS/scripts/visss_gui.desktop /home/visss/.local/share/applications/
 ```
 
-5. Enable autostart:
+4. Enable autostart:
 ```bash
 mkdir -p ~/.config/autostart
 ln -s /home/visss/VISSS/scripts/visss_gui.desktop /home/visss/.config/autostart/
