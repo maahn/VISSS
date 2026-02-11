@@ -4,14 +4,43 @@
  */
 int const max_queue_size = 3000;
 
+/**
+ * @brief Thread-safe queue for frame metadata
+ */
 class frame_queue {
 public:
+  /**
+   * @brief Exception thrown when queue is cancelled
+   */
   struct cancelled {};
 
+  /**
+   * @brief Constructor
+   */
   frame_queue();
-  void push(MatMeta &&image);  // Accept by rvalue reference, not const reference
+  
+  /**
+   * @brief Pushes a frame metadata object to the queue
+   * @param image Frame metadata to push (rvalue reference)
+   */
+  void push(MatMeta &&image);
+  
+  /**
+   * @brief Pops a frame metadata object from the queue
+   * @return Frame metadata object
+   * @throws cancelled if queue has been cancelled
+   */
   MatMeta pop();
+  
+  /**
+   * @brief Cancels the queue, waking up all waiting threads
+   */
   void cancel();
+  
+  /**
+   * @brief Gets the current size of the queue
+   * @return Current size of the queue
+   */
   int size();
 
 private:
