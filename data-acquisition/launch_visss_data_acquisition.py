@@ -440,6 +440,9 @@ class runCpp:
         self.scrolled_text["yscrollcommand"] = s.set
         self.scrolled_text.bind("<Key>", lambda e: "break")
 
+        # Add context menu for copy/paste functionality
+        self.scrolled_text.bind("<Button-3>", self.show_context_menu)
+        
         self.scrolled_text.configure(font=("TkFixedFont", 8))
         self.scrolled_text.tag_config("INFO", foreground="black")
         self.scrolled_text.tag_config("DEBUG", foreground="gray")
@@ -459,6 +462,43 @@ class runCpp:
             )
             self.cleanThread.start()
 
+    def show_context_menu(self, event):
+        """
+        Show context menu for copy/paste functionality.
+        
+        Parameters
+        ----------
+        event : tkinter.Event
+            The mouse event that triggered the context menu.
+        """
+        # Create context menu
+        context_menu = tk.Menu(self.scrolled_text, tearoff=0)
+        context_menu.add_command(label="Copy", command=self.copy_text)
+        context_menu.add_command(label="Select All", command=self.select_all_text)
+        
+        # Display the context menu
+        context_menu.post(event.x_root, event.y_root)
+    
+    def copy_text(self):
+        """
+        Copy selected text to clipboard.
+        """
+        try:
+            selected_text = self.scrolled_text.get("sel.first", "sel.last")
+            self.scrolled_text.clipboard_clear()
+            self.scrolled_text.clipboard_append(selected_text)
+        except tk.TclError:
+            # No selection, do nothing
+            pass
+    
+    def select_all_text(self):
+        """
+        Select all text in the scrolled_text widget.
+        """
+        self.scrolled_text.tag_add(tk.SEL, "1.0", tk.END)
+        self.scrolled_text.mark_set(tk.INSERT, "1.0")
+        self.scrolled_text.see(tk.INSERT)
+        
     def writeToStatusFile(self, status):
         """
         Write status information to a file.
