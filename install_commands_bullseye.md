@@ -31,28 +31,40 @@ sudo apt-get upgrade
 ### Software Installation
 Install required packages:
 ```bash
-sudo apt install make gcc libx11-dev libxext-dev libgtk-3-dev libglade2-0 libglade2-dev libpcap0.8 libcap2 ethtool net-tools git gitk libcanberra-gtk-module libcanberra-gtk3-module libtiff-dev libboost-all-dev ffmpeg vlc apt-transport-https intltool libges-1.0-dev gstreamer1.0-plugins-bad libnotify-bin libnotify-dev ipython3 cmake-data librhash0 libuv1 cmake-qt-gui libavcodec-dev libavformat-dev libswscale-dev libdc1394-22-dev libxine2-dev libv4l-dev libgtk2.0-dev libtbb-dev libatlas-base-dev libmp3lame-dev libtheora-dev libvorbis-dev libxvidcore-dev libopencore-amrnb-dev libopencore-amrwb-dev x264 v4l-utils python3-numpy python3-dev python3-pip htop openssh-server mdm mdadm samba cifs-utils chrome-gnome-shell apache2 certbot libpcap-dev python3-tk unattended-upgrades net-tools libopencv-dev gnome-disk-utility gnome-system-tools software-properties-gtk network-manager-openconnect-gnome openconnect seahorse rsync x2goserver x2goserver-xsession gtkterm python3-pysolar python3-filelock autossh python3-pil linux-image-rt-amd64
+sudo apt install make gcc libx11-dev libxext-dev libgtk-3-dev libglade2-0 libglade2-dev libpcap0.8 libcap2 ethtool net-tools git gitk libcanberra-gtk-module libcanberra-gtk3-module libtiff-dev libboost-all-dev ffmpeg vlc apt-transport-https intltool libges-1.0-dev gstreamer1.0-plugins-bad libnotify-bin libnotify-dev ipython3 cmake-data librhash0 libuv1 cmake-qt-gui libavcodec-dev libavformat-dev libswscale-dev libdc1394-dev libxine2-dev libv4l-dev libgtk2.0-dev libtbb-dev libatlas-base-dev libmp3lame-dev libtheora-dev libvorbis-dev libxvidcore-dev libopencore-amrnb-dev libopencore-amrwb-dev x264 v4l-utils python3-numpy python3-dev python3-pip htop openssh-server mdm mdadm samba cifs-utils chrome-gnome-shell apache2 certbot libpcap-dev python3-tk unattended-upgrades net-tools libopencv-dev gnome-disk-utility gnome-system-tools software-properties-gtk network-manager-openconnect-gnome openconnect seahorse rsync x2goserver x2goserver-xsession gtkterm python3-pysolar python3-filelock autossh python3-pil linux-image-rt-amd64 stress-ng python3-serial gparted linuxptp
 ```
 
 Consider disabeling hyper threading "nosmt" and reserving all but 2 cores for VISSS processing (replace 15 by nCpu-1)
 ```bash
 sudo nano /etc/default/grub
 ```
+
+AMD Ryzen 9 5950X 16 core
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus=1,2,3,17,18,19 nohz_full=1,2,3,17,18,19 rcu_nocbs=1,2,3,17,18,19 processor.max_cstate=1"
+```
+AMD Ryzen 9 3900X 12 core
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus=1,2,3,13,14,15 nohz_full=1,2,3,13,14,15 rcu_nocbs=1,2,3,13,14,15 processor.max_cstate=1"
+```
+Intel(R) Core(TM) i9-14900K
 ```
 GRUB_CMDLINE_LINUX_DEFAULT="quiet nosmt isolcpus=2-15 nohz_full=2-15 rcu_nocbs=2-15 processor.max_cstate=1 intel_idle.max_cstate=0"
 ```
+Intel(R) Core(TM) Ultra 9 285K
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus=1,2,3,4 nohz_full=1,2,3,4 rcu_nocbs=1,2,3,4 processor.max_cstate=1"
+```
 
-
-Copy sudoers file and allow chrt without sudo:
 ```bash
-sudo cp /home/visss/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
-sudo bash -c 'echo "@visss - rtprio 99" >> /etc/security/limits.conf'
+sudo update-grub
 ```
 
 Make sure pipes are large enough
 ```bash
 sudo bash -c 'echo "fs.pipe-max-size = 134217728" >> /etc/sysctl.conf'
 sudo bash -c 'echo "fs.pipe-user-pages-soft = 524288" >> /etc/sysctl.conf'
+sudo bash -c 'echo "@visss - rtprio 99" >> /etc/security/limits.conf'
 
 
 
@@ -85,9 +97,14 @@ sudo ./corinstall
 
 1. Clone repositories:
 ```bash
-git clone https://github.com/maahn/VISSS_configuration
 git clone https://github.com/maahn/VISSS
 ```
+
+Copy sudoers file and allow chrt without sudo:
+```bash
+sudo cp /home/visss/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
+```
+
 
 2. Build:
 ```bash
@@ -106,6 +123,8 @@ ln -s /home/visss/VISSS/scripts/visss_gui.desktop /home/visss/.local/share/appli
 mkdir -p ~/.config/autostart
 ln -s /home/visss/VISSS/scripts/visss_gui.desktop /home/visss/.config/autostart/
 ```
+
+Click on /home/visss/VISSS/scripts/visss_gui.desktop in the GUI to mark it as trusted.
 
 ## System Configuration
 
@@ -178,6 +197,17 @@ Enable security updates:
 sudo software-properties-gtk
 ```
 
+### Set up Syncthing if needed
+
+Download from website and install in ~/bin. Then
+```bash
+crontab -e
+```
+
+```
+@reboot screen -d -m -S syncthing /home/visss/bin/syncthing --no-browser
+```
+Open browser at http://localhost:8384/.
 
 ## System Services
 
@@ -192,18 +222,55 @@ ln -s /home/visss/visss_config/visss2/VISSS_INTERFACES.env VISSS_INTERFACES.env
 sudo cp -v ~/VISSS/scripts/services/* /etc/systemd/system/
 sudo systemctl daemon-reexec
 ```
-
-3. Enable services for leader:
+3. a Enable services for combined leader and follower computer:
 ```bash
 sudo systemctl enable --now visss_ptp_master@LEADER_NIC_VISSS
+sudo systemctl enable --now visss_ptp_master@FOLLOWER_NIC_VISSS
 sudo systemctl enable --now visss_sync_systemclock_to@LEADER_NIC_VISSS
+sudo systemctl enable --now visss_sync_systemclock_to@FOLLOWER_NIC_VISSS
+```
+3. b Enable services for leader only computer:
+```bash
+sudo systemctl enable --now visss_sync_systemclock_to@LEADER_NIC_VISSS
+sudo systemctl enable --now visss_sync_systemclock_to@LEADER_NIC_INTERNET
+sudo systemctl enable --now visss_ptp_master@LEADER_NIC_VISSS
+sudo systemctl enable --now visss_ptp_master@LEADER_NIC_INTERNET
+
+sudo systemctl status visss_sync_systemclock_to@LEADER_NIC_VISSS
+sudo systemctl status visss_sync_systemclock_to@LEADER_NIC_INTERNET
+sudo systemctl status visss_ptp_master@LEADER_NIC_VISSS
+sudo systemctl status visss_ptp_master@LEADER_NIC_INTERNET
+```
+for 5G cameras runs every minute
+```bash
+sudo systemctl enable --now visss_check-5gbit@LEADER_NIC_VISSS.timer
+sudo systemctl status visss_check-5gbit@LEADER_NIC_VISSS.service
 ```
 
-4. Enable services for follower:
+3. c Enable services for follower only computer :
 ```bash
 sudo systemctl enable --now visss_ptp_master@FOLLOWER_NIC_VISSS
 sudo systemctl enable --now visss_ptp_slave@FOLLOWER_NIC_INTERNET
+sudo systemctl enable --now visss_sync_nic_clock_to@FOLLOWER_NIC_VISSS
+sudo systemctl enable --now visss_sync_nic_clock_to_systemclock
+
+sudo systemctl status visss_ptp_master@FOLLOWER_NIC_VISSS
+sudo systemctl status visss_ptp_slave@FOLLOWER_NIC_INTERNET
+sudo systemctl status visss_sync_nic_clock_to@FOLLOWER_NIC_VISSS
+sudo systemctl status visss_sync_nic_clock_to_systemclock
 ```
+
+make sure chrony and ntp are not running
+```bash
+ps -ef | grep -E 'chronyd|ntpd|timesyncd'
+```
+for 5G cameras runs every minute
+```bash
+sudo systemctl enable --now visss_check-5gbit@FOLLOWER_NIC_VISSS.timer
+sudo systemctl status visss_check-5gbit@FOLLOWER_NIC_VISSS.service
+```
+
+
 
 ## Additional Setup
 
@@ -245,7 +312,7 @@ Add:
 1. Generate SSH key:
 ```bash
 ssh-keygen -t ed25519 -C "your email"
-cat /home/visss/.ssh/github_id_ed25519.pub
+cat /home/visss/.ssh/id_ed25519.pub
 ```
 
 2. Add key to GitHub repository settings.
