@@ -1,2 +1,2 @@
-visss ALL=(ALL) NOPASSWD: /home/visss/DALSA/GigeV/bin/gev_nettweak, /sbin/setcap, /home/visss/VISSS/scripts/gev_nettweak, /usr/bin/tee
+visss ALL=(ALL) NOPASSWD: /home/visss/DALSA/GigeV/bin/gev_nettweak, /sbin/setcap, /home/visss/VISSS/scripts/gev_nettweak, /usr/bin/tee, /usr/bin/uname
 

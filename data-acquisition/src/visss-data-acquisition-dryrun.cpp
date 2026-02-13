@@ -241,7 +241,7 @@ void *ImageCaptureThread(void *context) {
 
           // Insert a copy into all queues
           for (auto &q : queue) {
-            q.push(exportImgMeta);
+            q.push(std::move(exportImgMeta));
           }
 
           high_resolution_clock::time_point t2(high_resolution_clock::now());
