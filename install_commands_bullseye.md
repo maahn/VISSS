@@ -18,10 +18,6 @@ su
 /sbin/adduser username sudo
 ```
 
-### Network Configuration
-- Leader network card: fixed IP `192.168.100.1`
-- Follower network card: fixed IP `192.168.200.1`
-
 ### System Updates
 ```bash
 sudo apt-get update
@@ -92,6 +88,112 @@ cd DALSA/
 sudo ./corinstall
 ```
 3. Reboot system
+
+### Set up Syncthing if needed
+
+Syncthing can be used to syncronize config files accross VISSS set ups. It is optional. 
+Download from website and install in ~/bin. Then
+```bash
+crontab -e
+```
+
+```
+@reboot screen -d -m -S syncthing /home/visss/bin/syncthing --no-browser
+```
+Open browser at http://localhost:8384/.
+
+## Configuration files
+Set up syncthing for /home/visss/visss_config or use git 
+```bash
+cd
+git clone https://github.com/maahn/VISSS_configuration
+mv VISSS_configuration visss_config
+```
+
+## Network Configuration
+- Leader network card: fixed IP `192.168.100.1`
+- Follower network card: fixed IP `192.168.200.1`
+
+### DHCP Server
+A DHCP server avoids fixed IPs for the cameras which are a pain!
+
+Install 
+```bash
+sudo apt install isc-dhcp-server
+```
+Installation might show an error due to missing/wring configuration. You need to tell the DHCP daemon exactly which cable to talk through. Otherwise, it might try to start on your internet-facing Wi-Fi and cause a very awkward conversation with your IT department.
+
+```bash
+sudo nano /etc/default/isc-dhcp-server
+```
+
+Find the INTERFACESv4 line and add your VISSS interfaces (look them up with "sudo ifconfig"):
+```
+INTERFACESv4="enp3s0 enp4s0"
+```
+
+Then, edit /etc/dhcp/dhcpd.conf to define both networks:
+
+```bash
+sudo nano /etc/dhcp/dhcpd.conf
+```
+and add to the top (it is the same no matter whether leader or follower or combined computer)
+```
+authorative;
+include "/etc/dhcp/dhcp_visss_config.conf";  
+```
+Copy the provided config:
+```bash
+sudo cp /home/visss/visss_config/dhcp_visss_config.conf  /etc/dhcp/dhcp_visss_config.conf
+```
+which should look somthing like :
+```
+# Subnet for the leader interface
+subnet 192.168.100.0 netmask 255.255.255.0 {
+  range 192.168.100.10 192.168.100.99;
+  option routers 192.168.100.1;
+}
+
+# Subnet for the follower interface
+subnet 192.168.200.0 netmask 255.255.255.0 {
+  range 192.168.200.10 192.168.200.99;
+  option routers 192.168.200.1;
+}
+
+# VISSS 1 leader
+host visss1_leader {
+  hardware ethernet 00:01:0D:C3:0F:34; 
+  fixed-address 192.168.100.101;
+}
+
+# VISSS 1 follower
+host visss1_follower {
+  hardware ethernet 00:01:0D:C3:04:9F;
+  fixed-address 192.168.200.101;
+}
+
+```
+
+Every time you touch the config file, you must restart the service:
+
+```bash
+sudo systemctl restart isc-dhcp-server
+```
+
+See the logs at 
+
+```bash
+journalctl -u isc-dhcp-server.service -n 100
+```
+
+Once the service is back up, power-cycle your cameras. You can verify they took the correct IP by running:
+```bash
+ip neighbor
+```
+or
+```bash
+lsgev
+```
 
 ## VISSS Software Setup
 
