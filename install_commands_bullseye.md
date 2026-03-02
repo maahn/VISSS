@@ -153,6 +153,7 @@ subnet 192.168.200.0 netmask 255.255.255.0 {
   option routers 192.168.200.1;
 }
 
+```
 Every time you touch the config file, you must restart the service:
 
 ```bash
