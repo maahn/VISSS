@@ -353,6 +353,10 @@ sudo systemctl enable --now visss_check-5gbit@FOLLOWER_NIC_VISSS.timer
 sudo systemctl status visss_check-5gbit@FOLLOWER_NIC_VISSS.service
 ```
 
+You get better logs without beeing sudo with
+```bash
+sudo usermod -aG systemd-journal,adm $USER
+```
 
 
 ## Additional Setup
