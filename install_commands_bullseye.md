@@ -30,7 +30,7 @@ Install required packages:
 sudo apt install make gcc libx11-dev libxext-dev libgtk-3-dev libglade2-0 libglade2-dev libpcap0.8 libcap2 ethtool net-tools git gitk libcanberra-gtk-module libcanberra-gtk3-module libtiff-dev libboost-all-dev ffmpeg vlc apt-transport-https intltool libges-1.0-dev gstreamer1.0-plugins-bad libnotify-bin libnotify-dev ipython3 cmake-data librhash0 libuv1 cmake-qt-gui libavcodec-dev libavformat-dev libswscale-dev libdc1394-22-dev libxine2-dev libv4l-dev libgtk2.0-dev libtbb-dev libatlas-base-dev libmp3lame-dev libtheora-dev libvorbis-dev libxvidcore-dev libopencore-amrnb-dev libopencore-amrwb-dev x264 v4l-utils python3-numpy python3-dev python3-pip htop openssh-server mdm mdadm samba cifs-utils chrome-gnome-shell apache2 certbot libpcap-dev python3-tk unattended-upgrades net-tools libopencv-dev gnome-disk-utility gnome-system-tools software-properties-gtk network-manager-openconnect-gnome openconnect seahorse rsync x2goserver x2goserver-xsession gtkterm python3-pysolar python3-filelock autossh python3-pil
 ```
 
-Consider disabeling hyper threading "nosmt" and reserving all but 2 cores for VISSS processing (replace 15 by nCpu-1)
+Consider zusing CPUs exclusively for certain tasks to avoid lost frames
 ```bash
 sudo nano /etc/default/grub
 ```
@@ -139,15 +139,8 @@ sudo nano /etc/dhcp/dhcpd.conf
 ```
 and add to the top (it is the same no matter whether leader or follower or combined computer)
 ```
-authorative;
-include "/etc/dhcp/dhcp_visss_config.conf";  
-```
-Copy the provided config:
-```bash
-sudo cp /home/visss/visss_config/dhcp_visss_config.conf  /etc/dhcp/dhcp_visss_config.conf
-```
-which should look somthing like :
-```
+authoritative;
+
 # Subnet for the leader interface
 subnet 192.168.100.0 netmask 255.255.255.0 {
   range 192.168.100.10 192.168.100.99;
@@ -160,20 +153,6 @@ subnet 192.168.200.0 netmask 255.255.255.0 {
   option routers 192.168.200.1;
 }
 
-# VISSS 1 leader
-host visss1_leader {
-  hardware ethernet 00:01:0D:C3:0F:34; 
-  fixed-address 192.168.100.101;
-}
-
-# VISSS 1 follower
-host visss1_follower {
-  hardware ethernet 00:01:0D:C3:04:9F;
-  fixed-address 192.168.200.101;
-}
-
-```
-
 Every time you touch the config file, you must restart the service:
 
 ```bash
@@ -183,7 +162,7 @@ sudo systemctl restart isc-dhcp-server
 See the logs at 
 
 ```bash
-journalctl -u isc-dhcp-server.service -n 100
+journalctl -u isc-dhcp-server.service -n 100 -f
 ```
 
 Once the service is back up, power-cycle your cameras. You can verify they took the correct IP by running:
@@ -213,6 +192,7 @@ sudo cp /home/visss/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
 cd VISSS/data-acquisition/
 make
 ```
+If make fails, try "source /etc/profile"
 
 3. Create application shortcuts:
 ```bash
