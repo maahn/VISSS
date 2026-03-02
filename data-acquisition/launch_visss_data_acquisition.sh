@@ -7,11 +7,8 @@ SETTINGS=""
 #only overides settings file if present
 while [ $# -gt 0 ]; do
   case "$1" in
-    --IP=*)
-      IP="${1#*=}"
-      ;;
-    --MAC=*)
-      MAC="${1#*=}"
+    --SERIAL=*)
+      SERIAL="${1#*=}"
       ;;
     --INTERFACE=*)
       INTERFACE="${1#*=}"
@@ -117,8 +114,8 @@ EXE=$ROOTPATH/visss-data-acquisition
 if [ -z "$NAME" ]; then   
   NAME="${CAMERACONFIG%.*}"
 fi
-if [ -z "$IP" ]
-	then echo "BASH variable IP not set. EXIT"
+if [ -z "$SERIAL" ]
+	then echo "BASH variable SERIAL not set. EXIT"
 	exit
 fi
 
@@ -162,20 +159,20 @@ if [ $CPUNIC -ne -1 ]; then
     done
 fi
 
-if ping -c 1 $IP > /dev/null
-	then
-	:
-else
-	/bin/echo "BASH Set camera IP address (just to be sure)"
-  /bin/echo "BASH /usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0"
-	/usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0
-fi
+# if ping -c 1 $IP > /dev/null
+# 	then
+# 	:
+# else
+# 	/bin/echo "BASH Set camera IP address (just to be sure)"
+#   /bin/echo "BASH /usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0"
+# 	/usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0
+# fi
 
 for (( ; ; ))
 do
   /bin/sleep 1
   # Build the command incrementally
-  COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -p=$NOPTP -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT --cpuserver=$CPUSERVER --cpustream=$CPUSTREAM --cpustorage=$CPUSTORAGE --cpuother=$CPUOTHER --cpuffmpeg=$CPUFFMPEG $CAMERACONFIG $IP"
+  COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -p=$NOPTP -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT --cpuserver=$CPUSERVER --cpustream=$CPUSTREAM --cpustorage=$CPUSTORAGE --cpuother=$CPUOTHER --cpuffmpeg=$CPUFFMPEG $CAMERACONFIG $SERIAL"
   
   # Use taskset to pin the process to CPU if CPUOTHER is set
   if [ $CPUOTHER -gt -1 ]; then

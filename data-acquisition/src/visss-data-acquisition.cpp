@@ -111,7 +111,7 @@ const char *params =
     "{ cpustorage        | -1,-1             | CPU storage thread affinity }"                                                                                                                                  
     "{ cpuother          | -1                | CPU other thread affinity }"                                                                                                                                    
     "{ cpuffmpeg         | -1,-1             | CPU ffmpeg thread affinity }"      "{ @config           | <none>            | camera configuration file }"
-    "{ @camera           | <none>            | camera IP }";
+    "{ @camera           | <none>            | camera Serial }";
 
 // ====================================
 
@@ -876,12 +876,12 @@ int main(int argc, char *argv[]) {
   std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Configuration file "
             << configFile << std::endl;
 
-  std::string camIP = parser.get<cv::String>(1);
-  std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Camera IP " << camIP
+  std::string camSerial = parser.get<cv::String>(1);
+  std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Camera IP " << camSerial
             << std::endl;
-  uint long camIPl = iptoul(camIP);
-  std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Camera IP long "
-            << camIPl << std::endl;
+  // uint long camIPl = iptoul(camIP);
+  // std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Camera IP long "
+  //           << camIPl << std::endl;
   int camIndex = 0;
 
   encoding = parser.get<cv::String>("encoding");
@@ -1135,7 +1135,7 @@ int main(int argc, char *argv[]) {
 
   //====================================================================
   // Open the camera.
-  status = GevOpenCameraByAddress(camIPl, GevExclusiveMode, &handle);
+  status = GevOpenCameraBySN(const_cast<char*>(camSerial.c_str()), GevExclusiveMode, &handle);
   if (status == 0) {
     //===================================================================
     // Get the XML file onto disk and use it to make the CNodeMap object.
