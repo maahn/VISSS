@@ -376,7 +376,7 @@ class runCpp:
         self.command += [
             #'systemd-run', '--user', '--scope', #'--property=CPUQuota=100%',
             f"{self.rootpath}/launch_visss_data_acquisition.sh",
-            f"--SERIAL={self.cameraConfig['serial']}",
+            f"--SERIAL={self.cameraConfig['serialnumber']}",
             f"--FOLLOWERMODE={self.cameraConfig['follower']}",
             f"--INTERFACE={self.cameraConfig['interface']}",
             f"--MAXMTU={self.configuration['maxmtu']}",
