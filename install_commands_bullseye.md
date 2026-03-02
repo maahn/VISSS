@@ -18,10 +18,6 @@ su
 /sbin/adduser username sudo
 ```
 
-### Network Configuration
-- Leader network card: fixed IP `192.168.100.1`
-- Follower network card: fixed IP `192.168.200.1`
-
 ### System Updates
 ```bash
 sudo apt-get update
@@ -38,21 +34,33 @@ Consider disabeling hyper threading "nosmt" and reserving all but 2 cores for VI
 ```bash
 sudo nano /etc/default/grub
 ```
+
+AMD Ryzen 9 5950X 16 core
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus=1,2,3,17,18,19 nohz_full=1,2,3,17,18,19 rcu_nocbs=1,2,3,17,18,19 processor.max_cstate=1"
+```
+AMD Ryzen 9 3900X 12 core
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus=1,2,3,13,14,15 nohz_full=1,2,3,13,14,15 rcu_nocbs=1,2,3,13,14,15 processor.max_cstate=1"
+```
+Intel(R) Core(TM) i9-14900K
 ```
 GRUB_CMDLINE_LINUX_DEFAULT="quiet nosmt isolcpus=2-15 nohz_full=2-15 rcu_nocbs=2-15 processor.max_cstate=1 intel_idle.max_cstate=0"
 ```
+Intel(R) Core(TM) Ultra 9 285K
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus=1,2,3,4 nohz_full=1,2,3,4 rcu_nocbs=1,2,3,4 processor.max_cstate=1"
+```
 
-
-Copy sudoers file and allow chrt without sudo:
 ```bash
-sudo cp /home/visss/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
-sudo bash -c 'echo "@visss - rtprio 99" >> /etc/security/limits.conf'
+sudo update-grub
 ```
 
 Make sure pipes are large enough
 ```bash
 sudo bash -c 'echo "fs.pipe-max-size = 134217728" >> /etc/sysctl.conf'
 sudo bash -c 'echo "fs.pipe-user-pages-soft = 524288" >> /etc/sysctl.conf'
+sudo bash -c 'echo "@visss - rtprio 99" >> /etc/security/limits.conf'
 
 
 
@@ -81,13 +89,124 @@ sudo ./corinstall
 ```
 3. Reboot system
 
+### Set up Syncthing if needed
+
+Syncthing can be used to syncronize config files accross VISSS set ups. It is optional. 
+Download from website and install in ~/bin. Then
+```bash
+crontab -e
+```
+
+```
+@reboot screen -d -m -S syncthing /home/visss/bin/syncthing --no-browser
+```
+Open browser at http://localhost:8384/.
+
+## Configuration files
+Set up syncthing for /home/visss/visss_config or use git 
+```bash
+cd
+git clone https://github.com/maahn/VISSS_configuration
+mv VISSS_configuration visss_config
+```
+
+## Network Configuration
+- Leader network card: fixed IP `192.168.100.1`
+- Follower network card: fixed IP `192.168.200.1`
+
+### DHCP Server
+A DHCP server avoids fixed IPs for the cameras which are a pain!
+
+Install 
+```bash
+sudo apt install isc-dhcp-server
+```
+Installation might show an error due to missing/wring configuration. You need to tell the DHCP daemon exactly which cable to talk through. Otherwise, it might try to start on your internet-facing Wi-Fi and cause a very awkward conversation with your IT department.
+
+```bash
+sudo nano /etc/default/isc-dhcp-server
+```
+
+Find the INTERFACESv4 line and add your VISSS interfaces (look them up with "sudo ifconfig"):
+```
+INTERFACESv4="enp3s0 enp4s0"
+```
+
+Then, edit /etc/dhcp/dhcpd.conf to define both networks:
+
+```bash
+sudo nano /etc/dhcp/dhcpd.conf
+```
+and add to the top (it is the same no matter whether leader or follower or combined computer)
+```
+authorative;
+include "/etc/dhcp/dhcp_visss_config.conf";  
+```
+Copy the provided config:
+```bash
+sudo cp /home/visss/visss_config/dhcp_visss_config.conf  /etc/dhcp/dhcp_visss_config.conf
+```
+which should look somthing like :
+```
+# Subnet for the leader interface
+subnet 192.168.100.0 netmask 255.255.255.0 {
+  range 192.168.100.10 192.168.100.99;
+  option routers 192.168.100.1;
+}
+
+# Subnet for the follower interface
+subnet 192.168.200.0 netmask 255.255.255.0 {
+  range 192.168.200.10 192.168.200.99;
+  option routers 192.168.200.1;
+}
+
+# VISSS 1 leader
+host visss1_leader {
+  hardware ethernet 00:01:0D:C3:0F:34; 
+  fixed-address 192.168.100.101;
+}
+
+# VISSS 1 follower
+host visss1_follower {
+  hardware ethernet 00:01:0D:C3:04:9F;
+  fixed-address 192.168.200.101;
+}
+
+```
+
+Every time you touch the config file, you must restart the service:
+
+```bash
+sudo systemctl restart isc-dhcp-server
+```
+
+See the logs at 
+
+```bash
+journalctl -u isc-dhcp-server.service -n 100
+```
+
+Once the service is back up, power-cycle your cameras. You can verify they took the correct IP by running:
+```bash
+ip neighbor
+```
+or
+```bash
+lsgev
+```
+
 ## VISSS Software Setup
 
 1. Clone repositories:
 ```bash
-git clone https://github.com/maahn/VISSS_configuration
 git clone https://github.com/maahn/VISSS
 ```
+
+Copy sudoers file and allow chrt without sudo:
+```bash
+sudo cp /home/visss/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
+```
+
 
 2. Build:
 ```bash
@@ -106,6 +225,8 @@ ln -s /home/visss/VISSS/scripts/visss_gui.desktop /home/visss/.local/share/appli
 mkdir -p ~/.config/autostart
 ln -s /home/visss/VISSS/scripts/visss_gui.desktop /home/visss/.config/autostart/
 ```
+
+Click on /home/visss/VISSS/scripts/visss_gui.desktop in the GUI to mark it as trusted.
 
 ## System Configuration
 
@@ -178,6 +299,17 @@ Enable security updates:
 sudo software-properties-gtk
 ```
 
+### Set up Syncthing if needed
+
+Download from website and install in ~/bin. Then
+```bash
+crontab -e
+```
+
+```
+@reboot screen -d -m -S syncthing /home/visss/bin/syncthing --no-browser
+```
+Open browser at http://localhost:8384/.
 
 ## System Services
 
@@ -192,18 +324,55 @@ ln -s /home/visss/visss_config/visss2/VISSS_INTERFACES.env VISSS_INTERFACES.env
 sudo cp -v ~/VISSS/scripts/services/* /etc/systemd/system/
 sudo systemctl daemon-reexec
 ```
-
-3. Enable services for leader:
+3. a Enable services for combined leader and follower computer:
 ```bash
 sudo systemctl enable --now visss_ptp_master@LEADER_NIC_VISSS
+sudo systemctl enable --now visss_ptp_master@FOLLOWER_NIC_VISSS
 sudo systemctl enable --now visss_sync_systemclock_to@LEADER_NIC_VISSS
+sudo systemctl enable --now visss_sync_systemclock_to@FOLLOWER_NIC_VISSS
+```
+3. b Enable services for leader only computer:
+```bash
+sudo systemctl enable --now visss_sync_systemclock_to@LEADER_NIC_VISSS
+sudo systemctl enable --now visss_sync_systemclock_to@LEADER_NIC_INTERNET
+sudo systemctl enable --now visss_ptp_master@LEADER_NIC_VISSS
+sudo systemctl enable --now visss_ptp_master@LEADER_NIC_INTERNET
+
+sudo systemctl status visss_sync_systemclock_to@LEADER_NIC_VISSS
+sudo systemctl status visss_sync_systemclock_to@LEADER_NIC_INTERNET
+sudo systemctl status visss_ptp_master@LEADER_NIC_VISSS
+sudo systemctl status visss_ptp_master@LEADER_NIC_INTERNET
+```
+for 5G cameras runs every minute
+```bash
+sudo systemctl enable --now visss_check-5gbit@LEADER_NIC_VISSS.timer
+sudo systemctl status visss_check-5gbit@LEADER_NIC_VISSS.service
 ```
 
-4. Enable services for follower:
+3. c Enable services for follower only computer :
 ```bash
 sudo systemctl enable --now visss_ptp_master@FOLLOWER_NIC_VISSS
 sudo systemctl enable --now visss_ptp_slave@FOLLOWER_NIC_INTERNET
+sudo systemctl enable --now visss_sync_nic_clock_to@FOLLOWER_NIC_VISSS
+sudo systemctl enable --now visss_sync_nic_clock_to_systemclock
+
+sudo systemctl status visss_ptp_master@FOLLOWER_NIC_VISSS
+sudo systemctl status visss_ptp_slave@FOLLOWER_NIC_INTERNET
+sudo systemctl status visss_sync_nic_clock_to@FOLLOWER_NIC_VISSS
+sudo systemctl status visss_sync_nic_clock_to_systemclock
 ```
+
+make sure chrony and ntp are not running
+```bash
+ps -ef | grep -E 'chronyd|ntpd|timesyncd'
+```
+for 5G cameras runs every minute
+```bash
+sudo systemctl enable --now visss_check-5gbit@FOLLOWER_NIC_VISSS.timer
+sudo systemctl status visss_check-5gbit@FOLLOWER_NIC_VISSS.service
+```
+
+
 
 ## Additional Setup
 
@@ -245,7 +414,7 @@ Add:
 1. Generate SSH key:
 ```bash
 ssh-keygen -t ed25519 -C "your email"
-cat /home/visss/.ssh/github_id_ed25519.pub
+cat /home/visss/.ssh/id_ed25519.pub
 ```
 
 2. Add key to GitHub repository settings.
