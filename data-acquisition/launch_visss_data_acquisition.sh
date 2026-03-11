@@ -7,11 +7,8 @@ SETTINGS=""
 #only overides settings file if present
 while [ $# -gt 0 ]; do
   case "$1" in
-    --IP=*)
-      IP="${1#*=}"
-      ;;
-    --MAC=*)
-      MAC="${1#*=}"
+    --SERIAL=*)
+      SERIAL="${1#*=}"
       ;;
     --INTERFACE=*)
       INTERFACE="${1#*=}"
@@ -70,6 +67,24 @@ while [ $# -gt 0 ]; do
     --SETTINGS=*)
       SETTINGS="${1#*=}"
       ;;
+    --CPUNIC=*)
+      CPUNIC="${1#*=}"
+      ;;
+    --CPUSERVER=*)
+      CPUSERVER="${1#*=}"
+      ;;
+    --CPUSTREAM=*)
+      CPUSTREAM="${1#*=}"
+      ;;
+    --CPUSTORAGE=*)
+      CPUSTORAGE="${1#*=}"
+      ;;
+    --CPUOTHER=*)
+      CPUOTHER="${1#*=}"
+      ;;
+    --CPUFFMPEG=*)
+      CPUFFMPEG="${1#*=}"
+      ;;
     *)
       printf "***************************\n"
       printf "* Error: Invalid argument.*\n"
@@ -99,8 +114,8 @@ EXE=$ROOTPATH/visss-data-acquisition
 if [ -z "$NAME" ]; then   
   NAME="${CAMERACONFIG%.*}"
 fi
-if [ -z "$IP" ]
-	then echo "BASH variable IP not set. EXIT"
+if [ -z "$SERIAL" ]
+	then echo "BASH variable SERIAL not set. EXIT"
 	exit
 fi
 
@@ -119,30 +134,62 @@ then
 	/bin/sleep 25
 fi
 
-if ping -c 1 $IP > /dev/null
-	then
-	:
-else
-	/bin/echo "BASH Set camera IP address (just to be sure)"
-  /bin/echo "BASH /usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0"
-	/usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0
+# Pin NIC IRQs if CPUNIC is set
+if [ $CPUNIC -ne -1 ]; then
+    echo "BASH Pinning NIC $INTERFACE IRQs to CPU $CPUNIC"
+    
+    # Function to convert CPU list to hex mask
+    cpu_list_to_mask() {
+        local cpus=("$@")
+        local mask=0
+        for cpu in "${cpus[@]}"; do
+            mask=$((mask | (1 << cpu)))
+        done
+        printf "%x" $mask
+    }
+
+    # Get all IRQs for the interface
+    IRQs=($(grep -w "$INTERFACE" /proc/interrupts | awk -F: '{print $1}' | tr -d ' '))
+    
+    # Pin each IRQ to the specified CPU core
+    for irq in "${IRQs[@]}"; do
+        MASK=$(cpu_list_to_mask $CPUNIC)
+        echo "BASH Pinning IRQ $irq to CPU $CPUNIC (mask $MASK)"
+        echo $MASK | sudo tee /proc/irq/$irq/smp_affinity > /dev/null
+    done
 fi
 
+# if ping -c 1 $IP > /dev/null
+# 	then
+# 	:
+# else
+# 	/bin/echo "BASH Set camera IP address (just to be sure)"
+#   /bin/echo "BASH /usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0"
+# 	/usr/local/bin/gevipconfig -p $MAC $IP 255.255.255.0
+# fi
 
 for (( ; ; ))
 do
   /bin/sleep 1
-	COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -p=$NOPTP -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT $CAMERACONFIG $IP"
-	/bin/echo "BASH $COMMAND"
-	if $COMMAND
-			then
-				/bin/echo "BASH worked"
-				exit
-	else
-		/bin/echo "BASH Didn't work, trying again in 5s"
-		/bin/sleep 5
-    /bin/echo "BASH Restarting VISSS"
-	fi
+  # Build the command incrementally
+  COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -p=$NOPTP -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT --cpuserver=$CPUSERVER --cpustream=$CPUSTREAM --cpustorage=$CPUSTORAGE --cpuother=$CPUOTHER --cpuffmpeg=$CPUFFMPEG $CAMERACONFIG $SERIAL"
+  
+  # Use taskset to pin the process to CPU if CPUOTHER is set
+  if [ $CPUOTHER -gt -1 ]; then
+    /bin/echo "BASH Pinning $EXE to $CPUOTHER"
+    COMMAND="taskset -c $CPUOTHER $COMMAND"
+  fi
+  
+  echo "BASH $COMMAND"
+  if $COMMAND
+    then
+      echo "BASH worked"
+      exit
+  else
+    echo "BASH Didn't work, trying again in 5s"
+    sleep 5
+    echo "BASH Restarting VISSS"
+  fi
 done
 
 

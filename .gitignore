@@ -51,3 +51,4 @@ data-acquisition/visss-data-acquisition-dryrun
 .ipynb_checkpoints
 tmp.json
 data-acquisition/xml/
+.aider*

@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 EnvironmentFile=/home/visss/VISSS_INTERFACES.env
-ExecStart=/usr/sbin/ptp4l -i $%i -m
+ExecStart=/usr/sbin/ptp4l -i $%i -m --tx_timestamp_timeout 50
 Restart=always
 RestartSec=5
 

@@ -1,0 +1,433 @@
+# Debian Bullseye Installation and Configuration Guide
+
+## Installation
+
+1. Install Debian Bullseye with:
+   - MATE desktop
+   - SSH server
+   - Webserver
+   - User `visss`
+
+2. Make sure automatic reboot after power failure is enabled in EFI settings.
+
+## Initial Configuration
+
+### Add user to sudoers
+```bash
+su
+/sbin/adduser username sudo
+```
+
+### System Updates
+```bash
+sudo apt-get update
+sudo apt-get upgrade
+```
+
+### Software Installation
+Install required packages:
+```bash
+sudo apt install make gcc libx11-dev libxext-dev libgtk-3-dev libglade2-0 libglade2-dev libpcap0.8 libcap2 ethtool net-tools git gitk libcanberra-gtk-module libcanberra-gtk3-module libtiff-dev libboost-all-dev ffmpeg vlc apt-transport-https intltool libges-1.0-dev gstreamer1.0-plugins-bad libnotify-bin libnotify-dev ipython3 cmake-data librhash0 libuv1 cmake-qt-gui libavcodec-dev libavformat-dev libswscale-dev libdc1394-22-dev libxine2-dev libv4l-dev libgtk2.0-dev libtbb-dev libatlas-base-dev libmp3lame-dev libtheora-dev libvorbis-dev libxvidcore-dev libopencore-amrnb-dev libopencore-amrwb-dev x264 v4l-utils python3-numpy python3-dev python3-pip htop openssh-server mdm mdadm samba cifs-utils chrome-gnome-shell apache2 certbot libpcap-dev python3-tk unattended-upgrades net-tools libopencv-dev gnome-disk-utility gnome-system-tools software-properties-gtk network-manager-openconnect-gnome openconnect seahorse rsync x2goserver x2goserver-xsession gtkterm python3-pysolar python3-filelock autossh python3-pil
+```
+
+Consider zusing CPUs exclusively for certain tasks to avoid lost frames
+```bash
+sudo nano /etc/default/grub
+```
+
+AMD Ryzen 9 5950X 16 core
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus=1,2,3,17,18,19 nohz_full=1,2,3,17,18,19 rcu_nocbs=1,2,3,17,18,19 processor.max_cstate=1"
+```
+AMD Ryzen 9 3900X 12 core
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus=1,2,3,13,14,15 nohz_full=1,2,3,13,14,15 rcu_nocbs=1,2,3,13,14,15 processor.max_cstate=1"
+```
+Intel(R) Core(TM) i9-14900K
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet nosmt isolcpus=2-15 nohz_full=2-15 rcu_nocbs=2-15 processor.max_cstate=1 intel_idle.max_cstate=0"
+```
+Intel(R) Core(TM) Ultra 9 285K
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus=1,2,3,4 nohz_full=1,2,3,4 rcu_nocbs=1,2,3,4 processor.max_cstate=1"
+```
+
+```bash
+sudo update-grub
+```
+
+Make sure pipes are large enough
+```bash
+sudo bash -c 'echo "fs.pipe-max-size = 134217728" >> /etc/sysctl.conf'
+sudo bash -c 'echo "fs.pipe-user-pages-soft = 524288" >> /etc/sysctl.conf'
+sudo bash -c 'echo "@visss - rtprio 99" >> /etc/security/limits.conf'
+
+
+
+```
+
+
+
+
+logout and login so it can take effect
+
+### Sublime Text Installation
+```bash
+wget -qO - https://download.sublimetext.com/sublimehq-pub.gpg | sudo apt-key add -
+echo "deb https://download.sublimetext.com/ apt/stable/" | sudo tee /etc/apt/sources.list.d/sublime-text.list 
+sudo apt-get update
+sudo apt-get install sublime-text
+```
+
+## GigE Framework Installation
+
+1. Download framework from [Teledyne DALSA](https://www.teledynedalsa.com/en/support/downloads-center/software-development-kits/132/)
+2. Install:
+```bash
+cd DALSA/
+sudo ./corinstall
+```
+3. Reboot system
+
+### Set up Syncthing if needed
+
+Syncthing can be used to syncronize config files accross VISSS set ups. It is optional. 
+Download from website and install in ~/bin. Then
+```bash
+crontab -e
+```
+
+```
+@reboot screen -d -m -S syncthing /home/visss/bin/syncthing --no-browser
+```
+Open browser at http://localhost:8384/.
+
+## Configuration files
+Set up syncthing for /home/visss/visss_config or use git 
+```bash
+cd
+git clone https://github.com/maahn/VISSS_configuration
+mv VISSS_configuration visss_config
+```
+
+## Network Configuration
+- Leader network card: fixed IP `192.168.100.1`
+- Follower network card: fixed IP `192.168.200.1`
+
+### DHCP Server
+A DHCP server avoids fixed IPs for the cameras which are a pain!
+
+Install 
+```bash
+sudo apt install isc-dhcp-server
+```
+Installation might show an error due to missing/wring configuration. You need to tell the DHCP daemon exactly which cable to talk through. Otherwise, it might try to start on your internet-facing Wi-Fi and cause a very awkward conversation with your IT department.
+
+```bash
+sudo nano /etc/default/isc-dhcp-server
+```
+
+Find the INTERFACESv4 line and add your VISSS interfaces (look them up with "sudo ifconfig"):
+```
+INTERFACESv4="enp3s0 enp4s0"
+```
+
+Then, edit /etc/dhcp/dhcpd.conf to define both networks:
+
+```bash
+sudo nano /etc/dhcp/dhcpd.conf
+```
+and add to the top (it is the same no matter whether leader or follower or combined computer)
+```
+authoritative;
+
+# Subnet for the leader interface
+subnet 192.168.100.0 netmask 255.255.255.0 {
+  range 192.168.100.10 192.168.100.99;
+  option routers 192.168.100.1;
+}
+
+# Subnet for the follower interface
+subnet 192.168.200.0 netmask 255.255.255.0 {
+  range 192.168.200.10 192.168.200.99;
+  option routers 192.168.200.1;
+}
+
+```
+Every time you touch the config file, you must restart the service:
+
+```bash
+sudo systemctl restart isc-dhcp-server
+```
+
+See the logs at 
+
+```bash
+journalctl -u isc-dhcp-server.service -n 100 -f
+```
+
+Once the service is back up, power-cycle your cameras. You can verify they took the correct IP by running:
+```bash
+ip neighbor
+```
+or
+```bash
+lsgev
+```
+
+## VISSS Software Setup
+
+1. Clone repositories:
+```bash
+git clone https://github.com/maahn/VISSS
+```
+
+Copy sudoers file and allow chrt without sudo:
+```bash
+sudo cp /home/visss/VISSS/scripts/visss-sudoers /etc/sudoers.d/visss
+```
+
+
+2. Build:
+```bash
+cd VISSS/data-acquisition/
+make
+```
+If make fails, try "source /etc/profile"
+
+3. Create application shortcuts:
+```bash
+mkdir -p /home/visss/.local/share/applications/
+ln -s /home/visss/VISSS/scripts/visss_gui.desktop /home/visss/.local/share/applications/
+```
+
+4. Enable autostart:
+```bash
+mkdir -p ~/.config/autostart
+ln -s /home/visss/VISSS/scripts/visss_gui.desktop /home/visss/.config/autostart/
+```
+
+Click on /home/visss/VISSS/scripts/visss_gui.desktop in the GUI to mark it as trusted.
+
+## System Configuration
+
+### Autologin Setup
+1. Ensure lightdm is used:
+```bash
+sudo dpkg-reconfigure lightdm
+```
+
+2. Add to `/etc/lightdm/lightdm.conf`:
+```bash
+[SeatDefaults]
+autologin-user=visss
+autologin-user-timeout=0
+user-session=mate
+```
+
+3. Reboot and verify
+
+### Timezone
+```bash
+sudo timedatectl set-timezone UTC
+```
+
+### RAID Setup (if needed)
+1. Create RAID:
+```bash
+sudo mdadm --create --verbose /dev/md0 --level=5 --raid-devices=3 /dev/sdb1 /dev/sdc1 /dev/sdd1
+```
+
+2. Format and setup RAID in `/data`
+
+3. Verify after reboot:
+```bash
+lsblk
+```
+
+### Apache2 Web Server
+1. Configure document root:
+```bash
+sudo nano /etc/apache2/sites-enabled/000-default.conf
+```
+Add:
+```apache
+DocumentRoot /data
+```
+
+2. Configure directory settings:
+```bash
+sudo nano /etc/apache2/apache2.conf
+```
+Add:
+```apache
+<Directory /data/>
+    Options Indexes FollowSymLinks
+    AllowOverride None
+    Require all granted
+    EnableMMAP Off
+</Directory>
+```
+
+3. Restart service:
+```bash
+sudo systemctl restart apache2
+```
+
+### Automatic Updates
+Enable security updates:
+```bash
+sudo software-properties-gtk
+```
+
+### Set up Syncthing if needed
+
+Download from website and install in ~/bin. Then
+```bash
+crontab -e
+```
+
+```
+@reboot screen -d -m -S syncthing /home/visss/bin/syncthing --no-browser
+```
+Open browser at http://localhost:8384/.
+
+## System Services
+
+### PTP Clock and NIC Configuration
+1. Link config file:
+```bash
+ln -s /home/visss/visss_config/visss2/VISSS_INTERFACES.env VISSS_INTERFACES.env
+```
+
+2. Install services:
+```bash
+sudo cp -v ~/VISSS/scripts/services/* /etc/systemd/system/
+sudo systemctl daemon-reexec
+```
+3. a Enable services for combined leader and follower computer:
+```bash
+sudo systemctl enable --now visss_ptp_master@LEADER_NIC_VISSS
+sudo systemctl enable --now visss_ptp_master@FOLLOWER_NIC_VISSS
+sudo systemctl enable --now visss_sync_systemclock_to@LEADER_NIC_VISSS
+sudo systemctl enable --now visss_sync_systemclock_to@FOLLOWER_NIC_VISSS
+```
+3. b Enable services for leader only computer:
+```bash
+sudo systemctl enable --now visss_sync_systemclock_to@LEADER_NIC_VISSS
+sudo systemctl enable --now visss_sync_systemclock_to@LEADER_NIC_INTERNET
+sudo systemctl enable --now visss_ptp_master@LEADER_NIC_VISSS
+sudo systemctl enable --now visss_ptp_master@LEADER_NIC_INTERNET
+
+sudo systemctl status visss_sync_systemclock_to@LEADER_NIC_VISSS
+sudo systemctl status visss_sync_systemclock_to@LEADER_NIC_INTERNET
+sudo systemctl status visss_ptp_master@LEADER_NIC_VISSS
+sudo systemctl status visss_ptp_master@LEADER_NIC_INTERNET
+```
+for 5G cameras runs every minute
+```bash
+sudo systemctl enable --now visss_check-5gbit@LEADER_NIC_VISSS.timer
+sudo systemctl status visss_check-5gbit@LEADER_NIC_VISSS.service
+```
+
+3. c Enable services for follower only computer :
+```bash
+sudo systemctl enable --now visss_ptp_master@FOLLOWER_NIC_VISSS
+sudo systemctl enable --now visss_ptp_slave@FOLLOWER_NIC_INTERNET
+sudo systemctl enable --now visss_sync_nic_clock_to@FOLLOWER_NIC_VISSS
+sudo systemctl enable --now visss_sync_nic_clock_to_systemclock
+
+sudo systemctl status visss_ptp_master@FOLLOWER_NIC_VISSS
+sudo systemctl status visss_ptp_slave@FOLLOWER_NIC_INTERNET
+sudo systemctl status visss_sync_nic_clock_to@FOLLOWER_NIC_VISSS
+sudo systemctl status visss_sync_nic_clock_to_systemclock
+```
+
+make sure chrony and ntp are not running
+```bash
+ps -ef | grep -E 'chronyd|ntpd|timesyncd'
+```
+for 5G cameras runs every minute
+```bash
+sudo systemctl enable --now visss_check-5gbit@FOLLOWER_NIC_VISSS.timer
+sudo systemctl status visss_check-5gbit@FOLLOWER_NIC_VISSS.service
+```
+
+You get better logs without beeing sudo with
+```bash
+sudo usermod -aG systemd-journal,adm $USER
+```
+
+
+## Additional Setup
+
+### VPN Configuration (Deprecated)
+1. Create polkit file:
+```bash
+sudo nano /etc/polkit-1/localauthority/10-vendor.d/org.freedesktop.NetworkManager.pkla
+```
+Add:
+```bash
+[nm-applet]
+Identity=unix-user:visss
+Action=org.freedesktop.NetworkManager.*
+ResultAny=yes
+ResultInactive=no
+ResultActive=yes
+```
+
+2. Create VPN script:
+```bash
+#!/bin/bash
+CON="vpn.uni-leipzig.de"
+STATUS=`nmcli con show --active | grep $CON | cut -f1 -d " "`
+if [ -z "$STATUS" ]; then
+    nmcli con up $CON
+fi
+```
+
+3. Add to cron:
+```bash
+crontab -e
+```
+Add:
+```bash
+* * * * * /home/visss/vpn_reconnect.sh > /home/visss/vpn_reconnect.log 2>&1
+```
+
+### Git Access
+1. Generate SSH key:
+```bash
+ssh-keygen -t ed25519 -C "your email"
+cat /home/visss/.ssh/id_ed25519.pub
+```
+
+2. Add key to GitHub repository settings.
+
+3. Set Git remote:
+```bash
+git remote set-url origin git@github.com:maahn/VISSS.git
+```
+
+## Verification
+
+1. Check services status:
+```bash
+sudo systemctl status visss_ptp_master@LEADER_NIC_VISSS
+sudo systemctl status visss_sync_systemclock_to@LEADER_NIC_VISSS
+```
+
+2. Verify RAID status:
+```bash
+sudo mdadm --detail /dev/md0
+```
+
+3. Check system time:
+```bash
+timedatectl status
+```
+
+4. Verify Apache configuration:
+```bash
+sudo apache2ctl -t
+```

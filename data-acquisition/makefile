@@ -77,7 +77,7 @@ install:
 
 $(EXE): $(OBJ_DIR)/visss-data-acquisition.o
 	$(CC) -g $^ $(LCLLIBS) -lpcap -L/usr/local/lib -lGevApi  -lCorW32  -lavcodec -lavutil $(openCV)  $(GENICAM_LIBS) -L$(ARCHLIBDIR) -lstdc++ -o $@
-	/usr/bin/sudo /sbin/setcap cap_sys_nice,cap_net_raw+eip $(EXE)
+	/usr/bin/sudo /sbin/setcap cap_sys_nice,cap_ipc_lock,cap_net_raw+eip $(EXE)
 	#/usr/bin/sudo /sbin/setcap cap_net_raw+eip $(EXE)
 
 $(OBJ_DIR)/visss-data-acquisition.o: $(SRC_DIR)/visss-data-acquisition.cpp
