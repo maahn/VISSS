@@ -408,7 +408,7 @@ void storage_worker_cv::run()
                       << ": " << strerror(errno) << std::endl;
       } else {
         PrintThread{} << "INFO-" << id_ << " | " << get_timestamp()
-                      << " | CPU affinity set to " << cpu_id << std::endl;
+                      << " | CPU storage affinity set to " << cpu_id << std::endl;
       }
     }
   }
