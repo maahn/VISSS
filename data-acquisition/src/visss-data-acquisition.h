@@ -1,7 +1,7 @@
 /**
  * @file visss-data-acquisition.h
  * @brief Header file for VISSS data acquisition system
- * 
+ *
  * This header file contains declarations for the VISSS data acquisition system,
  * including structures, constants, and function prototypes.
  */
@@ -47,7 +47,7 @@
 #include <atomic>
 #include <ctime>
 #include <sstream>
-#include <fcntl.h>   // For fcntl and F_SETPIPE_SZ / F_GETPIPE_SZ
+#include <fcntl.h> // For fcntl and F_SETPIPE_SZ / F_GETPIPE_SZ
 
 // ============================================================================
 /**
@@ -59,9 +59,9 @@ using std::chrono::microseconds;
 
 // ============================================================================
 
-    //int policy = SCHED_FIFO;
-    int policy = SCHED_RR;
-    // int policy = SCHED_OTHER;
+// int policy = SCHED_FIFO;
+int policy = SCHED_RR;
+// int policy = SCHED_OTHER;
 
 /**
  * @brief Device ID buffer for camera
@@ -222,7 +222,8 @@ int minMovingPixel = 20;
 /**
  * @brief Structure to hold image metadata
  */
-struct MatMeta {
+struct MatMeta
+{
   cv::Mat MatImage;
   unsigned long timestamp;
   unsigned long recordtime;
@@ -236,7 +237,8 @@ struct MatMeta {
  * @brief Get formatted timestamp string
  * @return Formatted timestamp string
  */
-std::string get_timestamp() {
+std::string get_timestamp()
+{
   char buffer[26];
   int millisec;
   struct tm *tm_info;
@@ -245,7 +247,8 @@ std::string get_timestamp() {
   gettimeofday(&tv, NULL);
 
   millisec = lrint(tv.tv_usec / 100000.0); // Round to nearest tenth sec
-  if (millisec >= 10) { // Allow for rounding up to nearest second
+  if (millisec >= 10)
+  { // Allow for rounding up to nearest second
     millisec -= 10;
     tv.tv_sec++;
   }
@@ -269,7 +272,8 @@ std::string get_timestamp() {
  * @param target Target path
  * @param link Link path
  */
-void create_symlink(std::string target, std::string link) {
+void create_symlink(std::string target, std::string link)
+{
   int result;
 
   char tmp[200];
@@ -284,7 +288,8 @@ void create_symlink(std::string target, std::string link) {
  * @brief Signal handler for SIGINT/SIGTERM
  * @param s Signal number
  */
-void signal_handler(int s) {
+void signal_handler(int s)
+{
   std::cout << "INFO | " << get_timestamp() << "| Catched signal Ctrl-C"
             << std::endl;
   done = true;
@@ -300,7 +305,8 @@ void signal_handler_null(int s) {}
  * @param path Path to create
  * @return 0 on success, -1 on failure
  */
-int mkdir_p(const char *path) {
+int mkdir_p(const char *path)
+{
   /* Adapted from http://stackoverflow.com/a/2336245/119527 */
   const size_t len = strlen(path);
   char _path[PATH_MAX];
@@ -309,20 +315,24 @@ int mkdir_p(const char *path) {
   errno = 0;
 
   /* Copy string so its mutable */
-  if (len > sizeof(_path) - 1) {
+  if (len > sizeof(_path) - 1)
+  {
     errno = ENAMETOOLONG;
     return -1;
   }
   strcpy(_path, path);
 
   /* Iterate the string */
-  for (p = _path + 1; *p; p++) {
-    if (*p == '/') {
+  for (p = _path + 1; *p; p++)
+  {
+    if (*p == '/')
+    {
       /* Temporarily truncate */
       *p = '\0';
 
       if (mkdir(_path, (S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH |
-                        S_ISVTX)) != 0) {
+                        S_ISVTX)) != 0)
+      {
         if (errno != EEXIST)
           return -1;
       }
@@ -340,13 +350,15 @@ int mkdir_p(const char *path) {
  * @param type OpenCV matrix type
  * @return String representation of type
  */
-std::string type2str(int type) {
+std::string type2str(int type)
+{
   std::string r;
 
   uchar depth = type & CV_MAT_DEPTH_MASK;
   uchar chans = 1 + (type >> CV_CN_SHIFT);
 
-  switch (depth) {
+  switch (depth)
+  {
   case CV_8U:
     r = "8U";
     break;
@@ -386,7 +398,8 @@ std::string type2str(int type) {
  * @param str Input stream
  * @return Vector of strings containing tokens
  */
-std::vector<std::string> getNextLineAndSplitIntoTokens(std::istream &str) {
+std::vector<std::string> getNextLineAndSplitIntoTokens(std::istream &str)
+{
   std::vector<std::string> result;
   std::string line;
   std::getline(str, line);
@@ -394,11 +407,13 @@ std::vector<std::string> getNextLineAndSplitIntoTokens(std::istream &str) {
   std::stringstream lineStream(line);
   std::string cell;
 
-  while (std::getline(lineStream, cell, ',')) {
+  while (std::getline(lineStream, cell, ','))
+  {
     result.push_back(cell);
   }
   // This checks for a trailing comma with no data after it.
-  if (!lineStream && cell.empty()) {
+  if (!lineStream && cell.empty())
+  {
     // If there was a trailing comma then add an empty element.
     result.push_back("");
   }
@@ -412,7 +427,8 @@ std::vector<std::string> getNextLineAndSplitIntoTokens(std::istream &str) {
  * @return Trimmed string
  */
 std::string trim(const std::string &str,
-                 const std::string &whitespace = " \t") {
+                 const std::string &whitespace = " \t")
+{
   const auto strBegin = str.find_first_not_of(whitespace);
   if (strBegin == std::string::npos)
     return ""; // no content
@@ -428,7 +444,8 @@ std::string trim(const std::string &str,
  * @param ipstr IP address string
  * @return Unsigned long representation of IP
  */
-unsigned long iptoul(std::string ipstr) {
+unsigned long iptoul(std::string ipstr)
+{
 
   char *ip = &ipstr[0];
 
@@ -436,7 +453,8 @@ unsigned long iptoul(std::string ipstr) {
   unsigned long val = 0, cvt;
 
   tmp = strtok(ip, ".");
-  for (i = 0; i < 4; i++) {
+  for (i = 0; i < 4; i++)
+  {
     sscanf(tmp, "%lu", &cvt);
     val <<= 8;
     val |= (unsigned char)cvt;
@@ -450,11 +468,13 @@ unsigned long iptoul(std::string ipstr) {
  * Example of use:
  *    PrintThread{} << "Hello world!" << std::endl;
  */
-class PrintThread : public std::ostringstream {
+class PrintThread : public std::ostringstream
+{
 public:
   PrintThread() = default;
 
-  ~PrintThread() {
+  ~PrintThread()
+  {
     std::lock_guard<std::mutex> guard(_mutexPrint);
     std::cout << this->str();
   }
@@ -473,7 +493,8 @@ std::mutex PrintThread::_mutexPrint{};
  */
 using time_point = std::chrono::system_clock::time_point;
 std::string serializeTimePoint(const time_point &time,
-  const std::string &format) {
+                               const std::string &format)
+{
   std::time_t tt = std::chrono::system_clock::to_time_t(time);
   std::tm tm = *std::gmtime(&tt); // GMT (UTC)
   // std::tm tm = *std::localtime(&tt); //Locale time-zone, usually UTC by
@@ -488,7 +509,8 @@ std::string serializeTimePoint(const time_point &time,
  * @param unixTimeMicros Unix time in microseconds
  * @return Formatted time string
  */
-std::string formatUnixTimeMicros(int64_t unixTimeMicros) {
+std::string formatUnixTimeMicros(int64_t unixTimeMicros)
+{
   using namespace std::chrono;
 
   // Convert microseconds to system_clock::time_point
@@ -510,24 +532,26 @@ std::string formatUnixTimeMicros(int64_t unixTimeMicros) {
   return oss.str();
 }
 
+// Initialize with defaults
+int cpu_server = -1;
+int cpu_stream = -1;
+int cpu_other = -1;
+std::vector<std::string> cpu_storage_list = {"-1", "-1"};
+std::vector<std::string> cpu_ffmpeg_list = {"-1", "-1"};
 
-// Initialize with defaults      
-int cpu_server = -1;             
-int cpu_stream = -1;             
-int cpu_other = -1;  
-std::vector<std::string> cpu_storage_list = {"-1","-1"};  
-std::vector<std::string> cpu_ffmpeg_list = {"-1","-1"};  
+// Add the string-to-list conversion logic:
+// Convert string to vector of integers for cpu_storage and cpu_ffmpeg
+auto parse_cpu_list = [](const std::string &str) -> std::vector<std::string>
+{
+  std::vector<std::string> result;
+  if (str.empty() || str == "-1")
+    return result;
 
-// Add the string-to-list conversion logic:                   
-// Convert string to vector of integers for cpu_storage and cpu_ffmpeg                     
-auto parse_cpu_list = [](const std::string& str) -> std::vector<std::string> {                                                                                                                                 
-    std::vector<std::string> result;                                                                                                                                                                           
-    if (str.empty() || str == "-1") return result;                                                                                                                                                             
-                                                                                                                                                                                                               
-    std::stringstream ss(str);                                                                                                                                                                                 
-    std::string item;                                                                                                                                                                                          
-    while (std::getline(ss, item, '@')) {                                                                                                                                                                      
-        result.push_back(item);                                                                                                                                                                                
-    }                                                                                                                                                                                                          
-    return result;                                                                                                                                                                                             
-};    
+  std::stringstream ss(str);
+  std::string item;
+  while (std::getline(ss, item, '@'))
+  {
+    result.push_back(item);
+  }
+  return result;
+};

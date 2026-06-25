@@ -1,7 +1,7 @@
 /**
  * @file processing_worker_cv.h
  * @brief Processing worker class for OpenCV video processing
- * 
+ *
  * This file contains the declaration and implementation of the processing_worker_cv
  * class, which handles processing video frames before storage.
  */
@@ -13,11 +13,12 @@
 
 /**
  * @brief Processing worker class for OpenCV video processing
- * 
+ *
  * This class handles processing video frames before storage, including
  * preprocessing steps and coordination with storage workers.
  */
-class processing_worker_cv {
+class processing_worker_cv
+{
 public:
   /**
    * @brief Constructor
@@ -119,13 +120,15 @@ processing_worker_cv::processing_worker_cv(
       //    , quality_(quality)
       //    , preset_(preset)
       ,
-      t_reset_(t_reset) {}
+      t_reset_(t_reset)
+{
+}
 // //
 // ----------------------------------------------------------------------------
 
 /**
  * @brief Run method - main execution loop
- * 
+ *
  * This method runs in a separate thread and processes frames from the queue,
  * performing preprocessing before passing them to storage workers.
  */
@@ -146,17 +149,21 @@ void processing_worker_cv::run()
                        t_reset_);
 
   // And start the worker threads for each storage worker
-  for (auto &s : storage) {
+  for (auto &s : storage)
+  {
     storage_thread.emplace_back(&storage_worker_cv::run, &s);
   }
 
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-  try {
+  try
+  {
     int32_t frame_count(0);
-    for (;;) {
+    for (;;)
+    {
       MatMeta image(queue_.pop());
-      if (!image.MatImage.empty()) {
+      if (!image.MatImage.empty())
+      {
         high_resolution_clock::time_point t1(high_resolution_clock::now());
 
         ++frame_count;
@@ -165,11 +172,13 @@ void processing_worker_cv::run()
         processedImage.id = image.id;
 
         // Insert a copy into all queues
-        for (auto &q : queue_writer) {
+        for (auto &q : queue_writer)
+        {
           q.push(processedImage);
         }
 
-        if (frame_count % fps_int == 0) {
+        if (frame_count % fps_int == 0)
+        {
           std::cout << "STATUS | " << get_timestamp()
                     << " | Proc. & Stor queues: " << queue_.size() << " & "
                     << queue_writer[0].size()
@@ -190,7 +199,9 @@ void processing_worker_cv::run()
         //     << " in " << (dt_us / 1000.0) << " ms" << std::endl;
       }
     }
-  } catch (frame_queue::cancelled & /*e*/) {
+  }
+  catch (frame_queue::cancelled & /*e*/)
+  {
     // Nothing more to process, we're done
 
     queue_writer[0].cancel();

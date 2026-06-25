@@ -7,36 +7,39 @@ int const max_queue_size = 3000;
 /**
  * @brief Thread-safe queue for frame metadata
  */
-class frame_queue {
+class frame_queue
+{
 public:
   /**
    * @brief Exception thrown when queue is cancelled
    */
-  struct cancelled {};
+  struct cancelled
+  {
+  };
 
   /**
    * @brief Constructor
    */
   frame_queue();
-  
+
   /**
    * @brief Pushes a frame metadata object to the queue
    * @param image Frame metadata to push (rvalue reference)
    */
   void push(MatMeta &&image);
-  
+
   /**
    * @brief Pops a frame metadata object from the queue
    * @return Frame metadata object
    * @throws cancelled if queue has been cancelled
    */
   MatMeta pop();
-  
+
   /**
    * @brief Cancels the queue, waking up all waiting threads
    */
   void cancel();
-  
+
   /**
    * @brief Gets the current size of the queue
    * @return Current size of the queue
@@ -48,27 +51,32 @@ private:
   std::mutex mutex_;
   std::condition_variable cond_;
   bool cancelled_;
-  std::atomic<int> size_estimate_;  // Lock-free size counter
+  std::atomic<int> size_estimate_; // Lock-free size counter
 };
 
 // Constructor
 frame_queue::frame_queue() : cancelled_(false), size_estimate_(0) {}
 
 // Cancel
-void frame_queue::cancel() {
+void frame_queue::cancel()
+{
   std::unique_lock<std::mutex> mlock(mutex_);
   cancelled_ = true;
   cond_.notify_all();
 }
 
-void frame_queue::push(MatMeta &&image) {
-  if (size_estimate_.load(std::memory_order_relaxed) <= max_queue_size) {
+void frame_queue::push(MatMeta &&image)
+{
+  if (size_estimate_.load(std::memory_order_relaxed) <= max_queue_size)
+  {
     std::unique_lock<std::mutex> mlock(mutex_);
-    queue_.push(std::move(image));  // Move instead of copy
+    queue_.push(std::move(image)); // Move instead of copy
     size_estimate_.fetch_add(1, std::memory_order_relaxed);
     mlock.unlock();
     cond_.notify_one();
-  } else {
+  }
+  else
+  {
     std::cout << "FATAL ERROR | " << get_timestamp() << " | Maximum queue size "
               << max_queue_size << " reached. Discarding data!" << std::endl;
     global_error = true;
@@ -76,24 +84,29 @@ void frame_queue::push(MatMeta &&image) {
 }
 
 // Pop - FIXED
-MatMeta frame_queue::pop() {
+MatMeta frame_queue::pop()
+{
   std::unique_lock<std::mutex> mlock(mutex_);
-  while (queue_.empty()) {
-    if (cancelled_) {
+  while (queue_.empty())
+  {
+    if (cancelled_)
+    {
       throw cancelled();
     }
     cond_.wait(mlock);
-    if (cancelled_) {
+    if (cancelled_)
+    {
       throw cancelled();
     }
   }
   MatMeta image(std::move(queue_.front()));
   queue_.pop();
-  size_estimate_.fetch_sub(1, std::memory_order_relaxed);  // Decrement after pop
+  size_estimate_.fetch_sub(1, std::memory_order_relaxed); // Decrement after pop
   return image;
 }
 
 // Size - lock-free
-int frame_queue::size() { 
+int frame_queue::size()
+{
   return size_estimate_.load(std::memory_order_relaxed);
 }

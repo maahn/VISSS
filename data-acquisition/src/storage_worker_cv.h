@@ -1,7 +1,7 @@
 /**
  * @file storage_worker_cv.h
  * @brief Storage worker class for OpenCV video processing
- * 
+ *
  * This file contains the declaration and implementation of the storage_worker_cv
  * class, which handles storing video frames and metadata to disk using FFmpeg
  * and managing the storage process in a separate thread.
@@ -14,11 +14,12 @@
 
 /**
  * @brief Storage worker class for OpenCV video processing
- * 
+ *
  * This class handles storing video frames and metadata to disk using FFmpeg
  * and managing the storage process in a separate thread.
  */
-class storage_worker_cv {
+class storage_worker_cv
+{
 public:
   /**
    * @brief Constructor
@@ -128,7 +129,8 @@ storage_worker_cv::storage_worker_cv(
       //    , quality_(quality)
       //    , preset_(preset)
       ,
-      live_window_frame_ratio_(live_window_frame_ratio) {
+      live_window_frame_ratio_(live_window_frame_ratio)
+{
   PrintThread{} << "INFO-" << id_ << " | " << get_timestamp()
                 << " | Thread storage_worker_cv created" << std::endl;
 }
@@ -139,7 +141,8 @@ storage_worker_cv::storage_worker_cv(
  * @brief Add metadata to output file
  * @param timestamp Timestamp for metadata
  */
-void storage_worker_cv::add_meta_data(unsigned long timestamp) {
+void storage_worker_cv::add_meta_data(unsigned long timestamp)
+{
 
   // std::chrono::milliseconds ms =
   // duration_cast<std::chrono::milliseconds>(t_reset.time_since_epoch());
@@ -185,7 +188,8 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp) {
   fMeta_ << "# PTP Status: " << std::string(ptp_status) << "\n";
   fMeta_ << "# Capture time, Record time, Frame id, Queue Length";
 
-  for (int ll = 0; ll < histSize; ll++) {
+  for (int ll = 0; ll < histSize; ll++)
+  {
     fMeta_ << ", " << std::to_string((int)range[ll]);
   }
   fMeta_ << "\n";
@@ -197,19 +201,23 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp) {
  * @param timestamp Timestamp for opening
  * @param imgSize Size of image
  */
-void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) {
+void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize)
+{
   create_filename(timestamp);
 
-  if (storeVideo) {
+  if (storeVideo)
+  {
     std::string ffmpegCommand = "";
-    // Add taskset command if CPU affinity is set                                   
-    if (!cpu_ffmpeg_list.empty() && cpu_ffmpeg_list.size() > id_) {                 
-      std::string cpu_id = cpu_ffmpeg_list[id_];   
-      if (cpu_id != "-1") {                   
-       // for RT kernel: ffmpegCommand += "chrt -r 1 taskset -c " + cpu_id + " ";              
-        ffmpegCommand += "taskset -c " + cpu_id + " ";              
-      }                                    
-    }        
+    // Add taskset command if CPU affinity is set
+    if (!cpu_ffmpeg_list.empty() && cpu_ffmpeg_list.size() > id_)
+    {
+      std::string cpu_id = cpu_ffmpeg_list[id_];
+      if (cpu_id != "-1")
+      {
+        // for RT kernel: ffmpegCommand += "chrt -r 1 taskset -c " + cpu_id + " ";
+        ffmpegCommand += "taskset -c " + cpu_id + " ";
+      }
+    }
     ffmpegCommand += "ffmpeg -loglevel warning -y -f rawvideo ";
     ffmpegCommand += "-vcodec rawvideo -framerate ";
     ffmpegCommand += std::to_string(fps_);
@@ -223,14 +231,16 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) {
 
     pipeout = popen(ffmpegCommand.data(), "w");
     fd = fileno(pipeout);
-    if (pipeout) {
-    int fd = fileno(pipeout);
-    // Set pipe to 128MB. If this returns < 0, check errno.
-    if (fcntl(fd, F_SETPIPE_SZ, 134217728) < 0) {
+    if (pipeout)
+    {
+      int fd = fileno(pipeout);
+      // Set pipe to 128MB. If this returns < 0, check errno.
+      if (fcntl(fd, F_SETPIPE_SZ, 134217728) < 0)
+      {
         PrintThread{} << "ERROR-" << id_ << " | " << get_timestamp() << " | Could "
-                  << "not set pipe size" << std::endl;
-                  global_error = true;
-    }
+                      << "not set pipe size" << std::endl;
+        global_error = true;
+      }
     }
     // writer_.open(filename_ + ".mkv", cv::CAP_FFMPEG, fourcc_, fps_,
     // frame_size_, is_color_);
@@ -247,7 +257,8 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) {
   //
   fileUsed = false;
 
-  if (storeMeta) {
+  if (storeMeta)
+  {
     // Open the text file.
     fMeta_.open(filename_ + ".txt");
     add_meta_data(timestamp);
@@ -262,22 +273,27 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize) {
  * @brief Close output files
  * @param timestamp Timestamp for closing
  */
-void storage_worker_cv::close_files(unsigned long timestamp) {
+void storage_worker_cv::close_files(unsigned long timestamp)
+{
 
-  if (!firstImage) {
+  if (!firstImage)
+  {
     fMeta_ << "# Last capture time: " << std::to_string(timestamp) << "\n";
     fMeta_.close();
     std::rename((filename_ + ".txt").c_str(),
                 (filename_final_ + ".txt").c_str());
     fflush(pipeout);
     pclose(pipeout);
-    if (fileUsed) {
+    if (fileUsed)
+    {
       std::rename((filename_ + ".mkv").c_str(),
                   (filename_final_ + ".mkv").c_str());
       PrintThread{} << "INFO-" << id_ << " | " << get_timestamp()
                     << " | Written " << filename_final_ + ".mkv" << std::endl;
       create_symlink(filename_final_ + ".mkv", filename_latest_ + ".mkv");
-    } else if (storeVideo) {
+    }
+    else if (storeVideo)
+    {
       std::remove((filename_ + ".mkv").c_str());
       PrintThread{} << "INFO-" << id_ << " | " << get_timestamp()
                     << " | Empty file removed: " << filename_ << ".mkv"
@@ -294,7 +310,8 @@ void storage_worker_cv::close_files(unsigned long timestamp) {
  * @brief Create filename for output
  * @param timestamp Timestamp for filename
  */
-void storage_worker_cv::create_filename(unsigned long timestamp) {
+void storage_worker_cv::create_filename(unsigned long timestamp)
+{
 
   std::string full_path;
   // std::time_t now_c = std::chrono::system_clock::to_time_t(t_reset);
@@ -316,14 +333,17 @@ void storage_worker_cv::create_filename(unsigned long timestamp) {
   //    std::string timestamp1 = serializeTimePoint(t_reset, "%Y/%m/%d");
   //    std::string timestamp2 =serializeTimePoint(t_reset, "%Y%m%d-%H%M%S");
 
-  if (name != "DRYRUN") {
+  if (name != "DRYRUN")
+  {
     full_path = path_ + "/" + hostname + "_" + name + "_" + DeviceID +
                 "/data/" + timestamp1 + "/";
     filename_ = path_ + "/tmp/" + hostname + "_" + name + "_" + DeviceID + "_" +
                 timestamp2 + "_" + std::to_string(id_);
     filename_final_ = full_path + hostname + "_" + name + "_" + DeviceID + "_" +
                       timestamp2 + "_" + std::to_string(id_);
-  } else {
+  }
+  else
+  {
     full_path = path_ + "/";
     filename_ =
         path_ + "/tmp/" + DeviceIDMeta + "_DRYRUN" + "_" + std::to_string(id_);
@@ -333,14 +353,16 @@ void storage_worker_cv::create_filename(unsigned long timestamp) {
   filename_latest_ = path_ + "/" + name + "_latest" + "_" + std::to_string(id_);
 
   res = mkdir_p((path_ + "/tmp/").c_str());
-  if (res != 0) {
+  if (res != 0)
+  {
     std::cerr << "FATAL ERROR" << id_ << " | " << get_timestamp()
               << " | Cannot create path " << (path_ + "/tmp/").c_str()
               << std::endl;
     global_error = true;
   }
   res = mkdir_p(full_path.c_str());
-  if (res != 0) {
+  if (res != 0)
+  {
     std::cerr << "FATAL ERROR" << id_ << " | " << get_timestamp()
               << " | Cannot create path " << full_path.c_str() << std::endl;
     global_error = true;
@@ -373,7 +395,7 @@ void storage_worker_cv::create_filename(unsigned long timestamp) {
 
 /**
  * @brief Run method - main execution loop
- * 
+ *
  * This method runs in a separate thread and processes frames from the queue,
  * storing them to disk and updating metadata.
  */
@@ -383,30 +405,37 @@ void storage_worker_cv::run()
 
   // Set LOWER priority for storage threads (lower than capture thread)
   struct sched_param param_storage;
-  param_storage.sched_priority = 5;  // Much lower than capture thread's priority
-  if (pthread_setschedparam(pthread_self(), SCHED_RR, &param_storage) != 0) {
+  param_storage.sched_priority = 5; // Much lower than capture thread's priority
+  if (pthread_setschedparam(pthread_self(), SCHED_RR, &param_storage) != 0)
+  {
     PrintThread{} << "WARNING-" << id_ << " | " << get_timestamp()
-                  << " | Failed to set storage thread priority: " << strerror(errno) 
+                  << " | Failed to set storage thread priority: " << strerror(errno)
                   << std::endl;
-  } else {
+  }
+  else
+  {
     PrintThread{} << "INFO-" << id_ << " | " << get_timestamp()
                   << " | Storage thread priority set to " << param_storage.sched_priority
                   << std::endl;
   }
-  
 
   // Set CPU affinity if configured
-  if (!cpu_storage_list.empty() && cpu_storage_list.size() > id_) {
+  if (!cpu_storage_list.empty() && cpu_storage_list.size() > id_)
+  {
     std::string cpu_id = cpu_storage_list[id_];
-    if (cpu_id != "-1") {
+    if (cpu_id != "-1")
+    {
       cpu_set_t cpuset;
       CPU_ZERO(&cpuset);
       CPU_SET(std::stoi(cpu_id), &cpuset);
-      if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0) {
+      if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0)
+      {
         PrintThread{} << "WARNING-" << id_ << " | " << get_timestamp()
-                      << " | Failed to set CPU affinity to " << cpu_id 
+                      << " | Failed to set CPU affinity to " << cpu_id
                       << ": " << strerror(errno) << std::endl;
-      } else {
+      }
+      else
+      {
         PrintThread{} << "INFO-" << id_ << " | " << get_timestamp()
                       << " | CPU storage affinity set to " << cpu_id << std::endl;
       }
@@ -460,30 +489,38 @@ void storage_worker_cv::run()
   // get_timestamp() << " | live_window_frame_ratio " <<
   // live_window_frame_ratio_ << std::endl;
 
-  if ((id_ == 0) && showPreview) {
+  if ((id_ == 0) && showPreview)
+  {
     cv::namedWindow("VISSS Live Image | " + name + " | " + std::to_string(id_),
                     cv::WINDOW_AUTOSIZE | cv ::WINDOW_KEEPRATIO);
   }
 
-  try {
+  try
+  {
 
-    for (;;) {
+    for (;;)
+    {
 
       MatMeta image(queue_.pop());
-      if (!image.MatImage.empty()) {
+      if (!image.MatImage.empty())
+      {
         high_resolution_clock::time_point t1(high_resolution_clock::now());
 
         // t_record = t1.time_since_epoch().count()/1000;
 
-        if (noptp) {
+        if (noptp)
+        {
           timestamp_s = (image.timestamp) / 1e6;
           timestamp_us = (image.timestamp);
-        } else {
+        }
+        else
+        {
           timestamp_s = (image.timestamp) / 1e9;
           timestamp_us = (image.timestamp) / 1e3;
         }
 
-        if (firstImage) {
+        if (firstImage)
+        {
           imgOld = image.MatImage * 0;
         }
 
@@ -504,19 +541,23 @@ void storage_worker_cv::run()
         // PrintThread{} <<  "M1 = " << std::endl << " "  << nPixelA[0]<< " "<<
         // nPixelA[1]<< " "<< nPixelA[2]<< " "<< nPixelA[3]<< " "<< nPixelA[4]<<
         // " "<< nPixelA[5] << " "<< nPixelA[6]<< std::endl << std::endl; cumsum
-        for (int ii = histSize - 1; ii-- > 0;) {
+        for (int ii = histSize - 1; ii-- > 0;)
+        {
           nPixelA[ii] = nPixelA[ii] + nPixelA[ii + 1];
         }
 
         movingPixel = false;
         tt = 1;
-        for (uint ll = 0; ll < nPixelA.size(); ll++) {
+        for (uint ll = 0; ll < nPixelA.size(); ll++)
+        {
           movingPixels[ll] = false;
           movingPixelThreshold = minMovingPixel / tt;
-          if (movingPixelThreshold < 2) {
+          if (movingPixelThreshold < 2)
+          {
             movingPixelThreshold = 2;
           }
-          if (nPixelA[ll] >= movingPixelThreshold) {
+          if (nPixelA[ll] >= movingPixelThreshold)
+          {
             movingPixels[ll] = true;
             movingPixel = true;
           }
@@ -534,7 +575,8 @@ void storage_worker_cv::run()
 
         imgOld = image.MatImage.clone();
         // rotate image if required
-        if (rotateImage) {
+        if (rotateImage)
+        {
           cv::rotate(image.MatImage, image.MatImage,
                      cv::ROTATE_90_COUNTERCLOCKWISE);
         }
@@ -542,9 +584,12 @@ void storage_worker_cv::run()
         //     nPixel[tt] = cv::sum(imgDiff > thresholds[tt])[0];
         // }
         // https://webcache.googleusercontent.com/search?q=cache:iUCC_CSnaLwJ:https://answers.opencv.org/question/60753/counting-black-white-pixels-with-a-threshold/+&cd=1&hl=de&ct=clnk&gl=de
-        if (site == "none") {
+        if (site == "none")
+        {
           textImg = "";
-        } else {
+        }
+        else
+        {
           textImg = site + " | ";
         }
 
@@ -561,18 +606,22 @@ void storage_worker_cv::run()
         tempStr = formatUnixTimeMicros(timestamp_us);
         textImg = textImg + tempStr + " | " + name +
                   " | Q:" + std::to_string(queue_.size()) + " | H: ";
-        for (int jj = histSize; jj-- > 0;) {
-          if (movingPixels[jj]) {
+        for (int jj = histSize; jj-- > 0;)
+        {
+          if (movingPixels[jj])
+          {
             old_string = std::to_string((int)range[jj]);
             new_string = std::string(3 - old_string.length(), '0') + old_string;
             textImg = textImg + new_string;
             break;
           }
         }
-        if (movingPixel || firstImage) {
+        if (movingPixel || firstImage)
+        {
           borderColor = (0);
-
-        } else {
+        }
+        else
+        {
           borderColor = (100);
           textImg = textImg + "N.R.";
         }
@@ -581,7 +630,8 @@ void storage_worker_cv::run()
         movePercentStr = cv::format("%3.1f", movePercent);
         textImg = textImg + " | M: " + movePercentStr + "%";
         textImg = textImg + " | " + std::to_string(id_);
-        if (queryGain) {
+        if (queryGain)
+        {
           textImg = textImg + " | E" + std::to_string((int)image.ExposureTime);
           textImg = textImg + "G" + std::to_string((int)image.Gain);
         }
@@ -590,17 +640,19 @@ void storage_worker_cv::run()
 
         cv::putText(imgWithMeta, textImg, cv::Point(20, 40), // Coordinates
                     cv::FONT_HERSHEY_PLAIN,                  // Font
-                    1.8,             // Scale. 2.0 = 2x bigger
-                    cv::Scalar(255), // BGR Color
-                    1,               // Line Thickness (Optional)
-                    cv::LINE_AA);    // Anti-alias (Optional)
+                    1.8,                                     // Scale. 2.0 = 2x bigger
+                    cv::Scalar(255),                         // BGR Color
+                    1,                                       // Line Thickness (Optional)
+                    cv::LINE_AA);                            // Anti-alias (Optional)
 
-        if (firstImage || image.newFile) {
+        if (firstImage || image.newFile)
+        {
 
           close_files(last_timestamp);
           open_files(timestamp_us, imgWithMeta.size());
 
-          if (storeVideo) {
+          if (storeVideo)
+          {
             cv::imwrite(filename_final_ + ".jpg", imgWithMeta);
             create_symlink(filename_final_ + ".jpg", filename_latest_ + ".jpg");
             // PrintThread{} ;
@@ -617,24 +669,29 @@ void storage_worker_cv::run()
         // statusFrame = (frame_count % ((int)fps_ *10) == 0) && (id_ == 0);
         statusFrame = ((timestamp_s) % 10 == 0) &&
                       (framesSinceLastStatus > (1.5 * fps_)) && (id_ == 0);
-        if (statusFrame) {
+        if (statusFrame)
+        {
           framesSinceLastStatus = 0;
         }
         if (writeallframes || movingPixel || firstImage || image.newFile ||
-            statusFrame) {
-          if (storeVideo) {
+            statusFrame)
+        {
+          if (storeVideo)
+          {
             // writer_.write(imgWithMeta);
             size_t sizeInBytes = imgWithMeta.step[0] * imgWithMeta.rows;
-            write(fd,imgWithMeta.data, sizeInBytes);
+            write(fd, imgWithMeta.data, sizeInBytes);
             fileUsed = true;
           }
-          if (storeMeta) {
+          if (storeMeta)
+          {
             message = std::to_string(timestamp_us) + ", " +
                       std::to_string(image.recordtime) + ", " +
                       std::to_string(image.id) + ", " +
                       std::to_string(queue_.size());
 
-            for (int kk = 0; kk < histSize; kk++) {
+            for (int kk = 0; kk < histSize; kk++)
+            {
               message = message + ", " + std::to_string((int)nPixelA[kk]);
             }
             message = message + "\n";
@@ -643,19 +700,23 @@ void storage_worker_cv::run()
           }
           ++frame_count_moving;
         }
-        if (frame_count % (int)fps_ == 0) {
+        if (frame_count % (int)fps_ == 0)
+        {
 
           message = "STATUS" + std::to_string(id_) + " | " + get_timestamp() +
                     " | Queue:" + std::to_string(queue_.size()) +
                     " | ID:" + std::to_string(image.id) + " | M: ";
-          for (int jj = histSize; jj-- > 0;) {
-            if (movingPixels[jj]) {
+          for (int jj = histSize; jj-- > 0;)
+          {
+            if (movingPixels[jj])
+            {
               message = message + std::to_string((int)range[jj]);
               break;
             }
           }
           message = message + " | M: " + movePercentStr + "%";
-          if (queryGain) {
+          if (queryGain)
+          {
             message =
                 message + " | E: " + std::to_string((int)image.ExposureTime);
             message = message + " | G: " + std::to_string((int)image.Gain);
@@ -664,7 +725,8 @@ void storage_worker_cv::run()
           std::cout << std::flush;
         }
         if ((id_ == 0) && showPreview &&
-            (frame_count % (live_window_frame_ratio_ / nStorageThreads) == 0)) {
+            (frame_count % (live_window_frame_ratio_ / nStorageThreads) == 0))
+        {
 
           cv::resize(imgWithMeta, imgSmall, cv::Size(), 0.4, 0.4);
           cv::imshow("VISSS Live Image | " + name + " | " + std::to_string(id_),
@@ -688,7 +750,9 @@ void storage_worker_cv::run()
         //     << " in " << (dt_us / 1000.0) << " ms" << std::endl;
       }
     }
-  } catch (frame_queue::cancelled & /*e*/) {
+  }
+  catch (frame_queue::cancelled & /*e*/)
+  {
     // Nothing more to process, we're done
     PrintThread{} << "INFO-" << id_ << " | " << get_timestamp()
                   << " | Storage queue " << id_

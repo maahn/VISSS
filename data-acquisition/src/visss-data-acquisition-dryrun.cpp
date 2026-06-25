@@ -3,7 +3,7 @@
 /**
  * @file visss-data-acquisition-dryrun.cpp
  * @brief Dry-run data acquisition program for VISSS system
- * 
+ *
  * This file contains the main implementation for the VISSS data acquisition
  * system in dry-run mode, which processes video files instead of live camera
  * data.
@@ -26,7 +26,7 @@
 
 /**
  * @brief Command line parameters for the dry-run application
- * 
+ *
  * Supported parameters:
  * - help (-h): Print usage
  * - output (-o): Output Path
@@ -78,9 +78,11 @@ const char *params =
  * @brief Get a character from standard input
  * @return Character input from user
  */
-char GetKey() {
+char GetKey()
+{
   char key = getchar();
-  while ((key == '\r') || (key == '\n')) {
+  while ((key == '\r') || (key == '\n'))
+  {
     key = getchar();
   }
   return key;
@@ -89,7 +91,8 @@ char GetKey() {
 /**
  * @brief Print menu instructions to user
  */
-void PrintMenu() {
+void PrintMenu()
+{
   std::cout << "***************************************************************"
                "***********"
             << std::endl;
@@ -102,7 +105,8 @@ void PrintMenu() {
 /**
  * @brief Context structure for image capture thread
  */
-typedef struct tagMY_CONTEXT {
+typedef struct tagMY_CONTEXT
+{
   cv::VideoCapture fileHandle;
   std::string csvFile;
   std::string base_name;
@@ -120,12 +124,14 @@ typedef struct tagMY_CONTEXT {
  * @param context Pointer to capture context
  * @return NULL pointer
  */
-void *ImageCaptureThread(void *context) {
+void *ImageCaptureThread(void *context)
+{
   MY_CONTEXT *captureContext = (MY_CONTEXT *)context;
   bool was_active = false;
   printf("THREAD1 ImageCaptureThread\n");
 
-  if (captureContext != NULL) {
+  if (captureContext != NULL)
+  {
     int sequence_init = 0;
     unsigned int sequence_count = 0;
 
@@ -160,21 +166,24 @@ void *ImageCaptureThread(void *context) {
     cv::Mat exportImg;
 
     // While we are still running.
-    while (!captureContext->exit) {
+    while (!captureContext->exit)
+    {
 
       // Wait for images to be received
       captureContext->fileHandle >> exportImg;
       // get time for recordtime timestamp
       high_resolution_clock::time_point tr(high_resolution_clock::now());
 
-      if (!exportImg.empty()) {
+      if (!exportImg.empty())
+      {
 
         was_active = true;
 
         // skip comment
         std::string csvLine;
         std::getline(csvHandle, csvLine);
-        while (csvLine.rfind("#", 0) == 0) {
+        while (csvLine.rfind("#", 0) == 0)
+        {
           std::getline(csvHandle, csvLine);
         }
         // copy data form ascii file
@@ -184,7 +193,8 @@ void *ImageCaptureThread(void *context) {
 
         ascii_timestamp = atol(trim(csvLines[0]).c_str());
 
-        if ((captureContext->enable_sequence) || (sequence_init == 1)) {
+        if ((captureContext->enable_sequence) || (sequence_init == 1))
+        {
 
           high_resolution_clock::time_point t1(high_resolution_clock::now());
 
@@ -197,7 +207,8 @@ void *ImageCaptureThread(void *context) {
 
           MatMeta exportImgMeta;
 
-          if (!sequence_init) {
+          if (!sequence_init)
+          {
             // init
 
             //--- INITIALIZE VIDEOWRITER
@@ -215,7 +226,8 @@ void *ImageCaptureThread(void *context) {
             // started" << std::endl;
 
             // And start the worker threads for each storage worker
-            for (auto &s : storage) {
+            for (auto &s : storage)
+            {
               printf("THREAD1 storage_thread.emplace_back\n");
               storage_thread.emplace_back(&storage_worker_cv::run, &s);
             }
@@ -240,7 +252,8 @@ void *ImageCaptureThread(void *context) {
           exportImgMeta.id = ascii_id;
 
           // Insert a copy into all queues
-          for (auto &q : queue) {
+          for (auto &q : queue)
+          {
             q.push(std::move(exportImgMeta));
           }
 
@@ -261,13 +274,15 @@ void *ImageCaptureThread(void *context) {
           // rest n_timeout after success
           n_timeouts = 0;
 
-          if ((maxframes > 0) && (frame_count >= maxframes)) {
+          if ((maxframes > 0) && (frame_count >= maxframes))
+          {
             std::cout << "FATAL ERROR | " << get_timestamp()
                       << " | Reached maximum number of frames" << std::endl;
             global_error = true;
           }
 
-          if (!captureContext->enable_sequence) {
+          if (!captureContext->enable_sequence)
+          {
             std::cout << "STATUS | " << get_timestamp()
                       << " | Complete sequence has " << sequence_count
                       << " frames" << std::endl;
@@ -276,17 +291,17 @@ void *ImageCaptureThread(void *context) {
 
             // writer.release();
           }
-
         }
 
-        else {
+        else
+        {
           printf("WAITING Frame %llu\r", (unsigned long long)id);
           fflush(stdout);
         }
-
       }
 
-      else {
+      else
+      {
         std::cerr << "STATUS | " << get_timestamp()
                   << " | Arrived at the end of the file" << std::endl;
         captureContext->exit = 1;
@@ -296,7 +311,8 @@ void *ImageCaptureThread(void *context) {
 
       // See if a sequence in progress needs to be stopped here.
       if (global_error ||
-          ((!captureContext->enable_sequence) && (sequence_init == 1))) {
+          ((!captureContext->enable_sequence) && (sequence_init == 1)))
+      {
         std::cout << "STATUS | " << get_timestamp()
                   << " | Complete sequence has " << sequence_count << "frames"
                   << std::endl;
@@ -304,7 +320,8 @@ void *ImageCaptureThread(void *context) {
         sequence_init = 0;
       }
 
-      if (global_error) {
+      if (global_error)
+      {
         captureContext->enable_sequence = 0;
         captureContext->exit = 1;
         std::cerr << "FATAL ERROR | " << get_timestamp()
@@ -312,7 +329,8 @@ void *ImageCaptureThread(void *context) {
       }
       id++;
 
-      if (storeVideo) {
+      if (storeVideo)
+      {
         // don'be too fast in dry run mode
         int sleeptime = 1000 / captureContext->fps;
         std::this_thread::sleep_for(std::chrono::milliseconds(sleeptime));
@@ -320,10 +338,12 @@ void *ImageCaptureThread(void *context) {
 
     } // while
 
-    if (was_active) {
+    if (was_active)
+    {
 
       // We're done reading, cancel all the queues
-      for (auto &q : queue) {
+      for (auto &q : queue)
+      {
         q.cancel();
       }
 
@@ -358,7 +378,8 @@ void *ImageCaptureThread(void *context) {
  * @param argv Array of command line arguments
  * @return Exit status
  */
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   cv::String videoFileIn;
   std::string videoFileInRaw;
   MY_CONTEXT context;
@@ -385,7 +406,8 @@ int main(int argc, char **argv) {
 
   cv ::CommandLineParser parser(argc, argv, params);
 
-  if (parser.has("help")) {
+  if (parser.has("help"))
+  {
     parser.printMessage();
     return 0;
   }
@@ -438,30 +460,41 @@ int main(int argc, char **argv) {
             << maxframes << std::endl;
 
   writeallframes1 = parser.get<int>("writeallframes");
-  if (writeallframes1 == 0) {
+  if (writeallframes1 == 0)
+  {
     writeallframes = false;
-  } else if (writeallframes1 == 1) {
+  }
+  else if (writeallframes1 == 1)
+  {
     writeallframes = true;
-  } else {
+  }
+  else
+  {
     std::cerr << "FATAL ERROR | " << get_timestamp()
               << "| writeallframes must be 0 or 1 " << writeallframes1
               << std::endl;
     global_error = true;
   }
   followermode1 = parser.get<int>("followermode");
-  if (followermode1 == 0) {
+  if (followermode1 == 0)
+  {
     max_n_timeouts1 = max_n_timeouts;
-  } else if (followermode1 == 1) {
+  }
+  else if (followermode1 == 1)
+  {
     max_n_timeouts1 =
         max_n_timeouts * 10; // tolerate more timeouts as a follower
-  } else {
+  }
+  else
+  {
     std::cerr << "FATAL ERROR | " << get_timestamp()
               << "| followermode must be 0 or 1 " << followermode1 << std::endl;
     global_error = true;
   }
 
   minBrightnessChange = parser.get<int>("minBrightChange");
-  if (minBrightnessChange == 20) {
+  if (minBrightnessChange == 20)
+  {
     range[0] = 20;
     range[1] = 30;
     range[2] = 40;
@@ -470,7 +503,9 @@ int main(int argc, char **argv) {
     range[5] = 100;
     range[6] = 120;
     range[7] = 256; // the upper boundary is exclusive;
-  } else if (minBrightnessChange == 30) {
+  }
+  else if (minBrightnessChange == 30)
+  {
     range[0] = 30;
     range[1] = 40;
     range[2] = 60;
@@ -479,7 +514,9 @@ int main(int argc, char **argv) {
     range[5] = 120;
     range[6] = 140;
     range[7] = 256; // the upper boundary is exclusive;
-  } else {
+  }
+  else
+  {
     std::cerr << "FATAL ERROR | " << get_timestamp()
               << "| minBrightChange must be 20 or 30 " << minBrightnessChange
               << std::endl;
@@ -499,11 +536,16 @@ int main(int argc, char **argv) {
             << storeMeta << std::endl;
 
   queryGain1 = parser.get<int>("querygain");
-  if (queryGain1 == 0) {
+  if (queryGain1 == 0)
+  {
     queryGain = false;
-  } else if (queryGain1 == 1) {
+  }
+  else if (queryGain1 == 1)
+  {
     queryGain = true;
-  } else {
+  }
+  else
+  {
     std::cerr << "FATAL ERROR | " << get_timestamp()
               << "| queryGain must be 0 or 1 " << queryGain1 << std::endl;
     global_error = true;
@@ -523,14 +565,18 @@ int main(int argc, char **argv) {
                "***********"
             << std::endl;
 
-  try {
+  try
+  {
     context.fileHandle = cv::VideoCapture(videoFileIn);
-  } catch (const char *) {
+  }
+  catch (const char *)
+  {
     std::cerr << "FATAL ERROR | " << get_timestamp() << "| Cannot open  "
               << videoFileIn << std::endl;
     return 1;
   }
-  if (!context.fileHandle.isOpened()) {
+  if (!context.fileHandle.isOpened())
+  {
     std::cerr << "FATAL ERROR | " << get_timestamp() << "| Cannot open2  "
               << videoFileIn << std::endl;
     return 1;
@@ -564,11 +610,13 @@ int main(int argc, char **argv) {
   sigIntHandler_null.sa_flags = 0;
   sigaction(SIGALRM, &sigIntHandler_null, NULL);
 
-  while (!(global_error) && (!done)) {
+  while (!(global_error) && (!done))
+  {
     alarm(1);
     c = GetKey();
 
-    if ((c == 0x1b) || (c == 'q') || (c == 'Q')) {
+    if ((c == 0x1b) || (c == 'q') || (c == 'Q'))
+    {
       done = true;
     }
   }
