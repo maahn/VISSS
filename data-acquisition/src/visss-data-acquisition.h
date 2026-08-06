@@ -113,11 +113,13 @@ int max_n_timeouts = 30;
 /**
  * @brief Global error flag
  */
-bool global_error = false;
+std::atomic<bool> global_error = false;
 /**
- * @brief Done flag
+ * @brief Done flag. Set from signal_handler(), so it must not be a plain
+ * bool/int: reading/writing a non-atomic variable concurrently with a
+ * signal handler is undefined behaviour.
  */
-int done = false;
+std::atomic<bool> done = false;
 /**
  * @brief Configuration file string
  */
