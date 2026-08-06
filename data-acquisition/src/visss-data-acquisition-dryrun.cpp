@@ -380,6 +380,12 @@ void *ImageCaptureThread(void *context)
  */
 int main(int argc, char **argv)
 {
+  // Storage workers write video frames into an ffmpeg pipe. If that
+  // subprocess dies, the next write() would raise SIGPIPE, whose default
+  // action kills the whole process. Ignore it so failed writes are instead
+  // reported through their normal EPIPE return value.
+  signal(SIGPIPE, SIG_IGN);
+
   cv::String videoFileIn;
   std::string videoFileInRaw;
   MY_CONTEXT context;
