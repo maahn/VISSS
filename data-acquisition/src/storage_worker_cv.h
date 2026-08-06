@@ -79,8 +79,8 @@ private:
   unsigned long timestamp_us = 0;
 
   // cv::VideoWriter writer_;
-  FILE *pipeout;
-  int fd;
+  FILE *pipeout = nullptr;
+  int fd = -1;
   /**
    * @brief Add metadata to output file
    * @param timestamp Timestamp for metadata
@@ -288,8 +288,12 @@ void storage_worker_cv::close_files(unsigned long timestamp)
     fMeta_.close();
     std::rename((filename_ + ".txt").c_str(),
                 (filename_final_ + ".txt").c_str());
-    fflush(pipeout);
-    pclose(pipeout);
+    if (pipeout)
+    {
+      fflush(pipeout);
+      pclose(pipeout);
+      pipeout = nullptr;
+    }
     if (fileUsed)
     {
       std::rename((filename_ + ".mkv").c_str(),
