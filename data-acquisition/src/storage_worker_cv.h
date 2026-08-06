@@ -476,7 +476,7 @@ void storage_worker_cv::run()
   int number_of_zeros;
 
   // boost::container::vector<bool>[histSize] movingPixels;
-  bool movingPixels[histSize];
+  bool movingPixels[MAX_HIST_SIZE];
   float movingPixelThreshold;
   bool movingPixel = false;
   int tt = 0;

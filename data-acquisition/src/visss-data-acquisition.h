@@ -199,12 +199,16 @@ unsigned long t_reset_uint_applied = 0;
 unsigned long id_offset = 0;
 
 /**
+ * @brief Maximum supported histogram size (bounds fixed-size arrays sized by histSize)
+ */
+const int MAX_HIST_SIZE = 8;
+/**
  * @brief Histogram range array
  */
 // histogram
 // float range[] = {20,30,40,60,80,100,120, 256  }; //the upper boundary is
 // exclusive
-float range[8]; // = {30,40,60,80,100,120, 140, 256  }; //the upper boundary is
+float range[MAX_HIST_SIZE]; // = {30,40,60,80,100,120, 140, 256  }; //the upper boundary is
                 // exclusive
 /**
  * @brief Histogram size
