@@ -982,9 +982,6 @@ int main(int argc, char *argv[])
   std::string camSerial = parser.get<cv::String>(1);
   std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Camera IP " << camSerial
             << std::endl;
-  // uint long camIPl = iptoul(camIP);
-  // std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Camera IP long "
-  //           << camIPl << std::endl;
   int camIndex = 0;
 
   encoding = parser.get<cv::String>("encoding");

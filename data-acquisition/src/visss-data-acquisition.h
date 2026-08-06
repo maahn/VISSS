@@ -460,36 +460,6 @@ std::string trim(const std::string &str,
 }
 
 /**
- * @brief Convert IP address string to unsigned long
- * @param ipstr IP address string
- * @return Unsigned long representation of IP
- */
-unsigned long iptoul(std::string ipstr)
-{
-  unsigned long val = 0;
-  std::stringstream ss(ipstr);
-  std::string octetStr;
-  int octetCount = 0;
-
-  while ((octetCount < 4) && std::getline(ss, octetStr, '.'))
-  {
-    unsigned long octet = 0;
-    try
-    {
-      octet = std::stoul(octetStr);
-    }
-    catch (const std::exception &)
-    {
-      octet = 0;
-    }
-    val <<= 8;
-    val |= (octet & 0xff);
-    ++octetCount;
-  }
-  return val;
-}
-
-/**
  * @brief Thread safe cout class
  * Example of use:
  *    PrintThread{} << "Hello world!" << std::endl;
