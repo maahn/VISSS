@@ -352,11 +352,8 @@ void *ImageCaptureThread(void *context)
   uint id_offset = 0;
 
   int type;
-  UINT32 val = 0;
   float valF = 0;
-  UINT32 valI = 0;
 
-  GEV_STATUS status = 0;
   GEV_STATUS statusF = 0;
 
   if (captureContext != NULL)
@@ -927,23 +924,18 @@ int main(int argc, char *argv[])
   // GEV_DEVICE_INTERFACE  pCamera[MAX_CAMERAS] = {0};
   GEV_STATUS status;
   GEV_STATUS status2;
-  int numCamera = 0;
   MY_CONTEXT context = {0};
   pthread_t tid;
   char c;
-  int res = 0;
   int writeallframes1;
   int noptp1;
   int rotateImage1;
   int queryGain1;
   int followermode1;
-  int rotate1;
   int minBrightnessChange;
   std::string cpu_storage_str, cpu_ffmpeg_str;
   FILE *fp = NULL;
-  FILE *fp2 = NULL;
   // char uniqueName[FILENAME_MAX];
-  char filename[FILENAME_MAX] = {0};
   // uint32_t macLow = 0; // Low 32-bits of the mac address (for file naming).
   int error_count = 0;
   int feature_count = 0;
@@ -982,7 +974,6 @@ int main(int argc, char *argv[])
   std::string camSerial = parser.get<cv::String>(1);
   std::cout << "DEBUG | " << get_timestamp() << " | PARSER: Camera IP " << camSerial
             << std::endl;
-  int camIndex = 0;
 
   encoding = parser.get<cv::String>("encoding");
   // std::cout << "DEBUG | " << get_timestamp() << " | PARSER: FFMPEG encoding
@@ -1196,8 +1187,6 @@ int main(int argc, char *argv[])
   // scheduler) is not too bad afer all.
   if (1)
   {
-    pthread_attr_t attrib;
-    int inherit_sched = 0;
     struct sched_param param = {0};
 
     // CHANGE THIS - don't calculate, set explicitly HIGH for capture thread
