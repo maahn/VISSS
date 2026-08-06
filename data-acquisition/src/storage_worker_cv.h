@@ -230,10 +230,9 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize)
     ffmpegCommand += " " + filename_ + ".mkv";
 
     pipeout = popen(ffmpegCommand.data(), "w");
-    fd = fileno(pipeout);
     if (pipeout)
     {
-      int fd = fileno(pipeout);
+      fd = fileno(pipeout);
       // Set pipe to 128MB. If this returns < 0, check errno.
       if (fcntl(fd, F_SETPIPE_SZ, 134217728) < 0)
       {
@@ -241,6 +240,13 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize)
                       << "not set pipe size" << std::endl;
         global_error = true;
       }
+    }
+    else
+    {
+      PrintThread{} << "FATAL ERROR-" << id_ << " | " << get_timestamp()
+                    << " | Failed to start ffmpeg: " << strerror(errno)
+                    << std::endl;
+      global_error = true;
     }
     // writer_.open(filename_ + ".mkv", cv::CAP_FFMPEG, fourcc_, fps_,
     // frame_size_, is_color_);
