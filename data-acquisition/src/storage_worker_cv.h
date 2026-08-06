@@ -638,7 +638,7 @@ void storage_worker_cv::run()
           textImg = textImg + "N.R.";
         }
 
-        movePercent = frame_count_moving * 100 / (frame_count_infile + 1);
+        movePercent = frame_count_moving * 100.0f / (frame_count_infile + 1);
         movePercentStr = cv::format("%3.1f", movePercent);
         textImg = textImg + " | M: " + movePercentStr + "%";
         textImg = textImg + " | " + std::to_string(id_);
