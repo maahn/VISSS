@@ -6,6 +6,7 @@
 *.lo
 *.o
 *.obj
+*.pyc
 
 # Precompiled Headers
 *.gch
@@ -52,3 +53,4 @@ data-acquisition/visss-data-acquisition-dryrun
 tmp.json
 data-acquisition/xml/
 .aider*
+.claude*
