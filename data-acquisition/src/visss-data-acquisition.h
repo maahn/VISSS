@@ -287,14 +287,21 @@ std::string get_timestamp()
  */
 void create_symlink(std::string target, std::string link)
 {
-  int result;
+  std::string tmp = link + ".tmp";
 
-  char tmp[200];
-  strcpy(tmp, link.c_str());
-  strcat(tmp, ".tmp");
-
-  result = symlink(target.c_str(), tmp);
-  rename(tmp, link.c_str());
+  if (symlink(target.c_str(), tmp.c_str()) != 0)
+  {
+    std::cerr << "ERROR | " << get_timestamp() << " | Failed to create symlink "
+              << tmp << " -> " << target << ": " << strerror(errno) << std::endl;
+    global_error = true;
+    return;
+  }
+  if (rename(tmp.c_str(), link.c_str()) != 0)
+  {
+    std::cerr << "ERROR | " << get_timestamp() << " | Failed to rename "
+              << tmp << " to " << link << ": " << strerror(errno) << std::endl;
+    global_error = true;
+  }
 }
 
 /**
