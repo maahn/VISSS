@@ -91,6 +91,12 @@ float transferMaxBlockSize = -99;
  * @brief PTP status string
  */
 char ptp_status[64] = {0};
+/**
+ * @brief Guards cameraTemperature/ptp_status/transferQueueCurrentBlockCount/
+ * transferMaxBlockSize, which are written by the capture thread and read by
+ * every storage worker thread
+ */
+std::mutex cameraStatusMutex;
 
 /**
  * @brief Hostname buffer

@@ -182,11 +182,23 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp)
   fMeta_ << "# Camera configuration: "
          << configFile.substr(configFile.find_last_of("/\\") + 1) << "\n";
   fMeta_ << "# Hostname: " << hostname << "\n";
-  fMeta_ << "# Camera Temperature: " << cameraTemperature << "\n";
+
+  std::string cameraTemperatureCopy;
+  int transferQueueCurrentBlockCountCopy;
+  float transferMaxBlockSizeCopy;
+  std::string ptpStatusCopy;
+  {
+    std::lock_guard<std::mutex> statusLock(cameraStatusMutex);
+    cameraTemperatureCopy = cameraTemperature;
+    transferQueueCurrentBlockCountCopy = transferQueueCurrentBlockCount;
+    transferMaxBlockSizeCopy = transferMaxBlockSize;
+    ptpStatusCopy = std::string(ptp_status);
+  }
+  fMeta_ << "# Camera Temperature: " << cameraTemperatureCopy << "\n";
   fMeta_ << "# transferQueueCurrentBlockCount: "
-         << transferQueueCurrentBlockCount << "\n";
-  fMeta_ << "# transferMaxBlockSize MB: " << transferMaxBlockSize << "\n";
-  fMeta_ << "# PTP Status: " << std::string(ptp_status) << "\n";
+         << transferQueueCurrentBlockCountCopy << "\n";
+  fMeta_ << "# transferMaxBlockSize MB: " << transferMaxBlockSizeCopy << "\n";
+  fMeta_ << "# PTP Status: " << ptpStatusCopy << "\n";
   fMeta_ << "# Capture time, Record time, Frame id, Queue Length";
 
   for (int ll = 0; ll < histSize; ll++)

@@ -495,52 +495,56 @@ void *ImageCaptureThread(void *context)
               timeStart = static_cast<long int>(time(NULL));
               // read temperature
 
-              statusF = GevGetFeatureValue(
-                  captureContext->camHandle, "DeviceTemperature", &type,
-                  sizeof(cameraTemperatureF), &cameraTemperatureF);
-              cameraTemperature = std::to_string(cameraTemperatureF);
-
-              // // network statistics
-              statusF += GevGetFeatureValue(
-                  captureContext->camHandle, "transferQueueCurrentBlockCount",
-                  &type, sizeof(transferQueueCurrentBlockCount),
-                  &transferQueueCurrentBlockCount);
-              statusF += GevGetFeatureValue(
-                  captureContext->camHandle, "transferMaxBlockSize", &type,
-                  sizeof(transferMaxBlockSize), &transferMaxBlockSize);
-              statusF += GevGetFeatureValueAsString(
-                  captureContext->camHandle, "ptpStatus", &type,
-                  sizeof(ptp_status), ptp_status);
-
-              if (statusF == GEVLIB_OK)
               {
-                PrintThread{}
-                    << "INFO | " << get_timestamp() << " | Temperature "
-                    << cameraTemperature << ", transferMaxBlockSize MB "
-                    << std::to_string(transferMaxBlockSize)
-                    << ", transferQueueCurrentBlockCount "
-                    << transferQueueCurrentBlockCount << ", ptpStatus "
-                    << std::string(ptp_status) << std::endl;
-              }
-              else
-              {
-                // if it does not work it typically indicates a larger problem,
-                // so better exit (and restart)
-                std::cout << std::endl
-                          << "FATAL ERROR | " << get_timestamp()
-                          << " | Unable to read temperature and other status "
-                             "information"
-                          << statusF << std::endl;
-                global_error = true;
-              }
+                std::lock_guard<std::mutex> statusLock(cameraStatusMutex);
 
-              if ((!noptp) && (std::string(ptp_status) != "Slave"))
-              {
-                std::cout << std::endl
-                          << "FATAL ERROR | " << get_timestamp()
-                          << " | Lost PTP clock synchronization: " << ptp_status
-                          << std::endl;
-                global_error = true;
+                statusF = GevGetFeatureValue(
+                    captureContext->camHandle, "DeviceTemperature", &type,
+                    sizeof(cameraTemperatureF), &cameraTemperatureF);
+                cameraTemperature = std::to_string(cameraTemperatureF);
+
+                // // network statistics
+                statusF += GevGetFeatureValue(
+                    captureContext->camHandle, "transferQueueCurrentBlockCount",
+                    &type, sizeof(transferQueueCurrentBlockCount),
+                    &transferQueueCurrentBlockCount);
+                statusF += GevGetFeatureValue(
+                    captureContext->camHandle, "transferMaxBlockSize", &type,
+                    sizeof(transferMaxBlockSize), &transferMaxBlockSize);
+                statusF += GevGetFeatureValueAsString(
+                    captureContext->camHandle, "ptpStatus", &type,
+                    sizeof(ptp_status), ptp_status);
+
+                if (statusF == GEVLIB_OK)
+                {
+                  PrintThread{}
+                      << "INFO | " << get_timestamp() << " | Temperature "
+                      << cameraTemperature << ", transferMaxBlockSize MB "
+                      << std::to_string(transferMaxBlockSize)
+                      << ", transferQueueCurrentBlockCount "
+                      << transferQueueCurrentBlockCount << ", ptpStatus "
+                      << std::string(ptp_status) << std::endl;
+                }
+                else
+                {
+                  // if it does not work it typically indicates a larger problem,
+                  // so better exit (and restart)
+                  std::cout << std::endl
+                            << "FATAL ERROR | " << get_timestamp()
+                            << " | Unable to read temperature and other status "
+                               "information"
+                            << statusF << std::endl;
+                  global_error = true;
+                }
+
+                if ((!noptp) && (std::string(ptp_status) != "Slave"))
+                {
+                  std::cout << std::endl
+                            << "FATAL ERROR | " << get_timestamp()
+                            << " | Lost PTP clock synchronization: " << ptp_status
+                            << std::endl;
+                  global_error = true;
+                }
               }
             }
 
