@@ -946,6 +946,12 @@ int main(int argc, char *argv[])
 
   nice(-15);
 
+  // Storage workers write video frames into an ffmpeg pipe. If that
+  // subprocess dies, the next write() would raise SIGPIPE, whose default
+  // action kills the whole process. Ignore it so failed writes are instead
+  // reported through their normal EPIPE return value.
+  signal(SIGPIPE, SIG_IGN);
+
   //============================================================================
   // Greetings
   std::cout << "VISSS data acquisition (" << __DATE__ << ")" << std::endl;
