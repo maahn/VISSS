@@ -466,21 +466,27 @@ std::string trim(const std::string &str,
  */
 unsigned long iptoul(std::string ipstr)
 {
+  unsigned long val = 0;
+  std::stringstream ss(ipstr);
+  std::string octetStr;
+  int octetCount = 0;
 
-  char *ip = &ipstr[0];
-
-  char i, *tmp;
-  unsigned long val = 0, cvt;
-
-  tmp = strtok(ip, ".");
-  for (i = 0; i < 4; i++)
+  while ((octetCount < 4) && std::getline(ss, octetStr, '.'))
   {
-    sscanf(tmp, "%lu", &cvt);
+    unsigned long octet = 0;
+    try
+    {
+      octet = std::stoul(octetStr);
+    }
+    catch (const std::exception &)
+    {
+      octet = 0;
+    }
     val <<= 8;
-    val |= (unsigned char)cvt;
-    tmp = strtok(NULL, ".");
+    val |= (octet & 0xff);
+    ++octetCount;
   }
-  return (val);
+  return val;
 }
 
 /**
