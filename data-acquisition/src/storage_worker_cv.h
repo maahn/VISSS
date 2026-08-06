@@ -729,7 +729,7 @@ void storage_worker_cv::run()
           }
           ++frame_count_moving;
         }
-        if (frame_count % (int)fps_ == 0)
+        if ((fps_ > 0) && (frame_count % fps_ == 0))
         {
 
           message = "STATUS" + std::to_string(id_) + " | " + get_timestamp() +
@@ -753,8 +753,9 @@ void storage_worker_cv::run()
           PrintThread{} << message << std::endl;
           std::cout << std::flush;
         }
-        if ((id_ == 0) && showPreview &&
-            (frame_count % (live_window_frame_ratio_ / nStorageThreads) == 0))
+        int previewFrameDivisor = live_window_frame_ratio_ / nStorageThreads;
+        if ((id_ == 0) && showPreview && (previewFrameDivisor > 0) &&
+            (frame_count % previewFrameDivisor == 0))
         {
 
           cv::resize(imgWithMeta, imgSmall, cv::Size(), 0.4, 0.4);
