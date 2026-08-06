@@ -222,7 +222,7 @@ void storage_worker_cv::open_files(unsigned long timestamp, cv::Size imgSize)
   {
     std::string ffmpegCommand = "";
     // Add taskset command if CPU affinity is set
-    if (!cpu_ffmpeg_list.empty() && cpu_ffmpeg_list.size() > id_)
+    if (!cpu_ffmpeg_list.empty() && cpu_ffmpeg_list.size() > static_cast<size_t>(id_))
     {
       std::string cpu_id = cpu_ffmpeg_list[id_];
       if (cpu_id != "-1")
@@ -444,7 +444,7 @@ void storage_worker_cv::run()
   }
 
   // Set CPU affinity if configured
-  if (!cpu_storage_list.empty() && cpu_storage_list.size() > id_)
+  if (!cpu_storage_list.empty() && cpu_storage_list.size() > static_cast<size_t>(id_))
   {
     std::string cpu_id = cpu_storage_list[id_];
     if (cpu_id != "-1")
