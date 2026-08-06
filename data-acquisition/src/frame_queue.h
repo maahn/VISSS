@@ -67,9 +67,13 @@ void frame_queue::cancel()
 
 void frame_queue::push(MatMeta &&image)
 {
-  if (size_estimate_.load(std::memory_order_relaxed) <= max_queue_size)
+  std::unique_lock<std::mutex> mlock(mutex_);
+  // Check the size under the lock: checking the lock-free size_estimate_
+  // outside the lock would let multiple concurrent producers all pass the
+  // check before any of them pushes, letting the queue grow past
+  // max_queue_size.
+  if (queue_.size() < static_cast<std::size_t>(max_queue_size))
   {
-    std::unique_lock<std::mutex> mlock(mutex_);
     queue_.push(std::move(image)); // Move instead of copy
     size_estimate_.fetch_add(1, std::memory_order_relaxed);
     mlock.unlock();
@@ -77,6 +81,7 @@ void frame_queue::push(MatMeta &&image)
   }
   else
   {
+    mlock.unlock();
     std::cout << "FATAL ERROR | " << get_timestamp() << " | Maximum queue size "
               << max_queue_size << " reached. Discarding data!" << std::endl;
     global_error = true;
