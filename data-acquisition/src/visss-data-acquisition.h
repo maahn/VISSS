@@ -253,7 +253,8 @@ std::string get_timestamp()
     tv.tv_sec++;
   }
 
-  tm_info = localtime(&tv.tv_sec);
+  struct tm tm_buf;
+  tm_info = localtime_r(&tv.tv_sec, &tm_buf);
 
   strftime(buffer, 26, "%y-%m-%d %H:%M:%S", tm_info);
   // int n_zero = 3;
@@ -496,7 +497,8 @@ std::string serializeTimePoint(const time_point &time,
                                const std::string &format)
 {
   std::time_t tt = std::chrono::system_clock::to_time_t(time);
-  std::tm tm = *std::gmtime(&tt); // GMT (UTC)
+  std::tm tm;
+  gmtime_r(&tt, &tm); // GMT (UTC)
   // std::tm tm = *std::localtime(&tt); //Locale time-zone, usually UTC by
   // default.
   std::stringstream ss;
@@ -522,7 +524,8 @@ std::string formatUnixTimeMicros(int64_t unixTimeMicros)
 
   // Convert to time_t for formatting
   std::time_t tt = system_clock::to_time_t(tp);
-  std::tm tm = *std::localtime(&tt);
+  std::tm tm;
+  localtime_r(&tt, &tm);
 
   // Format time and append milliseconds
   std::ostringstream oss;

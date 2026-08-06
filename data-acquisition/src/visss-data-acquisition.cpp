@@ -1473,7 +1473,8 @@ int main(int argc, char *argv[])
 
     // get ALL settings to dump the to file
     time_t t = time(0); // get time now
-    struct tm *now = localtime(&t);
+    struct tm now_buf;
+    struct tm *now = localtime_r(&t, &now_buf);
     char timestamp3[80];
     strftime(timestamp3, 80, "%Y%m%d-%H%M%S", now);
 

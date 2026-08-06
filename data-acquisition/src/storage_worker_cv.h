@@ -159,7 +159,8 @@ void storage_worker_cv::add_meta_data(unsigned long timestamp)
   // 0.6 with ptp status
 
   std::time_t temp = timestamp / 1e6;
-  std::tm *t = std::gmtime(&temp);
+  std::tm tm_buf;
+  std::tm *t = gmtime_r(&temp, &tm_buf);
 
   char timestampStr[80];
   strftime(timestampStr, 80, "%Y%m%d-%H%M%S", t);
@@ -333,7 +334,8 @@ void storage_worker_cv::create_filename(unsigned long timestamp)
   // strftime (timestamp2,80,"%Y%m%d-%H%M%S", now_tm);
 
   std::time_t temp = (timestamp + 1e5) / 1e6;
-  std::tm *t = std::gmtime(&temp);
+  std::tm tm_buf;
+  std::tm *t = gmtime_r(&temp, &tm_buf);
 
   char timestamp1[80];
   strftime(timestamp1, 80, "%Y/%m/%d", t);
