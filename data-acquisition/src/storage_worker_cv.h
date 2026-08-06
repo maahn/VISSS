@@ -690,8 +690,25 @@ void storage_worker_cv::run()
           {
             // writer_.write(imgWithMeta);
             size_t sizeInBytes = imgWithMeta.step[0] * imgWithMeta.rows;
-            write(fd, imgWithMeta.data, sizeInBytes);
-            fileUsed = true;
+            ssize_t written = write(fd, imgWithMeta.data, sizeInBytes);
+            if (written < 0)
+            {
+              PrintThread{} << "ERROR-" << id_ << " | " << get_timestamp()
+                            << " | Failed to write frame to ffmpeg pipe: "
+                            << strerror(errno) << std::endl;
+              global_error = true;
+            }
+            else
+            {
+              if (static_cast<size_t>(written) != sizeInBytes)
+              {
+                PrintThread{} << "ERROR-" << id_ << " | " << get_timestamp()
+                              << " | Short write to ffmpeg pipe (" << written
+                              << "/" << sizeInBytes << " bytes)" << std::endl;
+                global_error = true;
+              }
+              fileUsed = true;
+            }
           }
           if (storeMeta)
           {
