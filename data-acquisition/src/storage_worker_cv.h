@@ -481,11 +481,7 @@ void storage_worker_cv::run()
   std::string old_string;
   std::string new_string;
   std::string textImg;
-  std::time_t temp;
-  std::tm *t;
-  char timestampStr[80];
   std::string tempStr;
-  int number_of_zeros;
 
   // boost::container::vector<bool>[histSize] movingPixels;
   bool movingPixels[MAX_HIST_SIZE];
