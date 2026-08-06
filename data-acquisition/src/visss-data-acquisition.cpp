@@ -1837,8 +1837,8 @@ int main(int argc, char *argv[])
 
     std::cerr << "ERRORS: " << GEVLIB_ERROR_API_NOT_INITIALIZED << " FATAL "
               << GEVLIB_ERROR_INVALID_HANDLE
-              << " FATAL " GEVLIB_ERROR_INSUFFICIENT_MEMORY
-              << " FATAL " GEVLIB_ERROR_NO_CAMERA << " FATAL "
+              << " FATAL " << GEVLIB_ERROR_INSUFFICIENT_MEMORY
+              << " FATAL " << GEVLIB_ERROR_NO_CAMERA << " FATAL "
               << GEV_STATUS_ACCESS_DENIED << std::endl;
     global_error = true;
   }
