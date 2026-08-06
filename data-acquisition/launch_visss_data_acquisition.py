@@ -653,7 +653,9 @@ class runCpp:
         self.witeParamFile()
         # myEnv = os.environ.copy()
         # myEnv["TERM"] = "xterm"
-        self.process = Popen(command, stdout=PIPE, stderr=STDOUT, preexec_fn=os.setsid)
+        self.process = Popen(
+            command, stdout=PIPE, stderr=STDOUT, start_new_session=True
+        )
         # launch thread to read the subprocess output
         # (put the subprocess output into the queue in a background thread, # get output from the queue in the GUI thread. # Output chain: process.readline -> queue -> label) # limit output buffering (may stall subprocess)
         q = Queue()
@@ -847,18 +849,27 @@ class runCpp:
                 self.logger.error(f"Last image too old: {age}s!")
                 continue
 
-            img = Image.open(self.lastImage).convert("L")
-            height_offset = 64
-            brightnessThreshold = 50
-            arr = np.array(img)[height_offset:]
-            nPixel = arr.shape[0] * arr.shape[1]
-            dark_ratio = np.sum(arr < brightnessThreshold) / nPixel
+            try:
+                img = Image.open(self.lastImage).convert("L")
+                height_offset = 64
+                brightnessThreshold = 50
+                arr = np.array(img)[height_offset:]
+                nPixel = arr.shape[0] * arr.shape[1]
+                dark_ratio = np.sum(arr < brightnessThreshold) / nPixel
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to analyze {self.lastImage}: {e}", exc_info=True
+                )
+                continue
+
             if dark_ratio < (self.configuration["wiperThreshold"] / 100):
                 self.logger.info(f"Image is not blocked: {dark_ratio*100}%")
                 continue
 
             self.logger.info(f"Image is blocked: {dark_ratio*100}%. Cleaning!")
-            self.clean()
+            # clean() touches Tkinter widgets, which must only be done from
+            # the main thread, so schedule it instead of calling it directly.
+            self.parent.root.after(0, self.clean)
             # wait longer after cleaning to avoid cleaning too often!
             time.sleep(revisitTime)
 
@@ -1346,7 +1357,7 @@ class GUI(object):
 
         if minMax == "min":
             oper = operator.ge
-        elif minMax == "min":
+        elif minMax == "max":
             oper = operator.le
         else:
             raise ValueError("minMax must be min or max")
