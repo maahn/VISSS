@@ -35,6 +35,9 @@ bin
 data-acquisition/visss-data-acquisition
 data-acquisition/visss-data-acquisition-dryrun
 
+# CMake build directories (data-acquisition-emergent/*)
+build/
+
 # videos
 *gevbuf
 *.raw
