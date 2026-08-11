@@ -45,6 +45,12 @@ namespace
 constexpr double c_previewFinalScale = 0.5;
 constexpr double c_previewSdkReductionFactor = 0.5;
 
+// Must match recordtask.cpp's identical c_minSecondsBeforeRollover exactly - see this task's
+// doRollover comment below for why. Duplicated rather than shared via a header since each plugin
+// is an independent CMake project/.so (same reasoning as ShouldWritePortPayload) - if you change
+// one, change both.
+constexpr uint64_t c_minSecondsBeforeRollover = 10;
+
 // YYYY/MM/DD HH:MM:SS.mmm, local time zone - matches the old pipeline's overlay format exactly
 // (PROCESSING_SPEC_teeldyne.md §3.20's formatUnixTimeMicros; local time there is deliberate,
 // distinct from file naming which uses UTC per §3.22).
@@ -199,6 +205,7 @@ bool MotionDetectTask::Init()
     m_frameCountInFile = 0;
     m_frameCountMoving = 0;
     m_lastRolloverTimestampS = 0;
+    m_startTimestampS = 0;
 
     return true;
 }
@@ -330,10 +337,20 @@ bool MotionDetectTask::Process()
         // after, so a new file's first frame showed the outgoing file's trailing M% for one
         // frame) - the new file's first frame here shows a freshly-reset 0.0% instead, which is
         // simpler and avoids that one-frame artifact.
+        if (isFirstFrame)
+        {
+            m_startTimestampS = timestampS;
+        }
         const int32_t newFileIntervalSec = m_newFileIntervalSecParam.GetValue();
+        // Suppressed within c_minSecondsBeforeRollover seconds of this task's first frame - kept
+        // in sync with RecordTask's identical suppression (recordtask.cpp's
+        // RollSegmentIfNeeded/c_minSecondsBeforeRollover), so this task's own M:/H: reset lands on
+        // the same frame RecordTask actually opens a new segment on, not a boundary RecordTask
+        // itself skipped as a spurious near-immediate second rollover.
         const bool doRollover = (newFileIntervalSec > 0) &&
                                  (timestampS % static_cast<uint64_t>(newFileIntervalSec) == 0) &&
-                                 (timestampS != m_lastRolloverTimestampS);
+                                 (timestampS != m_lastRolloverTimestampS) &&
+                                 (timestampS >= m_startTimestampS + c_minSecondsBeforeRollover);
         if (doRollover || isFirstFrame)
         {
             m_frameCountInFile = 0;
@@ -346,7 +363,15 @@ bool MotionDetectTask::Process()
         std::snprintf(movePercentBuf, sizeof(movePercentBuf), "%.1f", movePercent);
 
         m_frameCountInFile++;
-        if (shouldWrite)
+        // Tracks actual detected motion (movingPixel), not shouldWrite: with WriteAllFrames on,
+        // shouldWrite is unconditionally true for every frame (see above), which would make M:
+        // a meaningless, permanently-100% stat instead of telling the operator anything about how
+        // much of the scene is actually moving - the old pipeline had this exact same quirk
+        // (storage_worker_cv.h's frame_count_moving also counted on its own writeallframes-ORed
+        // write decision, not on movingPixel alone), but the project owner flagged it as wrong
+        // rather than something to faithfully reproduce (2026-08-11) - M: is supposed to answer
+        // "how much motion is happening," which shouldWrite doesn't when write-filtering is off.
+        if (movingPixel)
         {
             m_frameCountMoving++;
         }
@@ -463,7 +488,7 @@ bool MotionDetectTask::Process()
         }
 
         // Roughly vertically centered in the border, small left margin. Uses the *rendered*
-        // (post-c_fontScale) cell height, not the raw 8x14 bitmap size, to center correctly.
+        // (post-c_fontScale) cell height, not the raw 16x28 bitmap size, to center correctly.
         const uint32_t originX = 10;
         const uint32_t originY = (MotionDetect::c_borderHeight > c_fontRenderedCellHeight)
                                       ? (MotionDetect::c_borderHeight - c_fontRenderedCellHeight) / 2

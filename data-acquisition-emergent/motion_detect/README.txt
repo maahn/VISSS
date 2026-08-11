@@ -11,18 +11,30 @@ Currently implemented: extends each frame with a border region at the top (64px,
 pipeline's hardcoded frameborder; black, or gray (100) if nothing moved this frame - a purely
 visual "nothing happened" flag) and draws a status-bar text overlay into it
 (site | timestamp | name | Q:<queue length> | H:<edge>[ N.R.] | M:<move%>), via a GPU-resident
-copy + border fill + custom CUDA bitmap-font kernel (font8x14.h, generated with a throwaway
-Python/PIL script, not hand-transcribed, to avoid glyph-correctness risk; rendered at 2x size via
-kernel.cuh's c_fontScale - change that constant, not the font data, to resize further). Text field
-notes:
-- `name` is the client's `-n` value (StringTaskParam, set by main.cpp - was silently stuck at this
-  task's own "VISSS" default until 2026-08-11, -n only reached RecordTask before that).
+copy + border fill + custom CUDA bitmap-font kernel (font16x28.h, generated with a throwaway
+Python/PIL script from DejaVuSansMono-Bold.ttf, not hand-transcribed, to avoid glyph-correctness
+risk - rendered natively at 16x28, not upscaled from a smaller bitmap; an earlier 8x14 version
+nearest-neighbor-upscaled 2x looked visibly blocky on real footage, replaced 2026-08-11 for
+genuinely finer glyph detail at the same on-screen size. kernel.cuh's c_fontScale, default 1,
+still applies a further nearest-neighbor upscale on top if bigger-but-blockier text is ever
+wanted). Text field notes:
+- `name` (StringTaskParam, set by main.cpp - was silently stuck at this task's own "VISSS" default
+  until 2026-08-11, -n only reached RecordTask before that) is this camera's own per-camera
+  `--name <serial> <name>` override if one was given on the command line, else the shared `-n`
+  value (see getCameraName() in main.cpp) - needed once several cameras share one process, since
+  otherwise every camera's overlay would show the same name regardless of which physical camera
+  it actually is (fixed 2026-08-11, same day as the *_latest_0.* symlink DeviceId fix in
+  ../record/README.txt, same underlying bug).
 - `H:` is the highest-triggered histogram bin's edge value (3-digit zero-padded, e.g. "030"),
   matching the old pipeline's exact scan-from-highest-bin logic (storage_worker_cv.h) - empty (just
   " N.R.") if nothing crossed any bin's adaptive threshold this frame.
-- `M:` is the percentage of frames written (not just "moving" - matches the old pipeline's own
-  frame_count_moving semantic, which counts on shouldWrite not on movingPixel alone) since the
-  current output file opened. Per-file reset without any cross-task signaling: this task
+- `M:` is the percentage of frames with actual detected motion (movingPixel) since the current
+  output file opened - NOT the percentage of frames written (shouldWrite). The old pipeline's own
+  frame_count_moving counted on its writeallframes-ORed write decision, same as shouldWrite here
+  initially was, which makes M: permanently ~100% and useless whenever write-all-frames is
+  enabled (a real quirk in both pipelines, not something to keep replicating - fixed here
+  2026-08-11 after the project owner flagged it, deliberately diverging from the old pipeline's
+  behavior). Per-file reset without any cross-task signaling: this task
   independently derives the same rollover-boundary crossing RecordTask uses from the same frame
   timestamps (see the `NewFileIntervalSec` task param and Process()'s comment) - no port carries
   data from RecordTask back to this task, so this is the only way to get per-file semantics here.

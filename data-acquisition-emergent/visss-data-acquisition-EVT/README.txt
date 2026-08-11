@@ -34,7 +34,8 @@ Startup sequence (main.cpp's main())
 6. pipeline.Start().
 7. Poll loop (200ms tick): checks --maxframes, relays RecordTask segment-lifecycle events
    (currently non-functional - see the --maxframes entry below), re-polls camera temperature/PTP
-   every 30s, prints a per-camera STATUS heartbeat every ~1s, pumps the cv::imshow/cv::waitKey
+   every 10 minutes (600s), prints a per-camera STATUS heartbeat (frame estimate/PTP only, no
+   temperature - see the STATUS heartbeat entry below) every ~1s, pumps the cv::imshow/cv::waitKey
    event loop if preview is on.
 8. On stop (Ctrl+C/SIGTERM/--maxframes reached): pipeline.Stop() - graceful, lets RecordTask
    finalize whatever segment is currently open rather than losing/corrupting the tail.
@@ -67,8 +68,23 @@ Command Line Interface:
     The target bitrate in Kbps. Default 10000.
 -i <num sec>
     New-file interval: RecordTask closes the current file and starts a new one every this-many
-    seconds (0 = never), no dropped frames, no pipeline restart. Default 600. See
-    ../record/recordtask.h for the exact file naming/rollover mechanics.
+    seconds (0 = never), no dropped frames, no pipeline restart. Default 600. Rollovers land
+    exactly on unixtime % interval == 0 (e.g. :00/:10/:20 for -i 600) for predictable file-start
+    times, except within the first 10s of startup (suppressed there to avoid a near-zero-length
+    second file right after the unconditionally-opened first segment - see
+    ../record/recordtask.h's RollSegmentIfNeeded comment, c_minSecondsBeforeRollover). See
+    ../record/recordtask.h for the exact file naming/rollover mechanics. The client prints its own
+    `INFO-<serial> | ... | new file (~): <full path>.mp4` line each time this boundary is crossed
+    (PrintNewFileNotice in main.cpp) - a client-side *estimate*, not a real notification from
+    RecordTask itself (same TaskParam one-way-sync limitation as RecordTask's segment-lifecycle
+    console events never appearing, see --maxframes below/record/recordtask.h). The boundary is
+    computed independently from wall-clock epoch seconds modulo this interval - the same rule
+    MotionDetectTask itself already uses for its M: overlay field (motiondetecttask.h) - and the
+    printed path is reconstructed to match RecordTask::OpenSegment's own naming convention
+    byte-for-byte (hostname, per-camera name from -n/--name, serial, and the boundary timestamp
+    itself as the filename's timestamp component). Should line up with the real file exactly as
+    long as the host clock is PTP/NTP-disciplined like the rest of this pipeline already assumes -
+    the "~" is a reminder this is a prediction, not a confirmation the file was actually written.
 -n <name>
     Instrument name, used in file naming (matches the old CLI's -n/--name). Default VISSS.
 -e <preset>
@@ -111,6 +127,15 @@ Command Line Interface:
     any code changes. If ANY line fails (unknown feature, bad value), every line's result is still
     logged, but the whole program aborts startup rather than running with a silently partial/wrong
     camera configuration - fix the file and rerun.
+--name <serial> <name>
+    Optional per-camera display-name override (repeatable, one per camera), used in that
+    camera's own overlay text/output filenames instead of -n. A camera whose serial has no
+    matching --name falls back to -n. Needed whenever several cameras share one process (e.g. a
+    combined leader+follower deployment on one host) - without this, every camera's
+    RecordTask/MotionDetectTask "Name" TaskParam would be set from the single shared -n value,
+    so e.g. both cameras' "_latest_0.jpg" symlinks and overlay text would show the same name
+    (only DeviceId, the numeric serial, would actually distinguish them) - fixed 2026-08-11 after
+    exactly this was found in real deployment output.
 --site <name>
     Site name shown in the status-bar overlay text (matches the old CLI's -s/--site; a long flag
     here since -s is already this file's server flag). Default "none".
@@ -132,16 +157,17 @@ grandmaster reachable on the camera network (e.g. the Mellanox NIC).
 
 STATUS heartbeat (console, ~1s per camera, not a flag)
 ============
-The client prints a `STATUS-<serial> | timestamp | frames~N | temp XC | PTP <status>` line once
-per second per camera - the client-side equivalent of the old Teledyne pipeline's once-per-second
-STATUS line (storage_worker_cv.h:743). Downstream tooling (the Python launcher's per-camera status
-widget/Clean-button gating) depends on seeing a line starting with `STATUS` to know the pipeline
-is actually alive, not just started. Can't reproduce the old line's exact content (live queue
+The client prints a `STATUS-<serial> | timestamp | frames~N | PTP <status>` line once per second
+per camera - the client-side equivalent of the old Teledyne pipeline's once-per-second STATUS line
+(storage_worker_cv.h:743). Downstream tooling (the Python launcher's per-camera status widget/
+Clean-button gating) depends on seeing a line starting with `STATUS` to know the pipeline is
+actually alive, not just started. Can't reproduce the old line's exact content (live queue
 length/histogram/move%) - those are computed entirely server-side inside the plugins' Process(),
 and TaskParam values don't sync that direction (see the --maxframes entry above) - so this reports
-what the client can actually observe directly: real camera temperature/PTP (the same GenICam reads
-the 30s status poll already does, just more often) plus the same elapsed-time frame estimate as
---maxframes, explicitly marked with `~`.
+what the client can actually observe directly: real camera PTP status plus the same elapsed-time
+frame estimate as --maxframes, explicitly marked with `~`. Temperature is deliberately NOT included
+here - it's only read/logged by the 10-minute status poll (see below), since sensor temperature
+drifts on the order of minutes and a fresh reading/line every second is mostly redundant noise.
 
 Generic camera-param loader design (for -c above)
 ============
@@ -175,7 +201,7 @@ Notes
   running before this binary can lock. See ../../install_commands_bullseye.md's "PTP Clock and
   NIC Configuration" section (§3a/b/c depending on leader/follower/combined topology) - this
   applies identically regardless of which camera SDK is in use.
-- Periodic (30s) camera status poll reads SensTemp (Int32CameraParam, not Float - confirmed
+- Periodic (10 minutes/600s) camera status poll reads SensTemp (Int32CameraParam, not Float - confirmed
   against this camera's real feature list, not assumed) and PtpStatus. PHYSNRMargin (considered
   as a network-link-health substitute for the old pipeline's Teledyne-only transport diagnostics)
   does NOT exist on this camera despite being in Emergent's docs ("Parameter PHYSNRMargin not

@@ -14,6 +14,7 @@ extern "C"
 
 #include <cuda_runtime.h>
 
+#include <pwd.h>
 #include <unistd.h>
 
 #include <chrono>
@@ -51,6 +52,48 @@ std::string AvErrToString(int errnum)
     char buf[AV_ERROR_MAX_STRING_SIZE] = {0};
     av_strerror(errnum, buf, sizeof(buf));
     return std::string(buf);
+}
+
+// See RollSegmentIfNeeded's comment: a boundary-triggered rollover within this many seconds of
+// the task's first frame is suppressed, to avoid a near-zero-length second file.
+constexpr uint64_t c_minSecondsBeforeRollover = 10;
+
+// eCaptureProServer runs as root (see ../../README.md's "Known gaps": vendor default, no
+// User=/capabilities in the systemd unit - root cause of the non-root camera-open failure was
+// never identified), so every file
+// this task creates - the finalized .mp4/.txt, the .jpg snapshot, and the directories built to
+// hold them - would otherwise be root-owned, unreadable/undeletable by the "visss" account that
+// owns everything else in the deployment (downstream tooling, sync scripts, VISSSlib). Resolved
+// once via getpwnam and cached (uid/gid don't change mid-run) rather than looked up on every
+// call. Returns false (and logs, but never aborts recording over it - a permissions/ownership
+// nicety isn't worth losing footage for) if the "visss" account doesn't exist on this host or the
+// chown itself fails.
+bool ChownToVisss(const std::string& path)
+{
+    static uid_t s_uid = 0;
+    static gid_t s_gid = 0;
+    static bool s_resolved = false;
+    static bool s_available = false;
+
+    if (!s_resolved)
+    {
+        s_resolved = true;
+        // getpwnam is not thread-safe (returns a pointer to static storage), but this task's
+        // rollover/snapshot paths that call ChownToVisss all run on the same eCaptureProServer
+        // worker thread for this task instance, never concurrently with each other.
+        const struct passwd* pw = getpwnam("visss");
+        if (pw != nullptr)
+        {
+            s_uid = pw->pw_uid;
+            s_gid = pw->pw_gid;
+            s_available = true;
+        }
+    }
+    if (!s_available)
+    {
+        return false;
+    }
+    return chown(path.c_str(), s_uid, s_gid) == 0;
 }
 } // namespace
 
@@ -304,17 +347,35 @@ bool RecordTask::RollSegmentIfNeeded(uint64_t timestampUs)
     const uint64_t timestampS = timestampUs / 1000000ULL;
     const int newFileIntervalSec = m_newFileIntervalSecParam.GetValue();
 
+    if (m_firstFrame)
+    {
+        m_startTimestampS = timestampS;
+    }
+
     // Matches the old pipeline's exact housekeeping trigger (PROCESSING_SPEC_teeldyne.md §3.13):
-    // fires once per interval boundary. Debounced against the modulo condition staying true for
-    // every frame sharing that boundary second (at 485fps that's hundreds of frames) by comparing
-    // against the frame-timestamp domain directly rather than wall clock - a wall-clock debounce
-    // (previously a hardcoded ">10s since last rollover" against time(nullptr)) is vulnerable to
-    // processing-latency jitter: when newFileIntervalSec is small (e.g. 10, for testing), that
-    // jitter can push the next legitimate boundary inside the debounce window and silently skip
-    // an entire rollover (reproduced: -i 10 skipped every other rollover on real hardware).
+    // fires once per interval boundary (unixtime % newFileIntervalSec == 0, e.g. :00/:10/:20 for
+    // 600s - project owner's explicit ask, 2026-08-11, for predictable file-start times, though
+    // this modulo condition already matched that before being asked - see below for what was
+    // actually missing). Debounced against the modulo condition staying true for every frame
+    // sharing that boundary second (at 485fps that's hundreds of frames) by comparing against the
+    // frame-timestamp domain directly rather than wall clock - a wall-clock debounce (previously a
+    // hardcoded ">10s since last rollover" against time(nullptr)) is vulnerable to processing-
+    // latency jitter: when newFileIntervalSec is small (e.g. 10, for testing), that jitter can
+    // push the next legitimate boundary inside the debounce window and silently skip an entire
+    // rollover (reproduced: -i 10 skipped every other rollover on real hardware).
+    //
+    // Also suppressed within c_minSecondsBeforeRollover seconds of the task's first frame
+    // (m_startTimestampS, set above): the very first segment is opened unconditionally below
+    // regardless of alignment (there has to be SOME file to record the earliest frames into), so
+    // if startup happened to land just before a boundary, the very next frame crossing that
+    // boundary would otherwise immediately roll over again into a second, near-zero-length file -
+    // this suppresses only that spurious extra-early rollover, not the boundary alignment itself;
+    // every rollover after the first still lands exactly on a unixtime%newFileIntervalSec==0
+    // boundary.
     const bool doHousekeeping = (newFileIntervalSec > 0) &&
                                  (timestampS % static_cast<uint64_t>(newFileIntervalSec) == 0) &&
-                                 (timestampS != m_lastRolloverTimestampS);
+                                 (timestampS != m_lastRolloverTimestampS) &&
+                                 (timestampS >= m_startTimestampS + c_minSecondsBeforeRollover);
 
     if (!doHousekeeping && !m_firstFrame)
     {
@@ -354,8 +415,8 @@ bool RecordTask::OpenSegment(uint64_t timestampUs)
 
     // threadId hardcoded to "_0": see the class doc comment.
     const std::string baseName = hostname + "_" + name + "_" + deviceId + "_" + timeStr + "_0";
-    const std::string finalDir =
-        outputRoot + "/" + hostname + "_" + name + "_" + deviceId + "/data/" + dateDir + "/";
+    const std::string instrumentDir = outputRoot + "/" + hostname + "_" + name + "_" + deviceId;
+    const std::string finalDir = instrumentDir + "/data/" + dateDir + "/";
     const std::string stagingDir = outputRoot + "/tmp/";
 
     std::error_code ec;
@@ -371,6 +432,11 @@ bool RecordTask::OpenSegment(uint64_t timestampUs)
         Abort("Failed to create directory '" + finalDir + "': " + ec.message());
         return false;
     }
+    // Idempotent (safe to re-chown an already-visss-owned directory every segment) - see
+    // ChownToVisss's comment for why this is needed at all. Not fatal if it fails.
+    ChownToVisss(stagingDir);
+    ChownToVisss(instrumentDir);
+    ChownToVisss(finalDir);
 
     m_stagingMp4Path = stagingDir + baseName + ".mp4";
     m_stagingTxtPath = stagingDir + baseName + ".txt";
@@ -506,11 +572,22 @@ void RecordTask::CloseSegment(bool reuseEncoder)
         LogMessage(eSdkPro::LogLevel::Error,
                    "Failed to move '" + m_stagingMp4Path + "' to '" + m_finalMp4Path + "': " + ec.message());
     }
+    else
+    {
+        // Moving out of tmp/ is exactly when this matters: the file just landed in its
+        // permanent, downstream-consumed location - see ChownToVisss's comment for why it would
+        // otherwise stay root-owned.
+        ChownToVisss(m_finalMp4Path);
+    }
     std::filesystem::rename(m_stagingTxtPath, m_finalTxtPath, ec);
     if (ec)
     {
         LogMessage(eSdkPro::LogLevel::Error,
                    "Failed to move '" + m_stagingTxtPath + "' to '" + m_finalTxtPath + "': " + ec.message());
+    }
+    else
+    {
+        ChownToVisss(m_finalTxtPath);
     }
 
     const std::string outputRoot = m_outputRootParam.GetValue();
@@ -789,6 +866,9 @@ bool RecordTask::Process()
             // but only symlink it if it actually got written, or the link dangles.
             if (SaveSnapshot(inputFrame, m_finalJpgPath))
             {
+                // Written directly to its final path (no tmp/ staging for jpg, unlike mp4/txt) -
+                // see ChownToVisss's comment for why this is needed at all.
+                ChownToVisss(m_finalJpgPath);
                 // DeviceId included - see the .mp4/.txt CreateSymlink calls' comment for why.
                 CreateSymlink(m_finalJpgPath, m_outputRootParam.GetValue() + "/" + m_nameParam.GetValue() + "_" +
                                                    m_deviceIdParam.GetValue() + "_latest_0.jpg");

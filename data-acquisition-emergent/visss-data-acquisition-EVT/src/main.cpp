@@ -4,6 +4,7 @@
 #include <opencv2/highgui.hpp>
 
 #include <sys/time.h>
+#include <unistd.h>
 
 #include <atomic>
 #include <chrono>
@@ -171,6 +172,20 @@ struct CameraConfigParams
     std::string m_path;
 };
 
+// Per-camera display-name override (--name <serial> <name>, repeatable) - mirrors
+// CameraConfigParams/-c: several cameras behind one process (e.g. a combined leader+follower
+// deployment) each need their OWN name baked into their OWN overlay text/output filenames
+// (RecordTask's "{Name}_{DeviceId}_latest_0.*" symlinks, motion_detect's status-bar text), not the
+// single shared -n value every camera got before this existed - see getCameraName().
+struct CameraNameParams
+{
+    CameraNameParams(const std::string& serial, const std::string& name) : m_serial{serial}, m_name{name}
+    {}
+
+    std::string m_serial;
+    std::string m_name;
+};
+
 struct Params
 {
     std::vector<ServerParams> m_serverParams;
@@ -209,6 +224,11 @@ struct Params
     // ApplyCameraConfigFile. A camera whose serial isn't listed here keeps its power-on-default
     // parameters (unchanged fallback behavior).
     std::vector<CameraConfigParams> m_cameraConfigs{};
+    // Optional per-camera display-name overrides (--name <serial> <name>, repeatable) - see
+    // CameraNameParams/getCameraName(). A camera whose serial isn't listed here falls back to
+    // m_name (the shared -n value), unchanged fallback behavior for single-camera-per-process
+    // deployments.
+    std::vector<CameraNameParams> m_cameraNames{};
     // Matches the old CLI's -s/--site: site name shown in the status-bar overlay text (long flag
     // here since -s is already this file's server flag).
     std::string m_site{"none"};
@@ -246,6 +266,12 @@ void PrintHelp(const std::string& progName)
               << "                   line), applied to the matching camera after it's opened\n"
               << "                   (repeatable, one per camera). Optional - a camera with no\n"
               << "                   matching -c keeps its power-on-default parameters.\n"
+              << "  --name <serial> <name>  Per-camera display name, used in that camera's own\n"
+              << "                   overlay text/output filenames instead of -n (repeatable, one\n"
+              << "                   per camera). Optional - a camera with no matching --name falls\n"
+              << "                   back to -n. Needed whenever several cameras share one process\n"
+              << "                   (e.g. a combined leader+follower deployment), since without it\n"
+              << "                   every camera's output would show the same -n name.\n"
               << "  --site <name>    Site name shown in the status-bar overlay text. Default \"none\".\n"
               << "  --maxframes <n>  Debug: stop the run once ~n frames have elapsed (estimated from\n"
               << "                   camera FrameRate, not an exact count). Default: unlimited.\n"
@@ -327,6 +353,11 @@ Params parseArgs(int argc, char* argv[])
             params.m_cameraConfigs.push_back(CameraConfigParams(argv[argIdx + 1], argv[argIdx + 2]));
             argIdx += 2;
         }
+        else if (arg == "--name")
+        {
+            params.m_cameraNames.push_back(CameraNameParams(argv[argIdx + 1], argv[argIdx + 2]));
+            argIdx += 2;
+        }
         else if (arg == "--site")
         {
             params.m_site = argv[argIdx + 1];
@@ -390,9 +421,10 @@ void setPtp(std::vector<Camera> cams)
 // Reads each camera's temperature/PTP status and relays it to the matching RecordTask's metadata
 // .txt header (§3.24) - RecordTask has no direct camera parameter access of its own. Called both
 // eagerly once (right before recording starts, so the *first* segment's header already has real
-// values instead of the "not yet read" placeholders) and periodically every 30s from the main
-// poll loop (so later segments - and the console - reflect any drift, e.g. rising temperature
-// over a long recording session).
+// values instead of the "not yet read" placeholders) and periodically every 10 minutes (600s) from
+// the main poll loop (so later segments - and the console - reflect any drift, e.g. rising
+// temperature over a long recording session). This is also the only place temperature is ever
+// logged/read at all - deliberately not on PrintStatusHeartbeat's ~1s cadence, see its comment.
 void PollCameraStatus(const std::vector<Camera>& cams,
                       std::vector<std::pair<std::string, PluginTask>>& recordTasksById)
 {
@@ -446,10 +478,13 @@ void PollCameraStatus(const std::vector<Camera>& cams,
 // client GetParameter<T>().GetValue() call (confirmed by testing while building --maxframes - see
 // recordtask.h's class doc for the full writeup; no DataOutput/DataInput port from those plugins
 // to this client exists to carry it instead, unlike ShouldWrite between the two plugins
-// themselves). So this reports what the client can actually observe directly: real camera
-// temperature/PTP (the same GenICam reads PollCameraStatus already does, just every ~1s instead
-// of every 30s) plus an elapsed-time-based frame-count estimate (same technique as --maxframes),
-// honestly labeled with "~" rather than presented as an exact live count.
+// themselves). So this reports what the client can actually observe directly: real camera PTP
+// status plus an elapsed-time-based frame-count estimate (same technique as --maxframes), honestly
+// labeled with "~" rather than presented as an exact live count. Temperature is deliberately NOT
+// read/printed here (only PollCameraStatus does that, every 10 minutes, see its comment) - at ~1s
+// cadence a per-heartbeat temperature read/line would be almost entirely redundant noise (sensor
+// temperature drifts on the order of minutes, not seconds) for both the console and the
+// TimedRotatingFileHandler-backed Python log file.
 void PrintStatusHeartbeat(const std::vector<Camera>& cams,
                           const std::vector<std::pair<std::string, uint32_t>>& cameraFramerates,
                           const std::chrono::steady_clock::time_point& startTime)
@@ -474,11 +509,9 @@ void PrintStatusHeartbeat(const std::vector<Camera>& cams,
 
         try
         {
-            const int32_t temperature = cam.GetParameter<Int32CameraParam>("SensTemp").GetValue();
             const std::string ptpStatus = cam.GetParameter<EnumCameraParam>("PtpStatus").GetValue();
             std::cout << LogLine("STATUS", serial,
-                                  "frames~" + std::to_string(estimatedFrames) + " | temp " +
-                                      std::to_string(temperature) + "C | PTP " + ptpStatus)
+                                  "frames~" + std::to_string(estimatedFrames) + " | PTP " + ptpStatus)
                       << std::endl;
         }
         catch (const std::exception& ex)
@@ -500,6 +533,101 @@ const std::string* getCameraConfigPath(const std::string& serial, const Params& 
         }
     }
     return nullptr;
+}
+
+// Per-camera display name (--name <serial> <name>) if this camera has one, else the shared -n
+// value (params.m_name) - see CameraNameParams's comment for why a single shared name isn't
+// enough once several cameras share one process.
+std::string getCameraName(const std::string& serial, const Params& params)
+{
+    for (auto& cameraName : params.m_cameraNames)
+    {
+        if (cameraName.m_serial == serial)
+        {
+            return cameraName.m_name;
+        }
+    }
+    return params.m_name;
+}
+
+// Client-side estimate of RecordTask's own rollover boundary and the exact final file path it
+// will write there (mirrors motiondetecttask.cpp's identical "epoch seconds %
+// NewFileIntervalSec == 0" check, itself derived from PTP-synced frame timestamps - see
+// motiondetecttask.h's M: field comment) - computed independently client-side since eSDK Pro
+// TaskParam values set inside a plugin's own code never propagate back to a client
+// GetParameter<T>().GetValue() call (same one-way-sync limitation as the RecordTask console
+// event relay, see recordtask.h's class doc), so the client can never be *told* by RecordTask
+// itself when a segment actually rolls over or what it named the result. Uses wall clock
+// (system_clock, not steady_clock) so the boundary aligns to the same epoch-second grid
+// RecordTask/MotionDetectTask use (both derived from PTP-disciplined frame timestamps), not to
+// this process's own start time - accurate as long as the host clock itself is disciplined
+// (PTP/NTP), same assumption the rest of this pipeline already depends on. The path is built to
+// match RecordTask::OpenSegment's naming convention byte-for-byte (recordtask.cpp) - hostname_
+// name_deviceId/data/Y/m/d/hostname_name_deviceId_timestamp_0.mp4 - using the boundary second
+// itself (bucket * newFileIntervalSec) as the timestamp, since that's exactly the frame
+// timestamp at which RecordTask's own rollover condition first fires. lastBucket is caller-owned
+// (persists across calls) so this only prints once per boundary crossing, not once per ~200ms
+// poll tick.
+void PrintNewFileNotice(const std::vector<Camera>& cams, const Params& params,
+                        const std::vector<std::pair<std::string, std::string>>& cameraOutputRoots,
+                        uint64_t startEpochS, uint64_t& lastBucket)
+{
+    const uint32_t newFileIntervalSec = params.m_newFileIntervalSec;
+    if (newFileIntervalSec == 0)
+    {
+        // -i 0 means "never roll over" (see PrintHelp) - no periodic boundary to report.
+        return;
+    }
+    const uint64_t nowEpochS = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
+            .count());
+    // Must match recordtask.cpp's identical c_minSecondsBeforeRollover - see RollSegmentIfNeeded's
+    // comment for why. Duplicated rather than shared via a header (client and plugin are separate
+    // CMake projects/binaries) - if you change one, change both.
+    constexpr uint64_t c_minSecondsBeforeRollover = 10;
+    if (nowEpochS < startEpochS + c_minSecondsBeforeRollover)
+    {
+        return;
+    }
+    const uint64_t bucket = nowEpochS / newFileIntervalSec;
+    if (bucket == lastBucket)
+    {
+        return;
+    }
+    lastBucket = bucket;
+
+    char hostnameBuf[256] = {0};
+    gethostname(hostnameBuf, sizeof(hostnameBuf) - 1);
+    const std::string hostname(hostnameBuf);
+
+    const std::time_t segmentSeconds = static_cast<std::time_t>(bucket * newFileIntervalSec);
+    std::tm tmBuf{};
+    gmtime_r(&segmentSeconds, &tmBuf);
+    char timeStr[32];
+    strftime(timeStr, sizeof(timeStr), "%Y%m%d-%H%M%S", &tmBuf);
+    char dateDir[32];
+    strftime(dateDir, sizeof(dateDir), "%Y/%m/%d", &tmBuf);
+
+    for (const auto& cam : cams)
+    {
+        const std::string serial = std::to_string(cam.GetDiscoveryInfo().m_serialNumber);
+        const std::string name = getCameraName(serial, params);
+
+        std::string outputRoot;
+        for (auto& entry : cameraOutputRoots)
+        {
+            if (entry.first == serial)
+            {
+                outputRoot = entry.second;
+                break;
+            }
+        }
+
+        const std::string baseName = hostname + "_" + name + "_" + serial + "_" + timeStr + "_0";
+        const std::string finalMp4Path =
+            outputRoot + "/" + hostname + "_" + name + "_" + serial + "/data/" + dateDir + "/" + baseName + ".mp4";
+        std::cout << LogLine("INFO", serial, "new file (~): " + finalMp4Path) << std::endl;
+    }
 }
 
 std::string getServerRecordPath(Server server, const Params& params)
@@ -715,7 +843,12 @@ int main(int argc, char* argv[])
         }
         std::cout << "Bitrate: " << params.m_bitrateKbps << " Kbps" << std::endl;
         std::cout << "New file interval: " << params.m_newFileIntervalSec << " sec" << std::endl;
-        std::cout << "Name: " << params.m_name << std::endl;
+        std::cout << "Name: " << params.m_name << (params.m_cameraNames.empty() ? "" : " (default/fallback)")
+                  << std::endl;
+        for (auto& cameraName : params.m_cameraNames)
+        {
+            std::cout << "\t" << "Serial: " << cameraName.m_serial << " Name: " << cameraName.m_name << std::endl;
+        }
         std::cout << "nvenc preset: " << params.m_preset << std::endl;
         std::cout << "Rotate: " << (params.m_rotate ? "on (90 CCW)" : "off") << std::endl;
         std::cout << "MinBrightChange: " << params.m_minBrightChange << std::endl;
@@ -807,6 +940,9 @@ int main(int argc, char* argv[])
         // elapsed time can be converted to an estimated frame count. There is no live frame-count
         // readout available to the client (see Params::m_maxFrames's comment).
         std::vector<std::pair<std::string, uint32_t>> cameraFramerates;
+        // Each camera's server recording path (OutputRoot) - used by PrintNewFileNotice to
+        // reconstruct RecordTask's own final file path client-side (see its comment for why).
+        std::vector<std::pair<std::string, std::string>> cameraOutputRoots;
 
         // Initialize pipeline
         for (auto& server : system.GetServers())
@@ -846,7 +982,12 @@ int main(int argc, char* argv[])
                     .SetValue(params.m_queueDepth);
                 // Was missing entirely - the overlay's "name" field silently showed
                 // MotionDetectTask's own default ("VISSS") regardless of -n, never the real value.
-                motionDetectTask.GetParameter<StringTaskParam>(c_motionDetectNameParamName).SetValue(params.m_name);
+                // getCameraName() falls back to the shared -n value if this camera has no
+                // --name <serial> <name> override (see CameraNameParams's comment) - this is what
+                // makes each physical camera's own overlay text/output filenames show its own
+                // name rather than every camera sharing whichever name -n happens to be.
+                const std::string cameraName = getCameraName(deviceId, params);
+                motionDetectTask.GetParameter<StringTaskParam>(c_motionDetectNameParamName).SetValue(cameraName);
                 motionDetectTask.GetParameter<Int32TaskParam>(c_motionDetectNewFileIntervalSecParamName)
                     .SetValue(static_cast<int32_t>(params.m_newFileIntervalSec));
 
@@ -864,7 +1005,7 @@ int main(int argc, char* argv[])
 
                 PluginTask recordTask = pipeline.CreatePluginTask(server, c_recordTaskName);
                 recordTask.GetParameter<StringTaskParam>(c_recordOutputRootParamName).SetValue(recordPath);
-                recordTask.GetParameter<StringTaskParam>(c_recordNameParamName).SetValue(params.m_name);
+                recordTask.GetParameter<StringTaskParam>(c_recordNameParamName).SetValue(cameraName);
                 recordTask.GetParameter<StringTaskParam>(c_recordDeviceIdParamName).SetValue(deviceId);
                 recordTask.GetParameter<Int32TaskParam>(c_recordWidthParamName)
                     .SetValue(static_cast<int32_t>(contentWidth));
@@ -914,6 +1055,7 @@ int main(int argc, char* argv[])
                 recordTasksById.push_back(std::make_pair(deviceId, recordTask));
                 recordTasksLastEvent.push_back(std::vector<std::string>(c_recordEventParamNames.size(), ""));
                 cameraFramerates.push_back(std::make_pair(deviceId, framerateParam.GetValue()));
+                cameraOutputRoots.push_back(std::make_pair(deviceId, recordPath));
             }
         }
 
@@ -945,6 +1087,20 @@ int main(int argc, char* argv[])
         // Eager first read (see PollCameraStatus's comment) so the first segment's metadata
         // header already has real temperature/PTP values instead of "not yet read" placeholders.
         PollCameraStatus(cams, recordTasksById);
+
+        // Software-start epoch second, used by PrintNewFileNotice to suppress a boundary crossing
+        // that RecordTask itself would also suppress (recordtask.cpp's
+        // c_minSecondsBeforeRollover) - kept in sync so this client-side prediction doesn't print
+        // a "new file" notice for a rollover that never actually happens.
+        const uint64_t startEpochS = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
+                .count());
+
+        // Initialized to the *current* boundary (not 0) so PrintNewFileNotice doesn't fire
+        // immediately for the segment that's already being opened right now - only for
+        // subsequent rollovers.
+        uint64_t lastNewFileBucket =
+            (params.m_newFileIntervalSec == 0) ? 0 : startEpochS / params.m_newFileIntervalSec;
 
         while (!g_shouldStop.load())
         {
@@ -987,7 +1143,7 @@ int main(int argc, char* argv[])
                 }
             }
 
-            if (std::chrono::duration_cast<std::chrono::seconds>(now - lastStatusTime).count() >= 30)
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - lastStatusTime).count() >= 600)
             {
                 PollCameraStatus(cams, recordTasksById);
                 lastStatusTime = now;
@@ -998,6 +1154,8 @@ int main(int argc, char* argv[])
                 PrintStatusHeartbeat(cams, cameraFramerates, startTime);
                 lastHeartbeatTime = now;
             }
+
+            PrintNewFileNotice(cams, params, cameraOutputRoots, startEpochS, lastNewFileBucket);
 
             // cv::imshow/cv::waitKey must run consistently from one thread (GTK-backed highgui
             // isn't safe to call from arbitrary threads) - this loop is that one thread; the

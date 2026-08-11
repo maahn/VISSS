@@ -403,7 +403,8 @@ class runCpp:
             f"--CPUFFMPEG={'@'.join(self.cameraConfig['cpuffmpeg'])}",
         ]
         print(self.command)
-        frame1 = ttk.Frame(self.parent.mainframe)
+        self.frame1 = ttk.Frame(self.parent.mainframe)
+        frame1 = self.frame1
         frame1.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.statusWidget = ttk.Label(frame1, textvariable=self.status)
@@ -981,89 +982,32 @@ class EmergentInstrument:
             a single dict).
         """
         self.parent = parent
-        self.cameraConfigs = cameraConfigs
 
         self.configuration = parent.configuration
         self.settings = parent.settings
         self.hostname = parent.hostname
         self.rootpath = parent.emergentRootpath
 
-        # Shared instrument name for the one CLI process: the C++ side only takes a single -n
-        # value, so it comes from the first camera's "name" field. File paths stay unique per
-        # camera regardless (serial number is always in the path), but warn loudly if the
-        # deployment YAML gives cameras behind one server different names, since only one of
-        # those names is what will actually show up in every recorded file's path/overlay text.
-        self.name = cameraConfigs[0]["name"]
+        # self.name/self.logger/self.loggerCpp/self.logDir/the log file handler are set up once
+        # here, from the *initial* load, and deliberately NOT rebuilt by _applyConfig()/
+        # reloadFromYaml() below - recreating a TimedRotatingFileHandler on every Start would be
+        # wasteful/error-prone, and logger identity doesn't need to track a possibly-renamed
+        # camera. self.name itself IS allowed to update on reload (see _applyConfig) since nothing
+        # depends on it staying fixed except the log file's path, already resolved by this point.
+        self.name = self.configuration.get("name") or cameraConfigs[0]["name"]
         self.logger = logging.getLogger("Python:EmergentInstrument:%s" % self.name)
         self.loggerCpp = logging.getLogger("C++:%s" % self.name)
 
-        for cc in cameraConfigs[1:]:
-            if cc["name"] != self.name:
-                self.logger.warning(
-                    "Camera serial %s has name '%s', which differs from the first camera's "
-                    "name '%s' - this deployment has multiple cameras behind one server, so "
-                    "they share ONE process and ONE -n value ('%s'). Give every camera behind "
-                    "the same server the same 'name' in the deployment YAML to avoid this "
-                    "confusion; serial number alone already keeps recorded file paths unique."
-                    % (cc["serialnumber"], cc["name"], self.name, self.name)
-                )
+        # Set (not sent) once, before the process ever starts, so a pipe-close caused by a
+        # user/wiper-triggered quit() isn't mistaken for a crash by update()'s retry logic.
+        self._stopRequested = False
 
-        # Per-camera bookkeeping - each physical camera still gets its own log dir/latest-image
-        # path/status file/config file/wiper port, even though they all share one C++ process.
-        self.cameras = []
-        for cameraConfig in cameraConfigs:
-            serial = cameraConfig["serialnumber"]
-            name = cameraConfig["name"]
-            logDir = f"{self.configuration['outdir']}/{self.hostname}_{name}_{serial}/logs"
-            try:
-                pathlib.Path(logDir).mkdir(parents=True, exist_ok=True)
-            except FileExistsError:
-                pass
-            except PermissionError:
-                messagebox.showerror(title=None, message="Cannot create %s" % logDir)
-                raise PermissionError
-
-            configFName = None
-            if "emergentparameters" in cameraConfig.keys():
-                configFName = "/tmp/%s_%s_%s.config" % (
-                    name,
-                    os.path.basename(self.parent.settings["configFile"]),
-                    str(datetime.date.today()),
-                )
-            else:
-                # Critical, not cosmetic: silently running a camera at power-on defaults (no
-                # exposure/framerate/etc override) is exactly the kind of gap a human glancing at
-                # the console needs to see, not discover later in the recorded data.
-                self.logger.warning(
-                    "Camera %s (serial %s) has NO emergentparameters section in the deployment "
-                    "YAML - it will run at its power-on-default camera settings, no -c flag "
-                    "will be passed for it!" % (name, serial)
-                )
-
-            self.cameras.append(
-                {
-                    "config": cameraConfig,
-                    "name": name,
-                    "serial": serial,
-                    "logDir": logDir,
-                    # self.name (the shared instrument name, not this camera's own YAML "name")
-                    # + serial - matches recordtask.cpp's CreateSymlink calls exactly, which use
-                    # the single shared Name CLI value + DeviceId. Using this camera's own "name"
-                    # here would point at a file the C++ binary never creates when cameras behind
-                    # one server have different YAML names (confirmed by testing - see
-                    # recordtask.h's "latest" naming comment for the full story).
-                    "lastImage": f"{self.configuration['outdir']}/{self.name}_{serial}_latest_0.jpg",
-                    "statusDir": f"{self.configuration['outdir']}/{self.hostname}_{name}_{serial}/data",
-                    "statusHtmlFile": f"{self.configuration['outdir']}/{self.hostname}_{name}_{serial}/status.html",
-                    "configFName": configFName,
-                    "serialPortWiper": cameraConfig.get("wiper"),
-                }
-            )
+        self._applyConfig(cameraConfigs)
 
         # Shared Python-side log file for the whole merged process - filed under the first
-        # camera's log dir. The C++ output itself already tags every line with "Camera<serial>:",
-        # so one shared log file/scrolled_text pane still distinguishes which camera each line is
-        # about.
+        # camera's log dir (fixed at the initial load, see above). The C++ output itself already
+        # tags every line with "Camera<serial>:", so one shared log file/scrolled_text pane still
+        # distinguishes which camera each line is about.
         self.logDir = self.cameras[0]["logDir"]
         self.log_queue = queue.Queue()
         self.queue_handler = QueueHandler(self.log_queue)
@@ -1088,38 +1032,8 @@ class EmergentInstrument:
         self.status = tk.StringVar()
         self.status.set("-")
 
-        # Set (not sent) once, before the process ever starts, so a pipe-close caused by a
-        # user/wiper-triggered quit() isn't mistaken for a crash by update()'s retry logic.
-        self._stopRequested = False
-
-        binary = (
-            f"{self.rootpath}/visss-data-acquisition-EVT/build/visss-data-acquisition-EVT"
-        )
-        self.command = [
-            binary,
-            "-s", "127.0.0.1", self.configuration["outdir"],
-            "-n", self.name,
-            "-i", str(self.configuration["newfileinterval"]),
-            "-l", str(self.configuration["liveratio"]),
-            "-m", str(self.configuration["minBrightchange"]),
-            "-b", str(self.configuration.get("bitrateKbps", 10000)),
-            "-e", str(self.configuration.get("encoding", "p1")),
-            "-q", str(self.configuration.get("queueDepth", 8)),
-        ]
-        if self.configuration.get("rotateimage"):
-            self.command.append("-r")
-        if self.configuration.get("storeallframes"):
-            self.command.append("-w")
-        if self.configuration.get("site"):
-            self.command += ["--site", str(self.configuration["site"])]
-        for cam in self.cameras:
-            if cam["configFName"] is not None:
-                self.command += ["-c", str(cam["serial"]), cam["configFName"]]
-        print(self.command)
-
-        self.wiperCameras = [c for c in self.cameras if c["serialPortWiper"] is not None]
-
-        frame1 = ttk.Frame(self.parent.mainframe)
+        self.frame1 = ttk.Frame(self.parent.mainframe)
+        frame1 = self.frame1
         frame1.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.statusWidget = ttk.Label(frame1, textvariable=self.status)
@@ -1170,12 +1084,246 @@ class EmergentInstrument:
         # its own lastImage independently, but all funnel into the same shared clean() (see its
         # doc comment for why cleaning is all-or-nothing across the cameras behind one process).
         self.cleanThreads = []
-        for cam in self.wiperCameras:
-            t = Thread(
-                target=self.checkCleaniness, args=(cam,), kwargs={}, daemon=True
+        self._cleanThreadSerials = set()
+        self._ensureCleanThreads()
+
+    def _applyConfig(self, cameraConfigs):
+        """
+        (Re)derive self.name/self.cameras/self.wiperCameras/self.command from cameraConfigs and
+        self.configuration. Called once from __init__, and again by reloadFromYaml() every time
+        Start is pressed, so editing the deployment YAML and pressing Start picks up the change
+        without restarting the GUI. self.logger/self.loggerCpp/self.logDir/the log file handler
+        are NOT touched here - see the comment in __init__ for why those stay fixed for the life
+        of this instance.
+
+        Parameters
+        ----------
+        cameraConfigs : list of dict
+            Configuration dictionaries for every camera this shared process should manage.
+
+        Raises
+        ------
+        ValueError
+            If two or more cameras in cameraConfigs share the same serialnumber - a copy-paste
+            typo in the deployment YAML that would otherwise silently produce duplicate -c flags
+            for one serial, ambiguous checkCleaniness/log routing, and only one of the two
+            camera's settings actually reaching that physical camera. Raised (not just logged) so
+            it can't be missed - callers decide how to handle it: __init__ lets it propagate
+            (nothing usable to fall back to on first load), reloadFromYaml() catches it and keeps
+            the previously working configuration instead of crashing a running instance.
+        """
+        self.cameraConfigs = cameraConfigs
+
+        serials = [c["serialnumber"] for c in cameraConfigs]
+        duplicateSerials = sorted({s for s in serials if serials.count(s) > 1})
+        if duplicateSerials:
+            message = (
+                "Deployment YAML has more than one camera entry with serialnumber %s - each "
+                "camera needs a unique serialnumber. Fix the YAML before continuing."
+                % duplicateSerials
             )
+            messagebox.showerror(title=None, message=message)
+            raise ValueError(message)
+
+        # Shared instrument name for the one CLI process: the C++ side only takes a single -n
+        # value. Prefer an explicit top-level "name" key in the deployment YAML (independent of
+        # any individual camera's own "name", which stays per-camera - see below). Deployments
+        # legitimately give each physical camera its own descriptive name (e.g.
+        # "microVISSS_leader"/"microVISSS_follower" for log/status file paths) without that
+        # implying anything about which name the merged process itself should report as -n - so
+        # falling back to "just use the first camera's name" is inherently ambiguous and worth a
+        # warning, but a mismatch is NOT a misconfiguration once a top-level name is given.
+        explicitName = self.configuration.get("name")
+        self.name = explicitName or cameraConfigs[0]["name"]
+
+        if not explicitName:
+            for cc in cameraConfigs[1:]:
+                if cc["name"] != self.name:
+                    self.logger.warning(
+                        "Camera serial %s has name '%s', which differs from the first "
+                        "camera's name '%s'. No top-level 'name' key is set in the deployment "
+                        "YAML, so the shared -n value for this one process falls back to "
+                        "whichever camera happens to be listed first ('%s') - add a top-level "
+                        "'name:' key to the deployment YAML to make this explicit and silence "
+                        "this warning; each camera's own 'name' can keep differing, it's only "
+                        "used for that camera's own log/status file paths."
+                        % (cc["serialnumber"], cc["name"], self.name, self.name)
+                    )
+
+        # Per-camera bookkeeping - each physical camera still gets its own log dir/latest-image
+        # path/status file/config file/wiper port, even though they all share one C++ process.
+        self.cameras = []
+        for cameraConfig in cameraConfigs:
+            serial = cameraConfig["serialnumber"]
+            # Final per-camera name is "<shared instrument name>_<this camera's own short
+            # name>" (e.g. "microVISSS_leader"), not the raw cameraConfig["name"] value on its
+            # own - lets the deployment YAML give each camera just "leader"/"follower" instead of
+            # repeating the instrument name in every entry ("microVISSS_leader"/
+            # "microVISSS_follower"). This is what actually reaches --name/file paths below; the
+            # short cameraConfig["name"] itself is otherwise unused past this point.
+            name = f"{self.name}_{cameraConfig['name']}"
+            logDir = f"{self.configuration['outdir']}/{self.hostname}_{name}_{serial}/logs"
+            try:
+                pathlib.Path(logDir).mkdir(parents=True, exist_ok=True)
+            except FileExistsError:
+                pass
+            except PermissionError:
+                messagebox.showerror(title=None, message="Cannot create %s" % logDir)
+                raise PermissionError
+
+            configFName = None
+            if "emergentparameters" in cameraConfig.keys():
+                configFName = "/tmp/%s_%s_%s.config" % (
+                    name,
+                    os.path.basename(self.parent.settings["configFile"]),
+                    str(datetime.date.today()),
+                )
+            else:
+                # Critical, not cosmetic: silently running a camera at power-on defaults (no
+                # exposure/framerate/etc override) is exactly the kind of gap a human glancing at
+                # the console needs to see, not discover later in the recorded data.
+                self.logger.warning(
+                    "Camera %s (serial %s) has NO emergentparameters section in the deployment "
+                    "YAML - it will run at its power-on-default camera settings, no -c flag "
+                    "will be passed for it!" % (name, serial)
+                )
+
+            self.cameras.append(
+                {
+                    "config": cameraConfig,
+                    "name": name,
+                    "serial": serial,
+                    "logDir": logDir,
+                    # This camera's final derived name (see above, "<self.name>_<short name>") +
+                    # serial - matches recordtask.cpp's CreateSymlink calls, which use the Name
+                    # TaskParam actually set for THIS camera's RecordTask instance via --name
+                    # <serial> <name> (always emitted per camera, see below).
+                    "lastImage": f"{self.configuration['outdir']}/{name}_{serial}_latest_0.jpg",
+                    "statusDir": f"{self.configuration['outdir']}/{self.hostname}_{name}_{serial}/data",
+                    "statusHtmlFile": f"{self.configuration['outdir']}/{self.hostname}_{name}_{serial}/status.html",
+                    "configFName": configFName,
+                    "serialPortWiper": cameraConfig.get("wiper"),
+                }
+            )
+
+        self.wiperCameras = [c for c in self.cameras if c["serialPortWiper"] is not None]
+
+        binary = (
+            f"{self.rootpath}/visss-data-acquisition-EVT/build/visss-data-acquisition-EVT"
+        )
+        self.command = [
+            binary,
+            "-s", "127.0.0.1", self.configuration["outdir"],
+            "-n", self.name,
+            "-i", str(self.configuration["newfileinterval"]),
+            "-l", str(self.configuration["liveratio"]),
+            "-m", str(self.configuration["minBrightchange"]),
+            "-b", str(self.configuration.get("bitrateKbps", 10000)),
+            "-e", str(self.configuration.get("encoding", "p1")),
+            "-q", str(self.configuration.get("queueDepth", 8)),
+        ]
+        if self.configuration.get("rotateimage"):
+            self.command.append("-r")
+        if self.configuration.get("storeallframes"):
+            self.command.append("-w")
+        if self.configuration.get("site"):
+            self.command += ["--site", str(self.configuration["site"])]
+        for cam in self.cameras:
+            if cam["configFName"] is not None:
+                self.command += ["-c", str(cam["serial"]), cam["configFName"]]
+        for cam in self.cameras:
+            # Each camera's own YAML "name" (e.g. "microVISSS_leader"/"microVISSS_follower"),
+            # not self.name (the single shared -n value) - without this, every camera behind
+            # this one process would show the same name in its own overlay text/output
+            # filenames (_latest_0.jpg, metadata header, ...) regardless of which physical
+            # camera actually produced it. main.cpp falls back to -n for any camera not listed
+            # here, so this is always safe to include even when every camera's name matches.
+            self.command += ["--name", str(cam["serial"]), cam["name"]]
+        print(self.command)
+
+    def reloadFromYaml(self):
+        """
+        Re-read the deployment YAML from disk and re-derive self.configuration/self.cameras/
+        self.command from it - called at the top of start() so every Start press picks up
+        whatever is currently on disk, without needing a GUI restart.
+
+        If the fresh YAML no longer has "emergent" as this deployment's sdk, or the set of
+        camera serials behind this process has changed, the reload is refused (this instance
+        would need to be torn down and rebuilt with a different set of cameras entirely, which
+        only GUI-level rebuild - see GUI.askopenfile()/buildApps() - can do safely) and the
+        previous, already-working self.configuration/self.cameras/self.command are kept as-is.
+        """
+        freshConfiguration = deepcopy(DEFAULTGENERAL)
+        freshConfiguration.update(self.parent.read_settings(self.parent.settings["configFile"]))
+
+        if freshConfiguration.get("sdk", "teledyne") != "emergent":
+            self.logger.warning(
+                "reloadFromYaml: deployment YAML no longer has sdk: emergent - keeping the "
+                "previously loaded configuration for this running instance. Use the "
+                "'Configuration File' button (or restart the GUI) to switch SDKs."
+            )
+            return
+
+        freshCameraConfigs = []
+        for cameraConfig1 in freshConfiguration.get("camera", []):
+            cameraConfig = deepcopy(DEFAULTCAMERA)
+            cameraConfig.update(cameraConfig1)
+            freshCameraConfigs.append(cameraConfig)
+
+        freshSerials = {c["serialnumber"] for c in freshCameraConfigs}
+        currentSerials = {c["serial"] for c in self.cameras}
+        if freshSerials != currentSerials:
+            self.logger.warning(
+                "reloadFromYaml: the set of camera serials in the deployment YAML changed "
+                "(was %s, now %s) - keeping the previously loaded configuration for this "
+                "running instance. Use the 'Configuration File' button (or restart the GUI) "
+                "to apply a structurally different camera set."
+                % (sorted(currentSerials), sorted(freshSerials))
+            )
+            return
+
+        # _applyConfig() reads self.configuration internally (outdir/site/etc.), so it has to be
+        # in place *before* the call - but roll back to the previous, already-working
+        # configuration if _applyConfig() rejects the fresh data, rather than leaving
+        # self.configuration pointing at data self.cameras/self.command were never rebuilt from.
+        previousConfiguration = self.configuration
+        self.configuration = freshConfiguration
+        try:
+            self._applyConfig(freshCameraConfigs)
+        except ValueError:
+            # _applyConfig() itself re-validates for duplicate serialnumbers (a genuine typo
+            # class the set-equality check above can miss - e.g. [87, 87, 88] vs. a current set
+            # of {87, 88} has equal *sets* but a real duplicate) and already showed a messagebox
+            # - keep the previously working configuration for this running instance rather than
+            # letting a YAML typo crash it mid-run.
+            self.configuration = previousConfiguration
+            self.logger.warning(
+                "reloadFromYaml: rejected (see messagebox) - keeping the previously loaded "
+                "configuration for this running instance."
+            )
+            return
+        self.parent.configuration = freshConfiguration
+        # Same serial set is guaranteed above, but a camera could have newly gained a "wiper"
+        # entry this reload - start a checkCleaniness thread for it now rather than only ever
+        # at __init__ time. Cameras that already had one keep their existing thread (which does
+        # a fresh self.cameras lookup by serial each iteration, see checkCleaniness) rather than
+        # being restarted.
+        self._ensureCleanThreads()
+        self.logger.info("reloadFromYaml: reloaded deployment YAML and reapplied configuration")
+
+    def _ensureCleanThreads(self):
+        """
+        Start a checkCleaniness thread for every wiper-equipped camera that doesn't already have
+        one running. Safe to call repeatedly (e.g. after every reloadFromYaml()) - tracks which
+        serials already have a thread in self._cleanThreadSerials.
+        """
+        for cam in self.wiperCameras:
+            if cam["serial"] in self._cleanThreadSerials:
+                continue
+            t = Thread(target=self.checkCleaniness, args=(cam["serial"],), daemon=True)
             t.start()
             self.cleanThreads.append(t)
+            self._cleanThreadSerials.add(cam["serial"])
 
     def show_context_menu(self, event):
         """
@@ -1323,17 +1471,22 @@ class EmergentInstrument:
 
     def start(self, command):
         """
-        Start the visss-data-acquisition-EVT process (first spawn - see _spawn() for what a
+        Reload the deployment YAML (see reloadFromYaml()) and start the
+        visss-data-acquisition-EVT process (first spawn - see _spawn() for what a
         crash-triggered respawn does differently).
 
         Parameters
         ----------
         command : list
-            Command to execute (self.command - kept as a parameter for interface parity with
-            runCpp.start(), which callers here rely on).
+            Ignored - kept as a parameter for interface parity with runCpp.start(), which
+            callers here rely on. self.command is rebuilt fresh by reloadFromYaml() just below
+            and used instead, so a value captured before this call (e.g. clickStartStop's
+            self.start(self.command)) is intentionally never used.
         """
+        self.reloadFromYaml()
+
         self.running.set("Running: %s" % self.name)
-        self.logger.info("Start camera with %s" % command)
+        self.logger.info("Start camera with %s" % self.command)
 
         for cam in self.wiperCameras:
             self.logger.info("Clean camera %s using port %s" % (cam["name"], cam["serialPortWiper"]))
@@ -1535,23 +1688,34 @@ class EmergentInstrument:
             self.logger.error("tried killing")
         self._resetIdleUI()
 
-    def checkCleaniness(self, cam):
+    def checkCleaniness(self, serial):
         """
         Periodically check if one camera needs cleaning. One of these runs per wiper-equipped
-        camera (see __init__), each independently watching its own lastImage; whichever one
-        decides a wipe is needed schedules the shared clean() (see its doc comment for why
-        cleaning is all-or-nothing across every camera behind this one process).
+        camera (see __init__/_ensureCleanThreads), each independently watching its own
+        lastImage; whichever one decides a wipe is needed schedules the shared clean() (see its
+        doc comment for why cleaning is all-or-nothing across every camera behind this one
+        process).
+
+        Looks up its camera dict from self.cameras by serial on every iteration, rather than
+        closing over a fixed dict, since reloadFromYaml() replaces self.cameras wholesale on
+        every Start - this way an already-running thread keeps watching the right (possibly
+        renamed/moved) lastImage path after a reload instead of a stale one.
 
         Parameters
         ----------
-        cam : dict
-            One entry from self.cameras - the camera this thread watches.
+        serial : str
+            Serial number of the camera this thread watches (key into self.cameras).
         """
         revisitTime = 60
         while True:
             time.sleep(revisitTime)
             if not self.running.get().startswith("Running"):
                 continue
+
+            cam = next((c for c in self.cameras if c["serial"] == serial), None)
+            if cam is None:
+                self.logger.error(f"checkCleaniness: camera {serial} no longer present, stopping")
+                return
 
             lastImage = cam["lastImage"]
             if not os.path.isfile(lastImage):
@@ -1722,11 +1886,29 @@ class GUI(object):
         status = ttk.Label(config, text=statusStr)
         status.pack(side=tk.LEFT, pady=6, padx=(6, 0))
 
-        self.configuration = deepcopy(DEFAULTGENERAL)
-        self.configuration.update(self.read_settings(self.settings["configFile"]))
-
+        self.appsConfigFrame = config
         self.autopilot = tk.IntVar()
         self.apps = []
+        self.triggerWidgets = []
+        self._triggerGeneration = 0
+
+        self.configuration = deepcopy(DEFAULTGENERAL)
+        self.configuration.update(self.read_settings(self.settings["configFile"]))
+        self.buildApps()
+
+        return
+
+    def buildApps(self):
+        """
+        (Re)build every per-camera app (runCpp/EmergentInstrument instance + its GUI widgets)
+        and the external-trigger polling loop from self.configuration, which must already be
+        set (see __init__ and askopenfile()). Safe to call again after destroyApps() to load a
+        genuinely different deployment YAML without restarting the GUI - each call bumps
+        self._triggerGeneration so any still-rescheduling queryExternalTrigger loop from a
+        previous call stops itself instead of running alongside the new one (see that method's
+        doc comment).
+        """
+        config = self.appsConfigFrame
 
         sdk = self.configuration.get("sdk", "teledyne")
         if sdk not in ("teledyne", "emergent"):
@@ -1761,15 +1943,15 @@ class GUI(object):
                 self.loggerRoot.addHandler(thisInstrument.log_handler)
                 self.loggerRoot.debug("Adding %s cameras " % cameraConfigs)
 
-        ChkBttn = ttk.Checkbutton(
+        self.autopilotChkBttn = ttk.Checkbutton(
             config,
             text="Autopilot",
             command=self.click_autopilot,
             variable=self.autopilot,
         )
-        ChkBttn.pack(side=tk.LEFT, pady=6, padx=6)
+        self.autopilotChkBttn.pack(side=tk.LEFT, pady=6, padx=6)
         if self.settings["autopilot"]:
-            ChkBttn.invoke()
+            self.autopilotChkBttn.invoke()
 
         if ("externalTrigger" in self.configuration.keys()) and (
             self.configuration["externalTrigger"] is not None
@@ -1781,6 +1963,7 @@ class GUI(object):
             writeHTML(self.triggerHtmlFile, "no trigger", "gray")
 
             self.externalTriggerStatus = []
+            generation = self._triggerGeneration
             for ee, externalTrigger in enumerate(self.configuration["externalTrigger"]):
                 self.externalTriggerStatus.append(
                     collections.deque(maxlen=externalTrigger["nBuffer"])
@@ -1793,6 +1976,7 @@ class GUI(object):
                 triggerWidget = ttk.Label(config, textvariable=trigger, width=40)
                 triggerWidget.pack(side=tk.RIGHT, pady=6, padx=6)
                 triggerWidget.config(background="yellow")
+                self.triggerWidgets.append(triggerWidget)
 
                 writeHTML(self.triggerHtmlFile, string, "yellow")
 
@@ -1804,13 +1988,40 @@ class GUI(object):
                         ee,
                         trigger,
                         triggerWidget,
+                        generation,
                     ),
                     kwargs=externalTrigger,
                     daemon=True,
                 )
                 x.start()
+        else:
+            self.externalTriggerStatus = [[]]
 
-        return
+    def destroyApps(self):
+        """
+        Tear down every app built by buildApps() - stops any running C++ process, destroys its
+        GUI frame, and clears the external-trigger widgets/state - so a subsequent buildApps()
+        call (from askopenfile()) starts from a clean slate for a possibly-different deployment
+        YAML, without restarting the whole GUI/Tk root.
+
+        Bumps self._triggerGeneration so old queryExternalTrigger self.root.after() chains stop
+        rescheduling themselves (see that method's doc comment) rather than continuing to poll
+        for a deployment that's no longer loaded.
+        """
+        for app in self.apps:
+            if app.running.get().startswith("Running"):
+                app.quit()
+            app.frame1.destroy()
+        self.apps = []
+
+        self._triggerGeneration += 1
+        for triggerWidget in self.triggerWidgets:
+            triggerWidget.destroy()
+        self.triggerWidgets = []
+        self.externalTriggerStatus = [[]]
+
+        if hasattr(self, "autopilotChkBttn"):
+            self.autopilotChkBttn.destroy()
 
     def getSerialNumbers(self):
         """
@@ -1850,14 +2061,21 @@ class GUI(object):
 
     def askopenfile(self):
         """
-        Open file dialog to select configuration file.
+        Open file dialog to select a different deployment YAML, tear down every currently
+        running app (stopping its C++ process first if needed) and rebuild from the new file -
+        no GUI restart needed, even if the new file has a different camera set or SDK than the
+        one currently loaded.
         """
         file = filedialog.askopenfilename(filetypes=[("YAML files", ".yaml")])
-        if file is not None:
+        if file:
             self.settings["configFile"] = file
-            self.configuration = self.read_settings(file)
             self.save_settings(None)
-            messagebox.showwarning(title=None, message="Restart to apply settings")
+
+            self.configuration = deepcopy(DEFAULTGENERAL)
+            self.configuration.update(self.read_settings(file))
+
+            self.destroyApps()
+            self.buildApps()
         else:
             messagebox.showerror(title=None, message="File not found")
 
@@ -1964,6 +2182,7 @@ class GUI(object):
         nn,
         trigger,
         triggerWidget,
+        generation,
         name,
         address,
         interval,
@@ -1984,6 +2203,12 @@ class GUI(object):
             Variable to store trigger status.
         triggerWidget : ttk.Label
             Widget to display trigger status.
+        generation : int
+            Value of self._triggerGeneration when this trigger's polling loop was started - if
+            it no longer matches self._triggerGeneration (buildApps() was called again, e.g. a
+            new deployment YAML was loaded via askopenfile()), this call is from a superseded
+            self.root.after() chain and stops rescheduling itself instead of running forever
+            alongside the new deployment's own trigger threads.
         name : str
             Name of the trigger.
         address : str
@@ -2001,6 +2226,9 @@ class GUI(object):
         nightOnly : bool
             Whether to only trigger during nighttime.
         """
+        if generation != self._triggerGeneration:
+            return
+
         if not bool(self.autopilot.get()):
             triggerWidget.config(background="gray")
             trigger.set("external trigger disabled")
@@ -2011,6 +2239,7 @@ class GUI(object):
                     nn,
                     trigger,
                     triggerWidget,
+                    generation,
                     name,
                     address,
                     interval,
@@ -2037,6 +2266,7 @@ class GUI(object):
                     nn,
                     trigger,
                     triggerWidget,
+                    generation,
                     name,
                     address,
                     interval,
@@ -2061,6 +2291,7 @@ class GUI(object):
                 nn,
                 trigger,
                 triggerWidget,
+                generation,
                 name,
                 address,
                 interval,

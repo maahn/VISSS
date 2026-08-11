@@ -1,6 +1,6 @@
 #include "kernel.cuh"
 
-#include "font8x14.h"
+#include "font16x28.h"
 
 #include <eSdkPro/errors.h>
 
@@ -37,8 +37,8 @@ __global__ void drawTextKernel(uint8_t* outBuf, uint32_t pitch, uint32_t frameWi
 
     const uint32_t srcX = localX / c_fontScale;
     const uint32_t srcY = localY / c_fontScale;
-    const uint8_t rowBits = g_font8x14[c - c_fontFirstChar][srcY];
-    const bool on = (rowBits >> (7 - srcX)) & 1;
+    const uint16_t rowBits = g_font16x28[c - c_fontFirstChar][srcY];
+    const bool on = (rowBits >> (c_fontCellWidth - 1 - srcX)) & 1;
     if (on)
     {
         outBuf[(py * pitch) + px] = 255;

@@ -240,6 +240,10 @@ private:
     // Housekeeping/rollover state, matching the old pipeline's exact trigger logic.
     bool m_firstFrame = true;
     uint64_t m_lastRolloverTimestampS = 0;
+    // Frame-timestamp-domain time of the very first frame this task ever processed - used to
+    // suppress a boundary-triggered rollover that would otherwise land suspiciously soon after
+    // the unconditionally-opened first segment (see RollSegmentIfNeeded's comment).
+    uint64_t m_startTimestampS = 0;
     bool m_snapshotPending = false; // set by OpenSegment(), consumed by the next Process() call
     uint64_t m_lastWrittenTimestampUs = 0; // for the "# Last capture time" footer on close
 

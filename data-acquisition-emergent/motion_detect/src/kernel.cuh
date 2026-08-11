@@ -4,12 +4,19 @@
 
 #include <stdint.h>
 
-// Font geometry, shared by kernel.cu (which also includes font8x14.h for the actual glyph data)
+// Font geometry, shared by kernel.cu (which also includes font16x28.h for the actual glyph data)
 // and callers that need to compute layout (e.g. centering text within the status-bar border).
-// Plain constexpr, safe to include from non-CUDA .cpp files - unlike font8x14.h, which uses the
+// Plain constexpr, safe to include from non-CUDA .cpp files - unlike font16x28.h, which uses the
 // CUDA __constant__ attribute and must only be included from a .cu file.
-constexpr uint32_t c_fontCellWidth = 8;
-constexpr uint32_t c_fontCellHeight = 14;
+//
+// 16x28, not the original 8x14: the original font was a tiny 8x14 bitmap nearest-neighbor
+// upscaled 2x at draw time (c_fontScale below), which looked visibly blocky/low-detail on real
+// footage - project owner flagged it as "still from the old resolution" (2026-08-11). Regenerated
+// (gen_font16x28.py, DejaVuSansMono-Bold.ttf, same source font as before) natively at 16x28
+// instead - same on-screen size as before (8x14 * scale 2 == 16x28 * scale 1), genuinely more
+// glyph detail since every pixel is a real render at that resolution, not a doubled-up blocky one.
+constexpr uint32_t c_fontCellWidth = 16;
+constexpr uint32_t c_fontCellHeight = 28;
 constexpr int c_fontFirstChar = 0x20;
 constexpr int c_fontLastChar = 0x7E;
 
@@ -22,9 +29,12 @@ constexpr int c_binEdges20[8] = {20, 30, 40, 60, 80, 100, 120, 256};
 constexpr int c_binEdges30[8] = {30, 40, 60, 80, 100, 120, 140, 256};
 
 // Nearest-neighbor upscale factor applied when drawing (each glyph bitmap bit becomes an NxN
-// block of output pixels) - the font data itself (font8x14.h) stays a fixed 8x14 bitmap;
+// block of output pixels) - the font data itself (font16x28.h) stays a fixed 16x28 bitmap;
 // c_fontScale is the only thing to change to make the status-bar text bigger/smaller on screen.
-constexpr uint32_t c_fontScale = 2;
+// Default 1: the font is already natively rendered at the on-screen size the old 8x14 font needed
+// scale=2 to reach, so no further (blocky) magnification is needed by default - raise this only
+// if even-bigger text is wanted, at the cost of the same blockiness this change was meant to fix.
+constexpr uint32_t c_fontScale = 1;
 // Rendered (on-screen) glyph cell size - what callers doing layout (e.g. centering text within
 // the status-bar border) should use, not c_fontCellWidth/Height, which is the raw bitmap size.
 constexpr uint32_t c_fontRenderedCellWidth = c_fontCellWidth * c_fontScale;

@@ -29,7 +29,16 @@ Design points (all verified against the real installed SDK/ffmpeg, not assumed)
   dropped frames at rollover boundaries. See recordtask.h's class doc for the exact file
   naming/rollover mechanics and RollSegmentIfNeeded()'s frame-timestamp-domain tracking (a
   wall-clock debounce used to silently skip every other rollover at small -i values; fixed by
-  tracking the last rollover in the frame-timestamp domain instead of time(nullptr)).
+  tracking the last rollover in the frame-timestamp domain instead of time(nullptr)). Rollovers
+  land exactly on unixtime % NewFileIntervalSec == 0 (e.g. :00/:10/:20 for -i 600), for predictable
+  file-start times - except within c_minSecondsBeforeRollover (10s) of the task's first frame,
+  where a boundary crossing is deliberately suppressed: the first segment opens unconditionally on
+  the first frame regardless of alignment, so if startup happened to land just before a boundary,
+  the very next frame would otherwise immediately roll over again into a second, near-zero-length
+  file - project owner's explicit ask (2026-08-11). motion_detect's MotionDetectTask mirrors this
+  exact suppression (its own independently-derived M:/H: reset boundary, kept in sync with this
+  task's real rollover - see motion_detect/README.txt), and so does the client's own
+  PrintNewFileNotice prediction (main.cpp) - all three must stay in sync if this ever changes.
 - forced-idr=1 AVOption is required, not just pict_type=AV_PICTURE_TYPE_I on the first frame of a
   new segment. Without it, every segment after the first rollover opened to a black/corrupt frame
   in players — HEVC allows non-IDR "keyframes" that still reference content before them, so the
@@ -54,14 +63,25 @@ Design points (all verified against the real installed SDK/ffmpeg, not assumed)
   hardcoded to _0 (round-robin thread-splitting isn't ported at all — GPU-resident processing
   removed the reason for it, confirmed with the project owner during the port).
 - *_latest_0.{mp4,txt,jpg} symlinks are named {OutputRoot}/{Name}_{DeviceId}_latest_0.* -
-  DeviceId included, not just Name, because Name is the single shared -n CLI value covering
-  every camera one client process manages (see visss-data-acquisition-EVT/README.txt). Without
-  DeviceId, two cameras behind one server (a real, confirmed deployment shape, not a hypothetical
-  edge case) would both write the *same* _latest path and race each other - found exactly this
-  way on real hardware (only one _latest set existed after a real 2-camera run), fixed 2026-08-11.
-  The Python launcher's EmergentInstrument constructs its wiper lastImage path to match this
-  exactly - if you ever change this naming, update that too (self.name + serial there, not that
-  camera's own possibly-different YAML name).
+  DeviceId included, not just Name, because several cameras can share one client process (see
+  visss-data-acquisition-EVT/README.txt). Without DeviceId, two cameras behind one server (a
+  real, confirmed deployment shape, not a hypothetical edge case) would both write the *same*
+  _latest path and race each other - found exactly this way on real hardware (only one _latest
+  set existed after a real 2-camera run), fixed 2026-08-11. Name itself was ALSO a shared -n CLI
+  value at first (same bug class: every camera's own recording showed up under whichever name -n
+  happened to be, e.g. a follower camera's files literally named "..._leader_...") until
+  main.cpp gained --name <serial> <name> the same day - Name here is now that camera's own
+  per-camera override when one is given, only falling back to the shared -n otherwise. The Python
+  launcher's EmergentInstrument constructs its wiper lastImage path to match this exactly (this
+  camera's own YAML "name" + serial, since --name is now always emitted per camera) - if you ever
+  change this naming, update that too.
+- Every file this task creates (the finalized .mp4/.txt, the .jpg snapshot, and the directories
+  built to hold them) is chowned to the "visss" user (ChownToVisss, recordtask.cpp) right after
+  it's created/moved into its final location - eCaptureProServer runs as root (see ../README.md's
+  "Known gaps"), so without this everything recorded would be root-owned and unreadable/
+  undeletable by the account everything else in the deployment (sync scripts, VISSSlib, the
+  Python launcher's own log/status files) runs as. Best-effort: logged but never fatal if the
+  "visss" account doesn't exist on a given host or the chown itself fails.
 
 Per-frame flow / ShouldWritePortPayload
 ============

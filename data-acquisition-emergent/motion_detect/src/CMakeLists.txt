@@ -8,5 +8,5 @@ target_sources("${PROJECT_NAME}" PRIVATE
 target_sources("${PROJECT_NAME}" PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/motiondetecttask.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/kernel.cuh"
-    "${CMAKE_CURRENT_SOURCE_DIR}/font8x14.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/font16x28.h"
 )

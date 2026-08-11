@@ -202,6 +202,10 @@ private:
     uint32_t m_frameCountInFile = 0;
     uint32_t m_frameCountMoving = 0;
     uint64_t m_lastRolloverTimestampS = 0;
+    // Mirrors RecordTask's m_startTimestampS/c_minSecondsBeforeRollover suppression (see its
+    // comment) - kept in sync so this task's M:/H: reset lands on the same frame RecordTask
+    // actually rolls over on, not a boundary RecordTask itself suppressed.
+    uint64_t m_startTimestampS = 0;
 
     // Live-preview decimation state (§3.25).
     uint32_t m_frameCounter = 0;
