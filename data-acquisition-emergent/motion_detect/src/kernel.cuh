@@ -13,6 +13,23 @@ constexpr uint32_t c_fontCellHeight = 14;
 constexpr int c_fontFirstChar = 0x20;
 constexpr int c_fontLastChar = 0x7E;
 
+// Host-visible copies of kernel.cu's g_binEdges20/g_binEdges30 __constant__ arrays (the __device__
+// qualifier means those aren't visible outside CUDA-compiled code) - motiondetecttask.cpp needs
+// the same edge values to format the status-bar "H:" field (PROCESSING_SPEC_teeldyne.md §3.18's
+// "the exact, hardcoded values to preserve"). Keep these byte-for-byte identical to kernel.cu's
+// copies - if you change one, change both.
+constexpr int c_binEdges20[8] = {20, 30, 40, 60, 80, 100, 120, 256};
+constexpr int c_binEdges30[8] = {30, 40, 60, 80, 100, 120, 140, 256};
+
+// Nearest-neighbor upscale factor applied when drawing (each glyph bitmap bit becomes an NxN
+// block of output pixels) - the font data itself (font8x14.h) stays a fixed 8x14 bitmap;
+// c_fontScale is the only thing to change to make the status-bar text bigger/smaller on screen.
+constexpr uint32_t c_fontScale = 2;
+// Rendered (on-screen) glyph cell size - what callers doing layout (e.g. centering text within
+// the status-bar border) should use, not c_fontCellWidth/Height, which is the raw bitmap size.
+constexpr uint32_t c_fontRenderedCellWidth = c_fontCellWidth * c_fontScale;
+constexpr uint32_t c_fontRenderedCellHeight = c_fontCellHeight * c_fontScale;
+
 /**
  * Draws ASCII text into an output frame using a fixed 8x14 monospace bitmap font, writing white
  * (255) pixels for "on" glyph pixels and leaving everything else untouched (so callers should

@@ -62,6 +62,12 @@ const std::string c_noPreviewParamName = "NoPreview";
 // so they're always given the *same* count - giving one port more slack than the other would
 // just move the blocking bottleneck to whichever port has fewer buffers.
 const std::string c_queueDepthParamName = "QueueDepth";
+// Same value/meaning as RecordTask's NewFileIntervalSec (matches the old CLI's -i/--newfileinterval).
+// Needed here too, independently, so the "M:" move-percent overlay field can reset per output
+// file without any cross-task communication: both tasks see the same frame timestamps and derive
+// the identical rollover-boundary crossing from the identical formula (see Process()'s comment),
+// so they stay in sync by construction rather than by signaling each other.
+const std::string c_newFileIntervalSecParamName = "NewFileIntervalSec";
 } // namespace MotionDetect
 
 // Wire format for the ShouldWrite companion data port (see MotionDetect::c_shouldWriteOutputName
@@ -89,9 +95,12 @@ struct ShouldWritePortPayload
  *
  * Currently implemented: extends each frame with a border region at the top (black, or gray if
  * nothing moved - §3.20) and draws a single-line status-bar text overlay into it
- * (site | timestamp | name | Q:<queue length> | frame id [| N.R.]), matching the old pipeline's
- * copyMakeBorder + putText stage as far as the data available at this point in the port allows.
- * See `QueueDepth` below for what "Q:" actually measures here. Optional
+ * (site | timestamp | name | Q:<queue length> | H:<edge>[N.R.] | M:<move%>), matching the old
+ * pipeline's copyMakeBorder + putText stage (storage_worker_cv.h's exact field set/order - see
+ * Process()'s comment for the "H:"/"M:" derivation) as far as the data available at this point in
+ * the port allows. Old pipeline's trailing thread-id field is dropped, not ported - round-robin
+ * thread-splitting isn't ported either (Finding B), so there's no thread id to show. See
+ * `QueueDepth` below for what "Q:" actually measures here. Optional
  * 90-degree counterclockwise rotation (§3.19, the `Rotate` param), applied to the content region
  * before the border/overlay is composited - swaps the output frame's width/height versus the raw
  * camera frame, which the client must account for when sizing RecordTask (see main.cpp).
@@ -139,9 +148,6 @@ struct ShouldWritePortPayload
  *
  * Deferred (not implemented yet, need a later stage first):
  *  - Queue depth: no eSDK Pro port-queue-depth query found (mapping doc gap list #3).
- *  - Histogram bin / move% overlay fields: motion detection now exists, but these aren't
- *    surfaced into the status-bar text yet (move% is a per-output-file cumulative stat that would
- *    need file-rollover awareness this task doesn't have).
  *  - Thread id: dropped - round-robin thread-splitting isn't being ported (mapping doc Finding B).
  *  - Exposure/gain: needs camera parameter access, which this frame-only plugin doesn't have yet.
  */
@@ -173,6 +179,7 @@ private:
     eSdkPro::Plugin::Int32TaskParam m_liveRatioParam{};
     eSdkPro::Plugin::BoolTaskParam m_noPreviewParam{};
     eSdkPro::Plugin::Int32TaskParam m_queueDepthParam{};
+    eSdkPro::Plugin::Int32TaskParam m_newFileIntervalSecParam{};
 
     // Reusable device buffer for the per-frame status text, uploaded once per Process() call and
     // read by the text-drawing kernel. Allocated once in Init(), not per frame.
@@ -188,6 +195,13 @@ private:
     // Recording-decision state (§3.21).
     bool m_firstFrame = true;
     uint32_t m_framesSinceLastStatusFrame = 0;
+
+    // "M:" move-percent overlay state (§3.20/§3.13), reset at Init() and at every independently-
+    // detected file-rollover boundary (see Process()'s comment) - matches the old pipeline's
+    // frame_count_infile/frame_count_moving, reset alongside its own file-open.
+    uint32_t m_frameCountInFile = 0;
+    uint32_t m_frameCountMoving = 0;
+    uint64_t m_lastRolloverTimestampS = 0;
 
     // Live-preview decimation state (§3.25).
     uint32_t m_frameCounter = 0;

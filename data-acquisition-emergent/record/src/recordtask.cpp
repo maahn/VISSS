@@ -515,8 +515,16 @@ void RecordTask::CloseSegment(bool reuseEncoder)
 
     const std::string outputRoot = m_outputRootParam.GetValue();
     const std::string name = m_nameParam.GetValue();
-    CreateSymlink(m_finalMp4Path, outputRoot + "/" + name + "_latest_0.mp4");
-    CreateSymlink(m_finalTxtPath, outputRoot + "/" + name + "_latest_0.txt");
+    const std::string deviceId = m_deviceIdParam.GetValue();
+    // DeviceId included, not just Name: Name is shared across every camera the client manages
+    // (one -n value for the whole process, see main.cpp), so two cameras behind one server would
+    // otherwise both write the *same* "_latest_0.*" path and race each other (confirmed by
+    // testing: a real 2-camera deployment produced only one set of _latest files, whichever
+    // camera's RecordTask wrote last "won"). DeviceId (the camera serial) is what actually keeps
+    // this unique per camera - matches the Python launcher's wiper lastImage path, which must
+    // stay in sync with this naming (see launch_visss_data_acquisition.py's EmergentInstrument).
+    CreateSymlink(m_finalMp4Path, outputRoot + "/" + name + "_" + deviceId + "_latest_0.mp4");
+    CreateSymlink(m_finalTxtPath, outputRoot + "/" + name + "_" + deviceId + "_latest_0.txt");
 
     LogMessage(eSdkPro::LogLevel::Info, "Written " + m_finalMp4Path);
     m_lastSegmentClosedParam.SetValue("Written " + m_finalMp4Path);
@@ -781,8 +789,9 @@ bool RecordTask::Process()
             // but only symlink it if it actually got written, or the link dangles.
             if (SaveSnapshot(inputFrame, m_finalJpgPath))
             {
-                CreateSymlink(m_finalJpgPath, m_outputRootParam.GetValue() + "/" + m_nameParam.GetValue() +
-                                                   "_latest_0.jpg");
+                // DeviceId included - see the .mp4/.txt CreateSymlink calls' comment for why.
+                CreateSymlink(m_finalJpgPath, m_outputRootParam.GetValue() + "/" + m_nameParam.GetValue() + "_" +
+                                                   m_deviceIdParam.GetValue() + "_latest_0.jpg");
             }
             m_snapshotPending = false;
         }

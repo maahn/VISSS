@@ -118,6 +118,15 @@ MotionDetectTask::MotionDetectTask()
     m_queueDepthParam.SetValue(8);
     m_queueDepthParam.SetToolTip(
         "Buffers pre-registered per output port - slack to absorb momentary downstream slowdowns.");
+
+    // Matches RecordTask's own NewFileIntervalSec - see MotionDetect::c_newFileIntervalSecParamName.
+    m_newFileIntervalSecParam =
+        CreateParameter<eSdkPro::Plugin::Int32TaskParam>(MotionDetect::c_newFileIntervalSecParamName);
+    m_newFileIntervalSecParam.SetValue(600);
+    m_newFileIntervalSecParam.SetToolTip(
+        "Same value as RecordTask's NewFileIntervalSec - resets the \"M:\" move-percent overlay "
+        "stat at the same boundaries RecordTask rolls over a file, without any cross-task "
+        "signaling (both derive the same boundary from the same frame timestamps).");
 }
 
 MotionDetectTask::~MotionDetectTask()
@@ -187,6 +196,9 @@ bool MotionDetectTask::Init()
     m_firstFrame = true;
     m_framesSinceLastStatusFrame = 0;
     m_frameCounter = 0;
+    m_frameCountInFile = 0;
+    m_frameCountMoving = 0;
+    m_lastRolloverTimestampS = 0;
 
     return true;
 }
@@ -268,6 +280,7 @@ bool MotionDetectTask::Process()
             histCounts[i] += histCounts[i + 1];
         }
         bool movingPixel = false;
+        bool movingPixels[7] = {false, false, false, false, false, false, false};
         int minMovingPixel = 20;
         int tt = 1;
         for (int bin = 0; bin < 7; bin++)
@@ -280,6 +293,7 @@ bool MotionDetectTask::Process()
             if (histCounts[bin] >= static_cast<uint32_t>(movingPixelThreshold))
             {
                 movingPixel = true;
+                movingPixels[bin] = true;
             }
             tt *= 2;
         }
@@ -306,6 +320,36 @@ bool MotionDetectTask::Process()
         }
 
         const bool shouldWrite = m_writeAllFramesParam.GetValue() || movingPixel || isFirstFrame || statusFrame;
+
+        // "M:" move-percent overlay stat (§3.20/§3.13): independently derives the same
+        // file-rollover boundary RecordTask uses (RollSegmentIfNeeded in recordtask.cpp) from the
+        // same frame timestamps, so the two tasks' resets stay in sync without any cross-task
+        // signaling - there is no port carrying data from RecordTask back to this task, so this
+        // is the only way to get per-file semantics here. Simplification vs. the old pipeline:
+        // the reset happens *before* this frame's text is built (old pipeline's reset happened
+        // after, so a new file's first frame showed the outgoing file's trailing M% for one
+        // frame) - the new file's first frame here shows a freshly-reset 0.0% instead, which is
+        // simpler and avoids that one-frame artifact.
+        const int32_t newFileIntervalSec = m_newFileIntervalSecParam.GetValue();
+        const bool doRollover = (newFileIntervalSec > 0) &&
+                                 (timestampS % static_cast<uint64_t>(newFileIntervalSec) == 0) &&
+                                 (timestampS != m_lastRolloverTimestampS);
+        if (doRollover || isFirstFrame)
+        {
+            m_frameCountInFile = 0;
+            m_frameCountMoving = 0;
+            m_lastRolloverTimestampS = timestampS;
+        }
+        const double movePercent =
+            static_cast<double>(m_frameCountMoving) * 100.0 / static_cast<double>(m_frameCountInFile + 1);
+        char movePercentBuf[16];
+        std::snprintf(movePercentBuf, sizeof(movePercentBuf), "%.1f", movePercent);
+
+        m_frameCountInFile++;
+        if (shouldWrite)
+        {
+            m_frameCountMoving++;
+        }
 
         // A 90-degree rotation swaps width/height for the content region - the border still sits
         // on top of the (now rotated) content, matching the old pipeline's order: rotate (§3.19)
@@ -380,16 +424,34 @@ bool MotionDetectTask::Process()
             }
         }
 
-        // Status-bar text. Fields still missing versus the old overlay (histogram bin/move%,
-        // thread id, exposure/gain) are documented in motiondetecttask.h. Q: matches the old
-        // overlay's field name/position (site | timestamp | name | Q:<queue> | ...).
+        // Status-bar text (site | timestamp | name | Q:<queue> | H:<edge>[N.R.] | M:<move%>),
+        // matching the old overlay's field set/order (storage_worker_cv.h) except the trailing
+        // thread-id field, dropped since round-robin thread-splitting isn't ported (Finding B).
+        // "H:" is the highest-triggered histogram bin's edge value (3-digit zero-padded, empty if
+        // nothing moved this frame) - old pipeline scans bins from highest to lowest and takes the
+        // first (i.e. highest) one whose adaptive threshold was exceeded.
+        std::string edgeStr;
+        {
+            const bool useThirty = m_minBrightChangeParam.GetValue() == 30;
+            const int* edges = useThirty ? c_binEdges30 : c_binEdges20;
+            for (int bin = 6; bin >= 0; bin--)
+            {
+                if (movingPixels[bin])
+                {
+                    std::string edgeDigits = std::to_string(edges[bin]);
+                    edgeStr = std::string(3 - std::min<size_t>(3, edgeDigits.size()), '0') + edgeDigits;
+                    break;
+                }
+            }
+        }
+
         std::string text = m_siteParam.GetValue() + " | " + formatTimestamp(inputFrame.GetTimestampNs()) + " | " +
-                            m_nameParam.GetValue() + " | Q:" + std::to_string(queueLength) +
-                            " | ID:" + std::to_string(inputFrame.GetFrameId());
+                            m_nameParam.GetValue() + " | Q:" + std::to_string(queueLength) + " | H:" + edgeStr;
         if (!movingPixel)
         {
-            text += " | N.R.";
+            text += " N.R.";
         }
+        text += " | M:" + std::string(movePercentBuf) + "%";
         const uint32_t textLen = std::min<uint32_t>(static_cast<uint32_t>(text.size()), c_maxTextLen);
 
         err = cudaMemcpy(m_deviceTextBuffer, text.data(), textLen, cudaMemcpyHostToDevice);
@@ -400,10 +462,11 @@ bool MotionDetectTask::Process()
                 "cudaMemcpy failed for status bar text upload: " + std::string(cudaGetErrorString(err)));
         }
 
-        // Roughly vertically centered in the border, small left margin.
+        // Roughly vertically centered in the border, small left margin. Uses the *rendered*
+        // (post-c_fontScale) cell height, not the raw 8x14 bitmap size, to center correctly.
         const uint32_t originX = 10;
-        const uint32_t originY = (MotionDetect::c_borderHeight > c_fontCellHeight)
-                                      ? (MotionDetect::c_borderHeight - c_fontCellHeight) / 2
+        const uint32_t originY = (MotionDetect::c_borderHeight > c_fontRenderedCellHeight)
+                                      ? (MotionDetect::c_borderHeight - c_fontRenderedCellHeight) / 2
                                       : 0;
         launchDrawTextKernel(outputFrame, m_deviceTextBuffer, textLen, originX, originY);
 

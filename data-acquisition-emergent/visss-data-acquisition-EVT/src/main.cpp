@@ -123,6 +123,8 @@ const std::string c_motionDetectLiveRatioParamName = "LiveRatio";
 const std::string c_motionDetectNoPreviewParamName = "NoPreview";
 const std::string c_motionDetectQueueDepthParamName = "QueueDepth";
 const std::string c_motionDetectSiteParamName = "Site";
+const std::string c_motionDetectNameParamName = "Name";
+const std::string c_motionDetectNewFileIntervalSecParamName = "NewFileIntervalSec";
 
 // RecordTask replaces NvencTask (see ../record/README.txt for why) - loaded the same way as
 // MotionDetectTask, must match the Record namespace in record/src/recordtask.h.
@@ -399,8 +401,8 @@ void PollCameraStatus(const std::vector<Camera>& cams,
         const std::string serial = std::to_string(cam.GetDiscoveryInfo().m_serialNumber);
         // SensTemp confirmed against this camera's actual feature list. PHYSNRMargin (which
         // would have been a substitute for the old pipeline's Teledyne-specific
-        // transferQueueCurrentBlockCount/transferMaxBlockSize, see pipeline-to-esdkpro-mapping.md
-        // gap #10) turned out NOT to exist on this camera despite being in Emergent's docs
+        // transferQueueCurrentBlockCount/transferMaxBlockSize, see README.txt) turned out NOT to
+        // exist on this camera despite being in Emergent's docs
         // ("Parameter PHYSNRMargin not found") - dropped rather than left failing every call,
         // which was also silencing the working SensTemp/PtpStatus fields since they shared one
         // try/catch. No network-link-health substitute currently available.
@@ -770,6 +772,19 @@ int main(int argc, char* argv[])
                 {
                     ApplyCameraConfigFile(cam, serial, *cameraConfigPath);
                 }
+                else
+                {
+                    // Not just cosmetic: silently running a camera at power-on defaults (no
+                    // exposure/framerate/etc override) is exactly the kind of gap worth surfacing
+                    // loudly rather than discovering later in the recorded data. Matches the
+                    // Python launcher's own warning for the same condition (see
+                    // launch_visss_data_acquisition.py's EmergentInstrument) - this one fires
+                    // even when the binary is run directly, bypassing the Python wrapper.
+                    std::cout << LogLine("WARNING", serial,
+                                          "no camera config file (-c) given for this camera - "
+                                          "running at power-on-default settings")
+                              << std::endl;
+                }
             }
         }
 
@@ -829,6 +844,11 @@ int main(int argc, char* argv[])
                     .SetValue(params.m_noPreview);
                 motionDetectTask.GetParameter<Int32TaskParam>(c_motionDetectQueueDepthParamName)
                     .SetValue(params.m_queueDepth);
+                // Was missing entirely - the overlay's "name" field silently showed
+                // MotionDetectTask's own default ("VISSS") regardless of -n, never the real value.
+                motionDetectTask.GetParameter<StringTaskParam>(c_motionDetectNameParamName).SetValue(params.m_name);
+                motionDetectTask.GetParameter<Int32TaskParam>(c_motionDetectNewFileIntervalSecParamName)
+                    .SetValue(static_cast<int32_t>(params.m_newFileIntervalSec));
 
                 // Create the record plugin task, replacing NvencTask - see ../record/README.txt
                 // for why. Width/Height must match what MotionDetectTask actually outputs

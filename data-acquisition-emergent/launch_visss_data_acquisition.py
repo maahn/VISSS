@@ -935,10 +935,11 @@ class EmergentInstrument:
     (Teledyne) stays byte-for-byte unchanged so its production behavior can't regress from this
     work, at the cost of duplicating the small amount of per-camera-process scaffolding
     (update/display/quit/kill/wiper) that both classes need. Mirrors runCpp's public shape
-    (self.running/self.status/self.statusWidget/self.CleanButton/self.logDir/self.statusHtmlFile/
-    self.lastImage attributes, start()/quit()/kill()/display()/poll_log_queue() entry points) so
-    GUI.__init__'s widget-creation code and GUI.queryExternalTrigger's app.statusWatcher() fan-out
-    work unchanged regardless of which class populates self.apps.
+    (self.running/self.status/self.statusWidget/self.CleanButton/self.logDir attributes,
+    start()/quit()/kill()/display()/poll_log_queue() entry points) so GUI.__init__'s
+    widget-creation code and GUI.queryExternalTrigger's app.statusWatcher() fan-out work
+    unchanged regardless of which class populates self.apps. Unlike runCpp, there is no single
+    self.statusHtmlFile/self.lastImage - those are per-camera now, see self.cameras.
 
     Real differences from runCpp:
     - No bash wrapper: the new binary already takes real flags (see main.cpp's parseArgs()), so
@@ -952,13 +953,20 @@ class EmergentInstrument:
       the new binary's "LEVEL-N" lines carry a camera serial number, not a small sequential
       storage-thread index, so forcing it through int() and calling it a thread number would be
       wrong.
-    - One-camera-per-instance, matching the real leader/follower deployment topology (each
-      Emergent host runs exactly one camera locally) - the C++ binary can in principle manage
-      several cameras on one server, but building for that here would be designing for a topology
-      nobody runs.
+    - **One instance per deployment/server, not per camera** - the C++ binary auto-discovers and
+      manages every camera on the servers it's given, in one process (unlike the old Teledyne
+      binary, which is fundamentally one-camera-per-process). Running one EmergentInstrument per
+      YAML camera entry would spawn multiple client processes racing to open the *same* physical
+      cameras behind one server - confirmed as a real bug (two GUI columns, only one camera ever
+      actually got its -c config applied) rather than a hypothetical. Fixed 2026-08-11:
+      GUI.__init__ now groups every "emergent" camera entry into one EmergentInstrument
+      (self.cameras, a list), which builds one -c <serial> <path> per camera into a single shared
+      command line. Per-camera bookkeeping (log dir, latest-image path, status file, wiper) still
+      exists per physical camera inside self.cameras; only the process/GUI-column/Start-Stop
+      button is shared.
     """
 
-    def __init__(self, parent, cameraConfig):
+    def __init__(self, parent, cameraConfigs):
         """
         Initialize the EmergentInstrument class.
 
@@ -966,58 +974,103 @@ class EmergentInstrument:
         ----------
         parent : GUI
             Reference to the parent GUI object.
-        cameraConfig : dict
-            Configuration dictionary for the camera.
+        cameraConfigs : list of dict
+            Configuration dictionaries for every camera this one shared process should manage
+            (every "emergent" entry in the deployment YAML's camera: list, in the real
+            one-server-per-host topology - see the class doc comment for why this is a list, not
+            a single dict).
         """
         self.parent = parent
-        self.cameraConfig = cameraConfig
+        self.cameraConfigs = cameraConfigs
 
         self.configuration = parent.configuration
         self.settings = parent.settings
         self.hostname = parent.hostname
         self.rootpath = parent.emergentRootpath
 
-        self.name = cameraConfig["name"]
+        # Shared instrument name for the one CLI process: the C++ side only takes a single -n
+        # value, so it comes from the first camera's "name" field. File paths stay unique per
+        # camera regardless (serial number is always in the path), but warn loudly if the
+        # deployment YAML gives cameras behind one server different names, since only one of
+        # those names is what will actually show up in every recorded file's path/overlay text.
+        self.name = cameraConfigs[0]["name"]
         self.logger = logging.getLogger("Python:EmergentInstrument:%s" % self.name)
         self.loggerCpp = logging.getLogger("C++:%s" % self.name)
 
-        self.logDir = (
-            f"{self.configuration['outdir']}/{self.hostname}_"
-            f"{self.cameraConfig['name']}_"
-            f"{self.cameraConfig['serialnumber']}/logs"
-        )
-        self.lastImage = (
-            f"{self.configuration['outdir']}/"
-            f"{self.cameraConfig['name']}_latest_0.jpg"
-        )
-        try:
-            pathlib.Path(self.logDir).mkdir(parents=True, exist_ok=True)
-        except FileExistsError:
-            pass
-        except PermissionError:
-            messagebox.showerror(title=None, message="Cannot create %s" % self.logDir)
-            raise PermissionError
-        self.statusDir = (
-            f"{self.configuration['outdir']}/{self.hostname}_"
-            f"{self.cameraConfig['name']}_"
-            f"{self.cameraConfig['serialnumber']}"
-            "/data"
-        )
-        self.statusHtmlFile = (
-            f"{self.configuration['outdir']}/{self.hostname}_"
-            f"{self.cameraConfig['name']}_"
-            f"{self.cameraConfig['serialnumber']}"
-            "/status.html"
-        )
+        for cc in cameraConfigs[1:]:
+            if cc["name"] != self.name:
+                self.logger.warning(
+                    "Camera serial %s has name '%s', which differs from the first camera's "
+                    "name '%s' - this deployment has multiple cameras behind one server, so "
+                    "they share ONE process and ONE -n value ('%s'). Give every camera behind "
+                    "the same server the same 'name' in the deployment YAML to avoid this "
+                    "confusion; serial number alone already keeps recorded file paths unique."
+                    % (cc["serialnumber"], cc["name"], self.name, self.name)
+                )
 
-        # Create a logging handler using a queue
+        # Per-camera bookkeeping - each physical camera still gets its own log dir/latest-image
+        # path/status file/config file/wiper port, even though they all share one C++ process.
+        self.cameras = []
+        for cameraConfig in cameraConfigs:
+            serial = cameraConfig["serialnumber"]
+            name = cameraConfig["name"]
+            logDir = f"{self.configuration['outdir']}/{self.hostname}_{name}_{serial}/logs"
+            try:
+                pathlib.Path(logDir).mkdir(parents=True, exist_ok=True)
+            except FileExistsError:
+                pass
+            except PermissionError:
+                messagebox.showerror(title=None, message="Cannot create %s" % logDir)
+                raise PermissionError
+
+            configFName = None
+            if "emergentparameters" in cameraConfig.keys():
+                configFName = "/tmp/%s_%s_%s.config" % (
+                    name,
+                    os.path.basename(self.parent.settings["configFile"]),
+                    str(datetime.date.today()),
+                )
+            else:
+                # Critical, not cosmetic: silently running a camera at power-on defaults (no
+                # exposure/framerate/etc override) is exactly the kind of gap a human glancing at
+                # the console needs to see, not discover later in the recorded data.
+                self.logger.warning(
+                    "Camera %s (serial %s) has NO emergentparameters section in the deployment "
+                    "YAML - it will run at its power-on-default camera settings, no -c flag "
+                    "will be passed for it!" % (name, serial)
+                )
+
+            self.cameras.append(
+                {
+                    "config": cameraConfig,
+                    "name": name,
+                    "serial": serial,
+                    "logDir": logDir,
+                    # self.name (the shared instrument name, not this camera's own YAML "name")
+                    # + serial - matches recordtask.cpp's CreateSymlink calls exactly, which use
+                    # the single shared Name CLI value + DeviceId. Using this camera's own "name"
+                    # here would point at a file the C++ binary never creates when cameras behind
+                    # one server have different YAML names (confirmed by testing - see
+                    # recordtask.h's "latest" naming comment for the full story).
+                    "lastImage": f"{self.configuration['outdir']}/{self.name}_{serial}_latest_0.jpg",
+                    "statusDir": f"{self.configuration['outdir']}/{self.hostname}_{name}_{serial}/data",
+                    "statusHtmlFile": f"{self.configuration['outdir']}/{self.hostname}_{name}_{serial}/status.html",
+                    "configFName": configFName,
+                    "serialPortWiper": cameraConfig.get("wiper"),
+                }
+            )
+
+        # Shared Python-side log file for the whole merged process - filed under the first
+        # camera's log dir. The C++ output itself already tags every line with "Camera<serial>:",
+        # so one shared log file/scrolled_text pane still distinguishes which camera each line is
+        # about.
+        self.logDir = self.cameras[0]["logDir"]
         self.log_queue = queue.Queue()
         self.queue_handler = QueueHandler(self.log_queue)
         formatter = logging.Formatter(LOGFORMAT)
         self.queue_handler.setFormatter(formatter)
         self.log_handler = logging.handlers.TimedRotatingFileHandler(
-            "%s/log_%s_%s"
-            % (self.logDir, self.name, self.cameraConfig["serialnumber"]),
+            "%s/log_%s" % (self.logDir, self.name),
             when="D",
             interval=1,
             backupCount=0,
@@ -1035,12 +1088,6 @@ class EmergentInstrument:
         self.status = tk.StringVar()
         self.status.set("-")
 
-        self.configFName = "/tmp/%s_%s_%s.config" % (
-            self.name,
-            os.path.basename(self.parent.settings["configFile"]),
-            str(datetime.date.today()),
-        )
-
         # Set (not sent) once, before the process ever starts, so a pipe-close caused by a
         # user/wiper-triggered quit() isn't mistaken for a crash by update()'s retry logic.
         self._stopRequested = False
@@ -1056,7 +1103,7 @@ class EmergentInstrument:
             "-l", str(self.configuration["liveratio"]),
             "-m", str(self.configuration["minBrightchange"]),
             "-b", str(self.configuration.get("bitrateKbps", 10000)),
-            "-e", str(self.configuration.get("nvencPreset", "p1")),
+            "-e", str(self.configuration.get("encoding", "p1")),
             "-q", str(self.configuration.get("queueDepth", 8)),
         ]
         if self.configuration.get("rotateimage"):
@@ -1065,9 +1112,12 @@ class EmergentInstrument:
             self.command.append("-w")
         if self.configuration.get("site"):
             self.command += ["--site", str(self.configuration["site"])]
-        if "emergentparameters" in self.cameraConfig.keys():
-            self.command += ["-c", str(self.cameraConfig["serialnumber"]), self.configFName]
+        for cam in self.cameras:
+            if cam["configFName"] is not None:
+                self.command += ["-c", str(cam["serial"]), cam["configFName"]]
         print(self.command)
+
+        self.wiperCameras = [c for c in self.cameras if c["serialPortWiper"] is not None]
 
         frame1 = ttk.Frame(self.parent.mainframe)
         frame1.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -1086,10 +1136,6 @@ class EmergentInstrument:
         self.CleanButton = ttk.Button(config, text="Clean", command=self.clean)
         self.CleanButton.pack(side=tk.RIGHT, anchor=tk.NW, pady=0, padx=(6, 0))
         self.CleanButton.state(["disabled"])
-        if "wiper" in self.cameraConfig.keys():
-            self.serialPortWiper = self.cameraConfig["wiper"]
-        else:
-            self.serialPortWiper = None
 
         self.runningWidget = ttk.Label(config, textvariable=self.running)
         self.runningWidget.pack(side=tk.LEFT, anchor=tk.NW, fill=tk.Y, expand=True)
@@ -1120,11 +1166,16 @@ class EmergentInstrument:
             self.clickStartStop(autopilot=True)
             self.startStopButton.state(["disabled"])
 
-        if "wiper" in self.cameraConfig.keys():
-            self.cleanThread = Thread(
-                target=self.checkCleaniness, args=(), kwargs={}, daemon=True
+        # One checkCleaniness thread per wiper-equipped camera, not per instance - each watches
+        # its own lastImage independently, but all funnel into the same shared clean() (see its
+        # doc comment for why cleaning is all-or-nothing across the cameras behind one process).
+        self.cleanThreads = []
+        for cam in self.wiperCameras:
+            t = Thread(
+                target=self.checkCleaniness, args=(cam,), kwargs={}, daemon=True
             )
-            self.cleanThread.start()
+            t.start()
+            self.cleanThreads.append(t)
 
     def show_context_menu(self, event):
         """
@@ -1161,7 +1212,9 @@ class EmergentInstrument:
 
     def writeToStatusFile(self, status):
         """
-        Write status information to a file.
+        Write status information to every camera's own audit-trail status file (one shared
+        process behind this instance can still mean several physical cameras, each with their
+        own downstream-consumed status.txt - matching the old per-camera-folder convention).
 
         Parameters
         ----------
@@ -1170,58 +1223,54 @@ class EmergentInstrument:
         """
         now = time.time()
         nowD = datetime.datetime.utcfromtimestamp(now)
-        statusDir = f"{self.statusDir}/{nowD.year}/" f"{nowD.month:02}/{nowD.day:02}/"
+        statusLine = f"{nowD}, {int(now*1000)}, {status}\n"
 
-        statusFile = f'{statusDir}/{self.hostname}_{self.cameraConfig["name"]}_'
-        statusFile += f'{self.cameraConfig["serialnumber"]}_{nowD.year}'
-        statusFile += f"{nowD.month:02}{nowD.day:02}_status.txt"
+        for cam in self.cameras:
+            statusDir = f"{cam['statusDir']}/{nowD.year}/" f"{nowD.month:02}/{nowD.day:02}/"
+            statusFile = f'{statusDir}/{self.hostname}_{cam["name"]}_'
+            statusFile += f'{cam["serial"]}_{nowD.year}'
+            statusFile += f"{nowD.month:02}{nowD.day:02}_status.txt"
 
-        try:
-            pathlib.Path(statusDir).mkdir(parents=True, exist_ok=True)
-        except FileExistsError:
-            pass
+            try:
+                pathlib.Path(statusDir).mkdir(parents=True, exist_ok=True)
+            except FileExistsError:
+                pass
 
-        if not os.path.isfile(statusFile):
-            self.logger.info("Creating status file %s" % statusFile)
+            if not os.path.isfile(statusFile):
+                self.logger.info("Creating status file %s" % statusFile)
 
-        status = f"{nowD}, {int(now*1000)}, {status}\n"
+            try:
+                with open(statusFile, "a") as sf:
+                    sf.write(statusLine)
+            except Exception as e:
+                self.logger.error(e, exc_info=True)
+
         self.logger.info(status)
-        try:
-            with open(statusFile, "a") as sf:
-                sf.write(status)
-        except Exception as e:
-            self.logger.error(e, exc_info=True)
         return
 
     def witeParamFile(self):
         """
-        Write the per-camera plain-text "FeatureName value" config file consumed by -c
-        <serial> <path>, from cameraConfig["emergentparameters"] (analogous to runCpp's
-        teledyneparameters). Any dict value whose entries are themselves dicts is flattened into
-        additional lines (generic version of the old teledyneparameters "IO" special case, not
-        tied to that key name).
-
-        Returns
-        -------
-        str or None
-            The written file's path, or None if this camera has no emergentparameters (in which
-            case the camera runs at its power-on-default settings - see __init__'s -c handling).
+        Write every camera's per-camera plain-text "FeatureName value" config file consumed by
+        its own -c <serial> <path>, from that camera's config["emergentparameters"] (analogous
+        to runCpp's teledyneparameters). Any dict value whose entries are themselves dicts is
+        flattened into additional lines (generic version of the old teledyneparameters "IO"
+        special case, not tied to that key name). Cameras with no emergentparameters section
+        (configFName is None) are skipped - already warned about in __init__.
         """
-        if "emergentparameters" not in self.cameraConfig.keys():
-            return None
-
-        self.logger.debug("witeParamFile: opening %s" % self.configFName)
-        with open(self.configFName, "w") as file:
-            for k, v in self.cameraConfig["emergentparameters"].items():
-                if isinstance(v, list):
-                    for entry in v:
-                        for k1, v1 in entry.items():
-                            self.logger.debug("witeParamFile: writing: %s %s" % (k1, v1))
-                            file.write("%s %s\n" % (k1, v1))
-                else:
-                    self.logger.debug("witeParamFile: writing %s %s" % (k, v))
-                    file.write("%s %s\n" % (k, v))
-        return self.configFName
+        for cam in self.cameras:
+            if cam["configFName"] is None:
+                continue
+            self.logger.debug("witeParamFile: opening %s" % cam["configFName"])
+            with open(cam["configFName"], "w") as file:
+                for k, v in cam["config"]["emergentparameters"].items():
+                    if isinstance(v, list):
+                        for entry in v:
+                            for k1, v1 in entry.items():
+                                self.logger.debug("witeParamFile: writing: %s %s" % (k1, v1))
+                                file.write("%s %s\n" % (k1, v1))
+                    else:
+                        self.logger.debug("witeParamFile: writing %s %s" % (k, v))
+                        file.write("%s %s\n" % (k, v))
 
     def clickStartStop(self, autopilot=False):
         """
@@ -1286,9 +1335,9 @@ class EmergentInstrument:
         self.running.set("Running: %s" % self.name)
         self.logger.info("Start camera with %s" % command)
 
-        if self.serialPortWiper is not None:
-            self.logger.info("Clean camera using port %s" % self.serialPortWiper)
-            y = Thread(target=doClean, args=(self.serialPortWiper,), daemon=True)
+        for cam in self.wiperCameras:
+            self.logger.info("Clean camera %s using port %s" % (cam["name"], cam["serialPortWiper"]))
+            y = Thread(target=doClean, args=(cam["serialPortWiper"],), daemon=True)
             y.start()
 
         self.witeParamFile()
@@ -1351,34 +1400,57 @@ class EmergentInstrument:
                 line = line.replace(b"\r", b"\n")
                 string = line.decode().rstrip()
 
+                # One shared process now speaks for every camera behind it, so every line needs
+                # its serial parsed up front (from the "LEVEL-<serial> | ..." prefix) to know
+                # which camera's status.html/Clean-button state a STATUS/ERROR line is actually
+                # about - a single shared statusHtmlFile doesn't exist anymore, see __init__.
+                idField = string.split("|")[0]
+                camForLine = None
+                if len(idField.split("-")) > 1:
+                    serialForLine = idField.split("-")[1].strip()
+                    for cam in self.cameras:
+                        if str(cam["serial"]) == serialForLine:
+                            camForLine = cam
+                            break
+                # No id (e.g. a general startup ERROR with no specific camera) - affects the
+                # whole shared process, so reflect it on every camera's status.html rather than
+                # silently dropping it.
+                camsForLine = [camForLine] if camForLine is not None else self.cameras
+
                 if line.startswith(b"STATUS"):
                     self.status.set(string)
                     self.statusWidget.config(background="green")
-                    writeHTML(self.statusHtmlFile, string, "green")
-                    if self.serialPortWiper is not None:
+                    for cam in camsForLine:
+                        writeHTML(cam["statusHtmlFile"], string, "green")
+                    if self.wiperCameras:
                         self.CleanButton.state(["!disabled"])
                 else:
                     if line.startswith(b"ERROR") or line.startswith(b"FATAL"):
                         self.status.set(string)
                         self.statusWidget.config(background="red")
-                        writeHTML(self.statusHtmlFile, string, "red")
+                        for cam in camsForLine:
+                            writeHTML(cam["statusHtmlFile"], string, "red")
                         thisLogger = self.loggerCpp.error
+                    elif line.startswith(b"WARNING"):
+                        # Without this branch WARNING lines (e.g. "no camera config file given"
+                        # from main.cpp) fell through to the plain-INFO branch below and displayed
+                        # identically to routine INFO lines - defeating the point of a warning.
+                        # scrolled_text's WARNING tag (orange) is already defined, just unused.
+                        thisLogger = self.loggerCpp.warning
                     elif line.startswith(b"DEBUG") or line.startswith(b"OPENCV"):
                         thisLogger = self.loggerCpp.debug
                     else:
                         thisLogger = self.loggerCpp.info
                     line4Logger = line.decode().rstrip()
                     if not ((line4Logger.startswith("***") or (line4Logger == ""))):
-                        idField = line4Logger.split("|")[0]
                         if line4Logger.startswith("BASH"):
                             pass
-                        elif len(idField.split("-")) > 1:
+                        elif camForLine is not None:
                             # "LEVEL-N" here carries a camera serial number, not a small
                             # sequential storage-thread index like the old Teledyne binary - do
                             # not force it through int()/call it a thread number.
-                            serial = idField.split("-")[1].strip()
                             line4Logger = "Camera%s: %s" % (
-                                serial,
+                                camForLine["serial"],
                                 line4Logger.split("|")[-1],
                             )
                         else:
@@ -1434,7 +1506,8 @@ class EmergentInstrument:
         string = "NOT RUNNING (YET)"
         self.status.set(string)
         self.statusWidget.config(background="yellow")
-        writeHTML(self.statusHtmlFile, string, "yellow")
+        for cam in self.cameras:
+            writeHTML(cam["statusHtmlFile"], string, "yellow")
         self.CleanButton.state(["disabled"])
 
     def quit(self):
@@ -1462,9 +1535,17 @@ class EmergentInstrument:
             self.logger.error("tried killing")
         self._resetIdleUI()
 
-    def checkCleaniness(self):
+    def checkCleaniness(self, cam):
         """
-        Periodically check if the camera needs cleaning.
+        Periodically check if one camera needs cleaning. One of these runs per wiper-equipped
+        camera (see __init__), each independently watching its own lastImage; whichever one
+        decides a wipe is needed schedules the shared clean() (see its doc comment for why
+        cleaning is all-or-nothing across every camera behind this one process).
+
+        Parameters
+        ----------
+        cam : dict
+            One entry from self.cameras - the camera this thread watches.
         """
         revisitTime = 60
         while True:
@@ -1472,19 +1553,20 @@ class EmergentInstrument:
             if not self.running.get().startswith("Running"):
                 continue
 
-            if not os.path.isfile(self.lastImage):
-                self.logger.error(f"Did not find {self.lastImage}!")
+            lastImage = cam["lastImage"]
+            if not os.path.isfile(lastImage):
+                self.logger.error(f"Did not find {lastImage}!")
                 continue
 
-            file_mtime = os.path.getmtime(self.lastImage)
+            file_mtime = os.path.getmtime(lastImage)
             current_time = time.time()
             age = current_time - file_mtime
             if age > self.configuration["newfileinterval"]:
-                self.logger.error(f"Last image too old: {age}s!")
+                self.logger.error(f"Last image too old ({cam['name']}): {age}s!")
                 continue
 
             try:
-                img = Image.open(self.lastImage).convert("L")
+                img = Image.open(lastImage).convert("L")
                 height_offset = 64
                 brightnessThreshold = 50
                 arr = np.array(img)[height_offset:]
@@ -1492,15 +1574,15 @@ class EmergentInstrument:
                 dark_ratio = np.sum(arr < brightnessThreshold) / nPixel
             except Exception as e:
                 self.logger.error(
-                    f"Failed to analyze {self.lastImage}: {e}", exc_info=True
+                    f"Failed to analyze {lastImage} ({cam['name']}): {e}", exc_info=True
                 )
                 continue
 
             if dark_ratio < (self.configuration["wiperThreshold"] / 100):
-                self.logger.info(f"Image is not blocked: {dark_ratio*100}%")
+                self.logger.info(f"Image is not blocked ({cam['name']}): {dark_ratio*100}%")
                 continue
 
-            self.logger.info(f"Image is blocked: {dark_ratio*100}%. Cleaning!")
+            self.logger.info(f"Image is blocked ({cam['name']}): {dark_ratio*100}%. Cleaning!")
             self.parent.root.after(0, self.clean)
             time.sleep(revisitTime)
 
@@ -1508,23 +1590,32 @@ class EmergentInstrument:
 
     def clean(self):
         """
-        Clean the camera using the wiper device.
+        Clean every wiper-equipped camera behind this process. Stops the shared process first -
+        there is only one Start/Stop button for every camera behind this one process (see the
+        class doc comment), so cleaning any one camera's lens briefly interrupts recording for
+        all of them. That's an inherent trade-off of the merged one-process-per-server design,
+        not something this method can avoid on its own; the wipe command itself is just a serial
+        write (doClean), independent of whether the C++ binary is running, so if that interruption
+        turns out to matter in practice this could be changed to skip the quit()/restart and fire
+        doClean() directly instead - not done here since it wasn't asked for.
         """
         self.startStopButton.state(["disabled"])
         self.CleanButton.state(["disabled"])
-        self.logger.info("Cleaning camera using port %s" % self.serialPortWiper)
+        for cam in self.wiperCameras:
+            self.logger.info("Cleaning camera %s using port %s" % (cam["name"], cam["serialPortWiper"]))
 
         if self.running.get().startswith("Running"):
             self.quit()
-            y = Thread(target=doClean, args=(self.serialPortWiper,), daemon=True)
-            y.start()
+            for cam in self.wiperCameras:
+                y = Thread(target=doClean, args=(cam["serialPortWiper"],), daemon=True)
+                y.start()
             self.parent.root.after(5 * 1000, self.endClean)
 
     def endClean(self):
         """
         Complete the cleaning process and restart if needed.
         """
-        self.logger.info("Done cleaning camera")
+        self.logger.info("Done cleaning")
         if self.running.get().startswith("Idle"):
             self.start(self.command)
         self.startStopButton.state(["!disabled"])
@@ -1642,20 +1733,33 @@ class GUI(object):
             raise ValueError("configuration['sdk'] must be 'teledyne' or 'emergent', got %s" % sdk)
 
         if "camera" in self.configuration.keys():
+            cameraConfigs = []
             for cameraConfig1 in self.configuration["camera"]:
                 cameraConfig = deepcopy(DEFAULTCAMERA)
                 cameraConfig.update(cameraConfig1)
+                cameraConfigs.append(cameraConfig)
 
-                if sdk == "teledyne":
+            if sdk == "teledyne":
+                # One runCpp per camera - the old binary is fundamentally one-camera-per-process,
+                # unchanged from before this file supported "emergent" too.
+                for cameraConfig in cameraConfigs:
                     thisCamera = runCpp(self, cameraConfig)
-                else:
-                    thisCamera = EmergentInstrument(self, cameraConfig)
-                self.apps.append(thisCamera)
-
-                # add loggers
-                self.loggerRoot.addHandler(thisCamera.queue_handler)
-                self.loggerRoot.addHandler(thisCamera.log_handler)
-                self.loggerRoot.debug("Adding %s camera " % cameraConfig)
+                    self.apps.append(thisCamera)
+                    self.loggerRoot.addHandler(thisCamera.queue_handler)
+                    self.loggerRoot.addHandler(thisCamera.log_handler)
+                    self.loggerRoot.debug("Adding %s camera " % cameraConfig)
+            else:
+                # One EmergentInstrument for every "emergent" camera together, not one per
+                # camera - the new binary auto-discovers and manages every camera on the servers
+                # it's given in a single process. Instantiating one EmergentInstrument per camera
+                # entry would spawn multiple client processes racing to open the same physical
+                # cameras (confirmed as a real bug, not hypothetical: two GUI columns, only one
+                # camera ever actually got its -c config applied) - see the class doc comment.
+                thisInstrument = EmergentInstrument(self, cameraConfigs)
+                self.apps.append(thisInstrument)
+                self.loggerRoot.addHandler(thisInstrument.queue_handler)
+                self.loggerRoot.addHandler(thisInstrument.log_handler)
+                self.loggerRoot.debug("Adding %s cameras " % cameraConfigs)
 
         ChkBttn = ttk.Checkbutton(
             config,

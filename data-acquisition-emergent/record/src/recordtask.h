@@ -114,7 +114,13 @@ struct ShouldWritePortPayload
  * with VISSSlib's existing parser):
  *   staging: {OutputRoot}/tmp/{hostname}_{Name}_{DeviceId}_{YYYYMMDD-HHMMSS}_0.{mp4,txt}
  *   final:   {OutputRoot}/{hostname}_{Name}_{DeviceId}/data/{YYYY}/{MM}/{DD}/<same base>.{mp4,txt,jpg}
- *   latest:  {OutputRoot}/{Name}_latest_0.{mp4,txt,jpg} -> final path
+ *   latest:  {OutputRoot}/{Name}_{DeviceId}_latest_0.{mp4,txt,jpg} -> final path
+ *     (DeviceId included here too, not just in staging/final - Name alone is shared across every
+ *     camera one client process manages, confirmed by testing: a real 2-camera-per-server
+ *     deployment produced only one set of _latest files without it, the two cameras' RecordTask
+ *     instances racing to overwrite the same symlink. Fixed 2026-08-11 - see
+ *     launch_visss_data_acquisition.py's EmergentInstrument, which must construct the matching
+ *     path for its wiper brightness check.)
  * Rollover happens every NewFileIntervalSec seconds (0 = never), using the exact same trigger
  * logic as the old pipeline's do_housekeeping (§3.13): fires once per interval boundary, debounced
  * so it can't re-fire on every frame within the same boundary second.

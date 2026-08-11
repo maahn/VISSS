@@ -9,8 +9,10 @@
 #include <algorithm>
 #include <string>
 
-// One block per character, one thread per glyph pixel - avoids any division/modulo in the kernel
-// body, since blockIdx.x already is the character index.
+// One block per character, one thread per *rendered* pixel (c_fontScale x c_fontScale per glyph
+// bitmap bit) - avoids any division/modulo for the character index, since blockIdx.x already is
+// it; localX/localY are divided by c_fontScale to find which glyph bit they upscale, which is the
+// only extra work versus the unscaled version.
 __global__ void drawTextKernel(uint8_t* outBuf, uint32_t pitch, uint32_t frameWidth, uint32_t frameHeight,
                                const char* text, uint32_t originX, uint32_t originY)
 {
@@ -18,7 +20,7 @@ __global__ void drawTextKernel(uint8_t* outBuf, uint32_t pitch, uint32_t frameWi
     const uint32_t localX = threadIdx.x;
     const uint32_t localY = threadIdx.y;
 
-    const uint32_t px = originX + (charIdx * c_fontCellWidth) + localX;
+    const uint32_t px = originX + (charIdx * c_fontRenderedCellWidth) + localX;
     const uint32_t py = originY + localY;
     if (px >= frameWidth || py >= frameHeight)
     {
@@ -33,8 +35,10 @@ __global__ void drawTextKernel(uint8_t* outBuf, uint32_t pitch, uint32_t frameWi
         return;
     }
 
-    const uint8_t rowBits = g_font8x14[c - c_fontFirstChar][localY];
-    const bool on = (rowBits >> (7 - localX)) & 1;
+    const uint32_t srcX = localX / c_fontScale;
+    const uint32_t srcY = localY / c_fontScale;
+    const uint8_t rowBits = g_font8x14[c - c_fontFirstChar][srcY];
+    const bool on = (rowBits >> (7 - srcX)) & 1;
     if (on)
     {
         outBuf[(py * pitch) + px] = 255;
@@ -49,7 +53,7 @@ void launchDrawTextKernel(eSdkPro::Frame& outputFrame, const char* deviceText, u
         return;
     }
 
-    const dim3 threadsPerBlock(c_fontCellWidth, c_fontCellHeight);
+    const dim3 threadsPerBlock(c_fontRenderedCellWidth, c_fontRenderedCellHeight);
     const dim3 blocksPerGrid(textLen);
 
     drawTextKernel<<<blocksPerGrid, threadsPerBlock>>>(outputFrame.GetDataPtr(), outputFrame.GetStride(),
@@ -103,7 +107,10 @@ void launchRotate90CcwKernel(const uint8_t* srcBuf, uint32_t srcPitch, uint32_t 
 
 // The two hardcoded bin-edge tables from PROCESSING_SPEC_teeldyne.md §3.18 - "the exact,
 // hardcoded values to preserve". 256 (not 255) as the last edge is deliberate: it's an exclusive
-// upper bound, so the 7th bin covers diff in [120,256) i.e. up to and including 255.
+// upper bound, so the 7th bin covers diff in [120,256) i.e. up to and including 255. Kept
+// byte-for-byte identical to kernel.cuh's host-visible c_binEdges20/c_binEdges30 (motiondetecttask.cpp
+// needs the same values for the status-bar "H:" field, but __constant__ isn't visible outside CUDA
+// compilation) - if you change one, change both.
 __constant__ int g_binEdges20[8] = {20, 30, 40, 60, 80, 100, 120, 256};
 __constant__ int g_binEdges30[8] = {30, 40, 60, 80, 100, 120, 140, 256};
 

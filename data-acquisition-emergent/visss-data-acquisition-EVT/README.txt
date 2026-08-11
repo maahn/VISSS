@@ -1,10 +1,50 @@
 visss-data-acquisition-EVT
 ============
 VISSS data acquisition for Emergent Vision cameras via eSDK Pro. Started as a copy of the
-eSDK Pro `record_nvenc` example; see ../pipeline-to-esdkpro-mapping.md for the port plan.
-Connects to all cameras on a given server using GPUDirect. Pipeline per camera:
+eSDK Pro `record_nvenc` example. Connects to all cameras on every `-s` server using GPUDirect -
+one client process manages every camera on every server it's told about (no per-camera process,
+unlike the old Teledyne pipeline). This is a real deployment shape, not just a single-camera
+convenience - a combined leader+follower host runs two cameras behind one server, and the Python
+launcher's EmergentInstrument creates one instance (one process, one -c per camera) per
+deployment, not per camera - see launch_visss_data_acquisition.py's EmergentInstrument class doc
+and ../record/README.txt's _latest_0.* naming note for what broke before that was fixed. Pipeline
+per camera:
 CameraTask -> MotionDetectTask (../motion_detect/) -> RecordTask (../record/), the latter
-replacing eSDK Pro's built-in NvencTask - see ../record/README.txt for why.
+replacing eSDK Pro's built-in NvencTask - see ../record/README.txt for why. See ../README.md for
+the overall architecture diagram and eSDK Pro API primer.
+
+Startup sequence (main.cpp's main())
+============
+1. -h/--help short-circuit, before any SDK calls.
+2. System::Create(), connect to each -s server.
+3. Discover + open every camera on every server; apply that camera's -c config file if any (see
+   the -c entry below for the generic-parameter-loader design).
+4. PTP sync: set PtpMode=TwoStep on every camera, poll PtpStatus until "Slave" (30x 1s retries),
+   then pipeline.SetPtpSyncMode(true) so the pipeline itself also refuses to run if any camera
+   loses sync later. This is mandatory, not a flag - a lock failure throws and aborts startup, it
+   never silently falls back to free-running/unsynced capture (matching the old Teledyne
+   pipeline's own §3.5 requirement). There is no "Master" role for eSDK Pro cameras - they only
+   ever sync as a slave to an external grandmaster (the PTP grandmaster on the camera network, a
+   Mellanox NIC in this deployment); confirmed via the vendor's own EVT_PTP example. Does NOT set
+   TriggerMode/AcquisitionMode (unlike the record_nvenc example it started from) - matches the old
+   VISSS leader's free-running, untriggered design.
+5. Per camera: create CameraTask, MotionDetectTask, RecordTask, wire InFrame/OutFrame/ShouldWrite
+   ports (plus PreviewFrame -> ImageDisplayTask if preview is on), set every task param from the
+   parsed CLI flags.
+6. pipeline.Start().
+7. Poll loop (200ms tick): checks --maxframes, relays RecordTask segment-lifecycle events
+   (currently non-functional - see the --maxframes entry below), re-polls camera temperature/PTP
+   every 30s, prints a per-camera STATUS heartbeat every ~1s, pumps the cv::imshow/cv::waitKey
+   event loop if preview is on.
+8. On stop (Ctrl+C/SIGTERM/--maxframes reached): pipeline.Stop() - graceful, lets RecordTask
+   finalize whatever segment is currently open rather than losing/corrupting the tail.
+
+Logging convention matches the old Teledyne pipeline's exact format (PrintThread,
+storage_worker_cv.h/visss-data-acquisition.h) so the shared Python launcher can parse both
+binaries' output the same way: `LEVEL[-id] | timestamp | message`, left-anchored, 2-digit-year +
+tenths-of-second timestamp, levels INFO/WARNING/ERROR/STATUS/BASH. Helper: LogLine(level, id,
+message) in main.cpp; NowString() for the timestamp format specifically (verified byte-for-byte
+against the old pipeline's get_timestamp(), not guessed).
 
 Build
 ============
@@ -87,9 +127,36 @@ Command Line Interface:
     Print a quick-reference flag summary and exit. Checked before any startup work, so this is
     fast/side-effect-free even without cameras or a server reachable.
 
-PTP sync is mandatory, not a flag: the program waits for every camera to reach PTP Slave status
-(requires a grandmaster reachable on the camera network, e.g. the Mellanox NIC) and aborts
-startup if any camera fails to lock within 30s. See setPtp() in src/main.cpp.
+PTP sync is mandatory, not a flag - see "Startup sequence" above for the detail; requires a
+grandmaster reachable on the camera network (e.g. the Mellanox NIC).
+
+STATUS heartbeat (console, ~1s per camera, not a flag)
+============
+The client prints a `STATUS-<serial> | timestamp | frames~N | temp XC | PTP <status>` line once
+per second per camera - the client-side equivalent of the old Teledyne pipeline's once-per-second
+STATUS line (storage_worker_cv.h:743). Downstream tooling (the Python launcher's per-camera status
+widget/Clean-button gating) depends on seeing a line starting with `STATUS` to know the pipeline
+is actually alive, not just started. Can't reproduce the old line's exact content (live queue
+length/histogram/move%) - those are computed entirely server-side inside the plugins' Process(),
+and TaskParam values don't sync that direction (see the --maxframes entry above) - so this reports
+what the client can actually observe directly: real camera temperature/PTP (the same GenICam reads
+the 30s status poll already does, just more often) plus the same elapsed-time frame estimate as
+--maxframes, explicitly marked with `~`.
+
+Generic camera-param loader design (for -c above)
+============
+eSDK Pro has no type-erased/generic parameter setter like GenApi's CValuePtr::FromString() -
+every Camera::GetParameter<T>(name) call requires the caller to already know T at compile time,
+and there's no documented way to ask "what type is this parameter?" without already picking one.
+GetParameter<T>() itself validates name+type and throws if wrong, though, and every GenICam node
+has exactly one true type - so the loader (SetCameraParamGeneric in main.cpp) reconstructs generic
+dispatch by trying each known CameraParamType in turn (UInt32, Int32, Float, Bool, Enum, String,
+Register, Command) until one's GetParameter<T>() doesn't throw. This is more code than a hardcoded
+parameter table, but means the config file can gain new parameter names later with zero C++
+changes, matching the old pipeline's real flexibility. Numeric values are parsed with
+std::stoul/std::stof (throw on bad input), not std::atoi (silently returns 0) - deliberate, since
+silently applying e.g. FrameRate=0 from a typo is exactly the failure mode this feature exists to
+prevent.
 
 Eg: To record on a local server in the current directory, stopping after 1000 frames:
 
@@ -103,3 +170,16 @@ Notes
 ============
 - On Windows you may not have permissions to create/modify files in the installed example directory. If so, move this example to another location before building.
 - On Windows you must add the eSdkPro bin directory to the current terminal session before running the example, for finding the necessary dependencies, e.g: `$env:PATH = "$env:PATH;$env:ECAPTURE_PRO_DIR\eSdkPro\bin"`
+- PTP infrastructure (ptp4l via linuxptp, the ../scripts/services/visss_ptp_*@.service /
+  visss_sync_*@.service units) is not part of this repo's C++ build - it has to actually be
+  running before this binary can lock. See ../../install_commands_bullseye.md's "PTP Clock and
+  NIC Configuration" section (§3a/b/c depending on leader/follower/combined topology) - this
+  applies identically regardless of which camera SDK is in use.
+- Periodic (30s) camera status poll reads SensTemp (Int32CameraParam, not Float - confirmed
+  against this camera's real feature list, not assumed) and PtpStatus. PHYSNRMargin (considered
+  as a network-link-health substitute for the old pipeline's Teledyne-only transport diagnostics)
+  does NOT exist on this camera despite being in Emergent's docs ("Parameter PHYSNRMargin not
+  found") - dropped rather than left failing every call. No network-link-health substitute
+  currently available; RoCENackCount was flagged as a possible alternative from the vendor's
+  transport-layer docs but never confirmed present - worth checking eCapture Pro's parameter
+  browser if this is revisited.

@@ -15,8 +15,8 @@ is used to provision a new machine.
 notes: enable auto-reboot after power failure in EFI, etc. Likely still applicable.)
 
 Confirmed present on the dev box: NVIDIA RTX PRO 4000 Blackwell GPU, dual-port Mellanox ConnectX-6
-Lx NIC (`enp129s0f0np0`/`enp129s0f1np1`, per `HANDOVER.md` — a "combined leader+follower" dev
-topology, NOT the two-PC production split), Emergent HR-2000SM camera(s).
+Lx NIC (`enp129s0f0np0`/`enp129s0f1np1` — a "combined leader+follower" dev topology, NOT the
+two-PC production split), Emergent HR-2000SM camera(s).
 
 ## OS Install
 
@@ -190,9 +190,9 @@ fully independent of the Teledyne/Emergent choice.
 
 ## Building and running the VISSS EVT client
 
-See `data-acquisition-emergent/HANDOVER.md` and the root `CLAUDE.md` for the authoritative
+See `data-acquisition-emergent/README.md` and the root `CLAUDE.md` for the authoritative
 build/run instructions (`./build_and_install.sh`, `EMERGENT_DIR`/`ECAPTURE_PRO_DIR` env vars,
-`sudo setcap`/plugin install steps) - not duplicated here.
+plugin install steps) - not duplicated here.
 
 ## sudoers configuration (for the Python launcher / this session's tooling)
 
