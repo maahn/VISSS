@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AI.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding assistants when working with code in this repository.
 
 ## What this repository is
 
@@ -120,9 +120,9 @@ non-zero exit**. Consequences worth knowing:
 ## Gotchas specific to this codebase
 
 - Do not assume a change compiles just because it looks correct — there is no CI here and the
-  DALSA SDK dependency means most dev environments (including this Claude Code sandbox) cannot
-  build the project at all. State that limitation explicitly rather than claiming a build was
-  verified when it was not.
+  DALSA SDK dependency means most dev sandboxes (including typical AI-coding-assistant sandboxes)
+  cannot build the project at all. State that limitation explicitly rather than claiming a build
+  was verified when it was not.
 - `storage_worker_cv.h`/`frame_queue.h`/`visss-data-acquisition.h` are shared between the live
   binary and the dryrun binary — a fix in one of those headers fixes both; logic inside `main()`
   in the two `.cpp` files is not shared and needs the same fix applied twice if relevant to both

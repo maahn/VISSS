@@ -190,7 +190,7 @@ fully independent of the Teledyne/Emergent choice.
 
 ## Building and running the VISSS EVT client
 
-See `data-acquisition-emergent/README.md` and the root `CLAUDE.md` for the authoritative
+See `data-acquisition-emergent/README.md` and the root `AI.md` for the authoritative
 build/run instructions (`./build_and_install.sh`, `EMERGENT_DIR`/`ECAPTURE_PRO_DIR` env vars,
 plugin install steps) - not duplicated here.
 
