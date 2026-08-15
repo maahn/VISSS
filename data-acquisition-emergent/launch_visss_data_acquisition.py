@@ -1979,6 +1979,12 @@ class GUI(object):
         self.apps = []
         self.triggerWidgets = []
         self._triggerGeneration = 0
+        # Results handed back from _fetchExternalTrigger() worker threads (see its comment) -
+        # drained on the main thread by _pollTriggerResults(), started once below and running
+        # for the life of the GUI, independent of buildApps()/destroyApps() cycles.
+        self._triggerResultQueue = Queue()
+        self._triggerInFlight = collections.defaultdict(bool)
+        self.root.after(100, self._pollTriggerResults)
 
         self.configuration = deepcopy(DEFAULTGENERAL)
         self.configuration.update(self.read_settings(self.settings["configFile"]))
@@ -2411,14 +2417,7 @@ class GUI(object):
                 nBuffer,
                 nightOnly,
             ),
-        )  # schedule next update
-
-        # default values
-        data = {
-            "unit": "",
-            "measurement": np.nan,
-            "timestamp": np.datetime64("now"),
-        }
+        )  # schedule next update - independent of how long the fetch below takes
 
         if minMax == "min":
             oper = operator.ge
@@ -2428,8 +2427,71 @@ class GUI(object):
             raise ValueError("minMax must be min or max")
 
         stopOnTimeout = convert2bool(stopOnTimeout)
-        nightOnly = convert2bool(nightOnly)
+        # Validates nightOnly the same way the pre-split code did (its converted value was never
+        # actually used again - the truthy check above uses the raw parameter) - kept as-is
+        # rather than silently dropping the validation while splitting this method.
+        convert2bool(nightOnly)
 
+        # urllib.request.urlopen()'s 10s timeout used to run inline on the Tk main thread,
+        # freezing the whole GUI (every camera's status update, Start/Stop, everything) for up
+        # to 10s whenever the trigger server was unreachable or slow. The fetch itself now runs
+        # in a worker thread (_fetchExternalTrigger, which must not touch any Tk object) and
+        # hands its result back through self._triggerResultQueue, drained on the main thread by
+        # _pollTriggerResults().
+        if self._triggerInFlight[nn]:
+            # The previous fetch for this trigger hasn't come back yet - skip rather than pile
+            # up concurrent requests every `interval` seconds against an unresponsive server.
+            self.loggerRoot.warning(
+                "queryExternalTrigger: previous request for %s still in flight, skipping" % name
+            )
+            return
+        self._triggerInFlight[nn] = True
+
+        t = Thread(
+            target=self._fetchExternalTrigger,
+            args=(
+                nn,
+                generation,
+                trigger,
+                triggerWidget,
+                name,
+                address,
+                interval,
+                threshold,
+                oper,
+                stopOnTimeout,
+                nBuffer,
+            ),
+            daemon=True,
+        )
+        t.start()
+
+    def _fetchExternalTrigger(
+        self,
+        nn,
+        generation,
+        trigger,
+        triggerWidget,
+        name,
+        address,
+        interval,
+        threshold,
+        oper,
+        stopOnTimeout,
+        nBuffer,
+    ):
+        """
+        Worker-thread half of queryExternalTrigger: the network fetch plus pure computation
+        (JSON decode, threshold comparison), none of which may touch a Tkinter object - Tkinter
+        is not thread-safe, and this runs off the main thread. The result is handed back via
+        self._triggerResultQueue for _pollTriggerResults()/_applyTriggerResult() to apply on the
+        main thread, mirroring how QueueHandler/log_queue already relay C++ subprocess output
+        from a background thread to the GUI elsewhere in this file.
+
+        Parameters mirror queryExternalTrigger's identically named ones, plus `oper` (already
+        resolved from minMax) and `generation`, carried through so the result can be dropped if
+        it turns out to belong to a deployment that has since been torn down.
+        """
         now = np.datetime64("now")
         try:
             response = (
@@ -2441,59 +2503,95 @@ class GUI(object):
                 error,
                 address,
             )
-            if stopOnTimeout:
-                continueMeasurement = False
-            else:
-                continueMeasurement = True
+            continueMeasurement = not stopOnTimeout
             measurement = "NO RESPONSE"
             unit = ""
+            timestamp = now
         else:
             data = json.loads(response)[name]
             self.loggerRoot.info("queryExternalTrigger: response %s" % str(data))
 
-            timeCond = now - np.datetime64(data["timestamp"]) < np.timedelta64(
+            timestamp = np.datetime64(data["timestamp"])
+            timeCond = now - timestamp < np.timedelta64(
                 TRIGGERINTERVALLFACTOR * int(interval), "s"
             )
             if timeCond:
                 continueMeasurement = oper(float(data["measurement"]), threshold)
             else:
                 self.loggerRoot.error(
-                    "queryExternalTrigger: Data too old %s"
-                    % (np.datetime64(data["timestamp"]))
+                    "queryExternalTrigger: Data too old %s" % timestamp
                 )
-                if stopOnTimeout:
-                    continueMeasurement = False
-                else:
-                    continueMeasurement = True
+                continueMeasurement = not stopOnTimeout
 
             measurement = "%g" % data["measurement"]
             unit = data["unit"]
 
-        string = "%s: %s %s %i/%i at %s" % (
-            name,
-            measurement,
-            unit,
-            np.sum(self.externalTriggerStatus[nn]),
-            nBuffer,
-            data["timestamp"],
+        self._triggerResultQueue.put(
+            {
+                "nn": nn,
+                "generation": generation,
+                "trigger": trigger,
+                "triggerWidget": triggerWidget,
+                "name": name,
+                "measurement": measurement,
+                "unit": unit,
+                "timestamp": timestamp,
+                "continueMeasurement": continueMeasurement,
+                "nBuffer": nBuffer,
+            }
         )
 
+    def _pollTriggerResults(self):
+        """
+        Drain _fetchExternalTrigger() results onto the main thread - see that method's comment.
+        Started once from __init__ and runs for the life of the GUI: unlike the per-deployment
+        trigger polling chains, this has nothing deployment-specific to guard against, since
+        _applyTriggerResult() itself checks each result's generation before touching anything.
+        """
+        for result in iter_except(self._triggerResultQueue.get_nowait, Empty):
+            self._applyTriggerResult(result)
+        self.root.after(100, self._pollTriggerResults)
+
+    def _applyTriggerResult(self, result):
+        """
+        Apply one background-fetched trigger result on the main thread - the widget-touching
+        tail of the old synchronous queryExternalTrigger, now separate from the network fetch
+        (see _fetchExternalTrigger()) since only the main thread may use Tkinter objects.
+
+        Parameters
+        ----------
+        result : dict
+            One item produced by _fetchExternalTrigger() - see its self._triggerResultQueue.put()
+            call for the exact keys.
+        """
+        self._triggerInFlight[result["nn"]] = False
+
+        if result["generation"] != self._triggerGeneration:
+            # destroyApps() ran (a different deployment YAML was loaded, or the GUI is
+            # shutting down) while this fetch was in flight - triggerWidget/trigger/
+            # self.externalTriggerStatus[nn] may already be gone or mean something else.
+            return
+
+        nn = result["nn"]
+        self.externalTriggerStatus[nn].append(result["continueMeasurement"])
+
+        string = "%s: %s %s %i/%i at %s" % (
+            result["name"],
+            result["measurement"],
+            result["unit"],
+            np.sum(self.externalTriggerStatus[nn]),
+            result["nBuffer"],
+            result["timestamp"],
+        )
         self.loggerRoot.info(string)
 
-        self.externalTriggerStatus[nn].append(continueMeasurement)
+        color = "green" if np.any(self.externalTriggerStatus[nn]) else "yellow"
 
-        if np.any(self.externalTriggerStatus[nn]):
-            color = "green"
-        else:
-            color = "yellow"
-
-        triggerWidget.config(background=color)
-        trigger.set(string)
+        result["triggerWidget"].config(background=color)
+        result["trigger"].set(string)
         writeHTML(self.triggerHtmlFile, string, color)
         for app in self.apps:
             app.statusWatcher()
-
-        return
 
 
 if __name__ == "__main__":
