@@ -223,6 +223,17 @@ bool RecordTask::InitEncoder()
         return false;
     }
 
+    if ((m_width % 2 != 0) || (m_height % 2 != 0))
+    {
+        // NV12 subsamples chroma 2x2, so odd dimensions have no well defined
+        // chroma plane size. Recording anyway (with the rounded-up memset in
+        // Process()) beats refusing to record, but it is worth saying out loud.
+        LogMessage(eSdkPro::LogLevel::Warning,
+                   "RecordTask: frame size " + std::to_string(m_width) + "x" + std::to_string(m_height) +
+                       " is not even; NV12 chroma is subsampled 2x2, expect the last row/column to be "
+                       "approximated.");
+    }
+
     const int framerate = m_framerateParam.GetValue();
     const int bitrateKbps = m_bitrateKbpsParam.GetValue();
 
@@ -525,6 +536,9 @@ bool RecordTask::OpenSegment(uint64_t timestampUs)
     }
 
     m_frameIndex = 0;
+    // Reset per segment: a segment in which no frame was ever written would
+    // otherwise inherit the previous segment's last capture time in its footer.
+    m_lastWrittenTimestampUs = 0;
     m_snapshotPending = true;
     LogMessage(eSdkPro::LogLevel::Info, "Started " + m_stagingMp4Path);
     m_lastSegmentStartedParam.SetValue("Started " + m_stagingMp4Path);
@@ -907,8 +921,11 @@ bool RecordTask::Process()
             return false;
         }
 
+        // Rounded up, not truncated: with an odd m_height the last chroma row
+        // was left uninitialized, showing up as coloured noise along the
+        // bottom edge of otherwise grey footage.
         cudaErr = cudaMemset2D(hwFrame->data[1], static_cast<size_t>(hwFrame->linesize[1]), 128, m_width,
-                                m_height / 2);
+                                (m_height + 1) / 2);
         if (cudaErr != cudaSuccess)
         {
             av_frame_free(&hwFrame);

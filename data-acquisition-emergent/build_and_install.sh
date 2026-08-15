@@ -64,8 +64,17 @@ for plugin_name in "${PLUGIN_NAMES[@]}"; do
         exit 1
     fi
 
-    echo "==> Installing ${PLUGIN_SO} to ${PLUGINS_INSTALL_DIR}/ (requires sudo)"
-    cp "${PLUGIN_SO}" "${PLUGINS_INSTALL_DIR}/"
+    # The plugin directory happens to be writable by the deploying user on this
+    # box, so plain cp works and no password is needed; fall back to sudo if a
+    # host has it root owned (the message used to promise sudo unconditionally,
+    # while the copy would simply have failed under set -e).
+    if [[ -w "${PLUGINS_INSTALL_DIR}" ]]; then
+        echo "==> Installing ${PLUGIN_SO} to ${PLUGINS_INSTALL_DIR}/"
+        cp "${PLUGIN_SO}" "${PLUGINS_INSTALL_DIR}/"
+    else
+        echo "==> Installing ${PLUGIN_SO} to ${PLUGINS_INSTALL_DIR}/ (requires sudo)"
+        sudo cp "${PLUGIN_SO}" "${PLUGINS_INSTALL_DIR}/"
+    fi
 done
 
 echo "==> Restarting ${SERVICE_NAME} (requires sudo)"

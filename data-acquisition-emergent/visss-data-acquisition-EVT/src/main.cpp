@@ -6,6 +6,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -281,6 +282,43 @@ void PrintHelp(const std::string& progName)
               << "See README.txt for full detail/rationale on each flag." << std::endl;
 }
 
+// argv[argIdx + offset], or a clear error naming the flag. Without this a
+// truncated command line (a trailing "-n", or "-c <serial>" with no path) read
+// argv[argc], which is NULL, straight into a std::string - an immediate
+// segfault rather than a usage message. The Python launcher builds this command
+// line, so a mismatch there showed up as a crash loop with no explanation.
+const char* requireArg(int argc, char* argv[], int argIdx, int offset, const std::string& flag)
+{
+    if (argIdx + offset >= argc)
+    {
+        throw std::runtime_error("Missing value for " + flag + " - see -h for usage");
+    }
+    return argv[argIdx + offset];
+}
+
+// Strict integer parse: std::atoi silently turns a typo ("-b 10O00") into 0,
+// which for e.g. the bitrate is a valid-looking but wrong setting that is only
+// noticeable much later in the recorded data.
+int64_t requireInt(int argc, char* argv[], int argIdx, int offset, const std::string& flag)
+{
+    const std::string value = requireArg(argc, argv, argIdx, offset, flag);
+    size_t consumed = 0;
+    int64_t parsed = 0;
+    try
+    {
+        parsed = std::stoll(value, &consumed);
+    }
+    catch (const std::exception&)
+    {
+        throw std::runtime_error("Value for " + flag + " is not a number: '" + value + "'");
+    }
+    if (consumed != value.size())
+    {
+        throw std::runtime_error("Value for " + flag + " is not a number: '" + value + "'");
+    }
+    return parsed;
+}
+
 Params parseArgs(int argc, char* argv[])
 {
     if (argc == 1)
@@ -298,27 +336,29 @@ Params parseArgs(int argc, char* argv[])
         // this loop never sees it in practice.
         if (arg == "-s")
         {
-            params.m_serverParams.push_back(ServerParams(argv[argIdx + 1], argv[argIdx + 2]));
+            const std::string ip = requireArg(argc, argv, argIdx, 1, arg);
+            const std::string path = requireArg(argc, argv, argIdx, 2, arg);
+            params.m_serverParams.push_back(ServerParams(ip, path));
             argIdx += 2;
         }
         else if (arg == "-b")
         {
-            params.m_bitrateKbps = std::atoi(argv[argIdx + 1]);
+            params.m_bitrateKbps = static_cast<uint32_t>(requireInt(argc, argv, argIdx, 1, arg));
             argIdx++;
         }
         else if (arg == "-i")
         {
-            params.m_newFileIntervalSec = std::atoi(argv[argIdx + 1]);
+            params.m_newFileIntervalSec = static_cast<uint32_t>(requireInt(argc, argv, argIdx, 1, arg));
             argIdx++;
         }
         else if (arg == "-n")
         {
-            params.m_name = argv[argIdx + 1];
+            params.m_name = requireArg(argc, argv, argIdx, 1, arg);
             argIdx++;
         }
         else if (arg == "-e")
         {
-            params.m_preset = argv[argIdx + 1];
+            params.m_preset = requireArg(argc, argv, argIdx, 1, arg);
             argIdx++;
         }
         else if (arg == "-r")
@@ -327,7 +367,7 @@ Params parseArgs(int argc, char* argv[])
         }
         else if (arg == "-m")
         {
-            params.m_minBrightChange = std::atoi(argv[argIdx + 1]);
+            params.m_minBrightChange = static_cast<int32_t>(requireInt(argc, argv, argIdx, 1, arg));
             argIdx++;
         }
         else if (arg == "-w")
@@ -336,7 +376,7 @@ Params parseArgs(int argc, char* argv[])
         }
         else if (arg == "-l")
         {
-            params.m_liveRatio = static_cast<uint32_t>(std::atoi(argv[argIdx + 1]));
+            params.m_liveRatio = static_cast<uint32_t>(requireInt(argc, argv, argIdx, 1, arg));
             argIdx++;
         }
         else if (arg == "--nopreview")
@@ -345,29 +385,59 @@ Params parseArgs(int argc, char* argv[])
         }
         else if (arg == "-q")
         {
-            params.m_queueDepth = std::atoi(argv[argIdx + 1]);
+            params.m_queueDepth = static_cast<int32_t>(requireInt(argc, argv, argIdx, 1, arg));
             argIdx++;
         }
         else if (arg == "-c")
         {
-            params.m_cameraConfigs.push_back(CameraConfigParams(argv[argIdx + 1], argv[argIdx + 2]));
+            const std::string serial = requireArg(argc, argv, argIdx, 1, arg);
+            const std::string path = requireArg(argc, argv, argIdx, 2, arg);
+            params.m_cameraConfigs.push_back(CameraConfigParams(serial, path));
             argIdx += 2;
         }
         else if (arg == "--name")
         {
-            params.m_cameraNames.push_back(CameraNameParams(argv[argIdx + 1], argv[argIdx + 2]));
+            const std::string serial = requireArg(argc, argv, argIdx, 1, arg);
+            const std::string name = requireArg(argc, argv, argIdx, 2, arg);
+            params.m_cameraNames.push_back(CameraNameParams(serial, name));
             argIdx += 2;
         }
         else if (arg == "--site")
         {
-            params.m_site = argv[argIdx + 1];
+            params.m_site = requireArg(argc, argv, argIdx, 1, arg);
             argIdx++;
         }
         else if (arg == "--maxframes")
         {
-            params.m_maxFrames = static_cast<uint32_t>(std::atoi(argv[argIdx + 1]));
+            params.m_maxFrames = static_cast<uint32_t>(requireInt(argc, argv, argIdx, 1, arg));
             argIdx++;
         }
+        else
+        {
+            // Unknown flags used to be skipped in silence, so a typo (or a
+            // rename on the Python launcher's side) meant the run quietly
+            // continued with the default value for that setting.
+            throw std::runtime_error("Unknown argument '" + arg + "' - see -h for usage");
+        }
+    }
+
+    // Checked here rather than being left to fail later and less clearly: no
+    // -s means no servers, which the SDK only reports as "No tasks to run"
+    // once the pipeline starts.
+    if (params.m_serverParams.empty())
+    {
+        throw std::runtime_error("No server given: at least one -s <ip> <record path> is required");
+    }
+    // Matches the old CLI's fatal validation - only these two select a defined
+    // bin-edge table (MotionDetectTask::Init() rejects anything else, but only
+    // server-side, where it surfaces as a generic pipeline start failure).
+    if (params.m_minBrightChange != 20 && params.m_minBrightChange != 30)
+    {
+        throw std::runtime_error("-m must be 20 or 30, got " + std::to_string(params.m_minBrightChange));
+    }
+    if (params.m_queueDepth < 1)
+    {
+        throw std::runtime_error("-q must be >= 1, got " + std::to_string(params.m_queueDepth));
     }
 
     return params;
@@ -404,15 +474,17 @@ void setPtp(std::vector<Camera> cams)
         std::string status = ptpStatusParam.GetValue();
         while (status != "Slave")
         {
-            std::cout << LogLine("INFO", serial, "waiting for PTP: " + status) << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-            numPtpCheck--;
-            status = ptpStatusParam.GetValue();
+            // Checked before sleeping again, not after the read: the old order
+            // threw even when that last read had just come back "Slave".
             if (numPtpCheck == 0)
             {
                 throw std::runtime_error("Camera " + serial + " failed to reach PTP Slave status (currently: " +
                                          status + ")");
             }
+            std::cout << LogLine("INFO", serial, "waiting for PTP: " + status) << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            numPtpCheck--;
+            status = ptpStatusParam.GetValue();
         }
         std::cout << LogLine("INFO", serial, "PTP: " + status) << std::endl;
     }
@@ -626,7 +698,9 @@ void PrintNewFileNotice(const std::vector<Camera>& cams, const Params& params,
         const std::string baseName = hostname + "_" + name + "_" + serial + "_" + timeStr + "_0";
         const std::string finalMp4Path =
             outputRoot + "/" + hostname + "_" + name + "_" + serial + "/data/" + dateDir + "/" + baseName + ".mp4";
-        std::cout << LogLine("INFO", serial, "new file (~): " + finalMp4Path) << std::endl;
+        // Predicted client side, never confirmed by RecordTask (see this function's comment)
+        std::cout << LogLine("INFO", serial, "new file expected (predicted, not confirmed): " + finalMp4Path)
+                  << std::endl;
     }
 }
 
@@ -885,6 +959,7 @@ int main(int argc, char* argv[])
         camOpenConfig.m_gpuDirectEnabled = c_useGpuDirect;
 
         // Discover and open cameras
+        std::vector<std::string> discoveredSerials;
         for (auto& server : system.GetServers())
         {
             std::cout << LogLine("INFO", "", "Server " + server.GetIp()) << std::endl;
@@ -899,6 +974,7 @@ int main(int argc, char* argv[])
 
                 Camera cam = server.AddCamera(discoveredCamInfo);
                 cam.Open(camOpenConfig);
+                discoveredSerials.push_back(serial);
 
                 const std::string* cameraConfigPath = getCameraConfigPath(serial, params);
                 if (cameraConfigPath != nullptr)
@@ -919,6 +995,43 @@ int main(int argc, char* argv[])
                               << std::endl;
                 }
             }
+        }
+
+        // A camera named by -c/--name that never turned up (power, cable, link down) used to be
+        // skipped in silence: the run then recorded only the cameras that did appear, while the
+        // Python launcher still showed "Running" for the whole instrument. Refuse to start
+        // instead - the launcher's restart loop will keep retrying, and the reason is on the
+        // console. Cameras that are discovered but not named on the command line stay allowed
+        // (they just run at power-on defaults, already warned about above).
+        std::vector<std::string> requestedSerials;
+        for (const auto& cameraConfig : params.m_cameraConfigs)
+        {
+            requestedSerials.push_back(cameraConfig.m_serial);
+        }
+        for (const auto& cameraName : params.m_cameraNames)
+        {
+            if (std::find(requestedSerials.begin(), requestedSerials.end(), cameraName.m_serial) ==
+                requestedSerials.end())
+            {
+                requestedSerials.push_back(cameraName.m_serial);
+            }
+        }
+        std::string missingSerials;
+        for (const auto& serial : requestedSerials)
+        {
+            if (std::find(discoveredSerials.begin(), discoveredSerials.end(), serial) == discoveredSerials.end())
+            {
+                if (!missingSerials.empty())
+                {
+                    missingSerials += ", ";
+                }
+                missingSerials += serial;
+            }
+        }
+        if (!missingSerials.empty())
+        {
+            throw std::runtime_error("Camera(s) named on the command line were not found: " + missingSerials +
+                                     " (" + std::to_string(discoveredSerials.size()) + " camera(s) discovered)");
         }
 
         Pipeline pipeline = system.GetPipeline();
