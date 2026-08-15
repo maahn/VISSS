@@ -21,6 +21,7 @@ import time
 import tkinter as tk
 import urllib.request
 from copy import deepcopy
+from functools import partial
 from itertools import islice
 from pathlib import Path
 from queue import Empty, Queue
@@ -57,6 +58,31 @@ DEFAULTCAMERA = {
     "cpustorage": ["-1", "-1"],
     "cpuother": -1,
     "cpuffmpeg": ["-1", "-1"],
+}
+# Deployment-YAML keys the apps index directly (i.e. without a .get() default), per sdk -
+# validated in GUI.buildApps() so a truncated/unreadable YAML names the missing key instead of
+# raising KeyError somewhere inside app construction. Keys covered by DEFAULTGENERAL/
+# DEFAULTCAMERA are not listed: those always have a value by the time an app sees them.
+REQUIREDCONFIG = {
+    "teledyne": [
+        "outdir",
+        "maxmtu",
+        "liveratio",
+        "encoding",
+        "site",
+        "fps",
+        "storagethreads",
+        "newfileinterval",
+        "storeallframes",
+        "querygain",
+        "minBrightchange",
+    ],
+    "emergent": [
+        "outdir",
+        "newfileinterval",
+        "liveratio",
+        "minBrightchange",
+    ],
 }
 
 
@@ -283,6 +309,12 @@ class runCpp:
         self.parent = parent
         self.cameraConfig = cameraConfig
 
+        # Pending Tkinter after() callbacks, one entry per self-rescheduling chain (see
+        # _after()/destroy()) - so destroyApps() can stop them instead of leaving them firing
+        # into destroyed widgets.
+        self._alive = True
+        self._afterIds = {}
+
         self.configuration = parent.configuration
         self.settings = parent.settings
         self.hostname = parent.hostname
@@ -389,7 +421,7 @@ class runCpp:
             f"--CPUSTREAM={self.cameraConfig['cpustream']}",
             f"--CPUSTORAGE={'@'.join(map(str, self.cameraConfig['cpustorage']))}",
             f"--CPUOTHER={self.cameraConfig['cpuother']}",
-            f"--CPUFFMPEG={'@'.join(self.cameraConfig['cpuffmpeg'])}",
+            f"--CPUFFMPEG={'@'.join(map(str, self.cameraConfig['cpuffmpeg']))}",
         ]
         print(self.command)
         self.frame1 = ttk.Frame(self.parent.mainframe)
@@ -439,7 +471,7 @@ class runCpp:
         self.scrolled_text.tag_config("ERROR", foreground="red")
         self.scrolled_text.tag_config("CRITICAL", foreground="red", underline=1)
         # Start polling messages from the queue
-        self.parent.mainframe.after(100, self.poll_log_queue)
+        self._after("log", 100, self.poll_log_queue)
 
         if self.settings["autopilot"] in [True, "true", "True", 1]:
             self.clickStartStop(autopilot=True)
@@ -450,6 +482,43 @@ class runCpp:
                 target=self.checkCleaniness, args=(), kwargs={}, daemon=True
             )
             self.cleanThread.start()
+
+    def _after(self, chain, delay, func, *args):
+        """
+        Tkinter after(), remembering the pending id per self-rescheduling chain so destroy()
+        can cancel it. Only the newest id per chain is kept: each callback schedules exactly
+        one successor, so an older id is either already fired or already cancelled.
+
+        Parameters
+        ----------
+        chain : str
+            Name of the callback chain ("log", "update", ...).
+        delay : int
+            Delay in milliseconds.
+        func : callable
+            Callback to schedule.
+        """
+        self._afterIds[chain] = self.parent.mainframe.after(delay, func, *args)
+
+    def destroy(self):
+        """
+        Stop this app's after() chains and detach its logging handlers. Called by
+        GUI.destroyApps() before the widgets go away: without it, poll_log_queue()/update()
+        keep rescheduling themselves every 100ms and eventually write into destroyed widgets
+        (TclError inside the Tk mainloop), and the handlers stay attached to loggerRoot
+        forever, buffering records nobody will ever display.
+        """
+        self._alive = False
+        for afterId in self._afterIds.values():
+            try:
+                self.parent.mainframe.after_cancel(afterId)
+            except tk.TclError:
+                pass
+        self._afterIds = {}
+        for logger in (self.logger, self.loggerCpp):
+            logger.removeHandler(self.queue_handler)
+            logger.removeHandler(self.log_handler)
+        self.log_handler.close()
 
     def show_context_menu(self, event):
         """
@@ -602,7 +671,6 @@ class runCpp:
                 "do not understand %s"
                 % list(map(list, self.parent.externalTriggerStatus))
             )
-            self.startStopButton.state(["disabled"])
 
     def start(self, command):
         """
@@ -661,6 +729,8 @@ class runCpp:
         q : queue.Queue
             Queue containing log messages.
         """
+        if not self._alive:
+            return
         for line in iter_except(q.get_nowait, Empty):  # display all content
             if line is None:
                 self.quit()
@@ -721,7 +791,7 @@ class runCpp:
                         # print(line4Logger)
                 # break # display no more than one line per 40 milliseconds
 
-        self.parent.mainframe.after(100, self.update, q)  # schedule next update
+        self._after("update", 100, self.update, q)  # schedule next update
 
     def display(self, record):
         """
@@ -753,6 +823,8 @@ class runCpp:
         """
         Poll the log queue for new messages to display.
         """
+        if not self._alive:
+            return
         # Check every 100ms if there is a new message in the queue to display
         while True:
             try:
@@ -761,7 +833,7 @@ class runCpp:
                 break
             else:
                 self.display(record)
-        self.parent.mainframe.after(100, self.poll_log_queue)
+        self._after("log", 100, self.poll_log_queue)
 
     def quit(self):
         """
@@ -834,14 +906,22 @@ class runCpp:
                 )
                 continue
 
-            if dark_ratio < (self.configuration["wiperThreshold"] / 100):
+            wiperThreshold = self.configuration.get("wiperThreshold")
+            if wiperThreshold is None:
+                self.logger.error(
+                    "wiperThreshold missing from the deployment YAML, cannot decide when to"
+                    " clean"
+                )
+                continue
+
+            if dark_ratio < (wiperThreshold / 100):
                 self.logger.info(f"Image is not blocked: {dark_ratio*100}%")
                 continue
 
             self.logger.info(f"Image is blocked: {dark_ratio*100}%. Cleaning!")
             # clean() touches Tkinter widgets, which must only be done from
             # the main thread, so schedule it instead of calling it directly.
-            self.parent.root.after(0, self.clean)
+            self._after("clean", 0, self.clean)
             # wait longer after cleaning to avoid cleaning too often!
             time.sleep(revisitTime)
 
@@ -859,7 +939,7 @@ class runCpp:
             self.quit()
             y = Thread(target=doClean, args=(self.serialPortWiper,), daemon=True)
             y.start()
-            self.parent.root.after(5 * 1000, self.endClean)  # schedule restart
+            self._after("endclean", 5 * 1000, self.endClean)  # schedule restart
 
     def endClean(self):
         """
@@ -954,6 +1034,10 @@ class EmergentInstrument:
         """
         self.parent = parent
 
+        # See runCpp's identical comment - pending after() chains, cancelled by destroy().
+        self._alive = True
+        self._afterIds = {}
+
         self.configuration = parent.configuration
         self.settings = parent.settings
         self.hostname = parent.hostname
@@ -1045,7 +1129,7 @@ class EmergentInstrument:
         self.scrolled_text.tag_config("ERROR", foreground="red")
         self.scrolled_text.tag_config("CRITICAL", foreground="red", underline=1)
         # Start polling messages from the queue
-        self.parent.mainframe.after(100, self.poll_log_queue)
+        self._after("log", 100, self.poll_log_queue)
 
         if self.settings["autopilot"] in [True, "true", "True", 1]:
             self.clickStartStop(autopilot=True)
@@ -1057,6 +1141,28 @@ class EmergentInstrument:
         self.cleanThreads = []
         self._cleanThreadSerials = set()
         self._ensureCleanThreads()
+
+    def _after(self, chain, delay, func, *args):
+        """
+        Tkinter after() that remembers its pending id per chain - see runCpp._after().
+        """
+        self._afterIds[chain] = self.parent.mainframe.after(delay, func, *args)
+
+    def destroy(self):
+        """
+        Stop this app's after() chains and detach its logging handlers - see runCpp.destroy().
+        """
+        self._alive = False
+        for afterId in self._afterIds.values():
+            try:
+                self.parent.mainframe.after_cancel(afterId)
+            except tk.TclError:
+                pass
+        self._afterIds = {}
+        for logger in (self.logger, self.loggerCpp):
+            logger.removeHandler(self.queue_handler)
+            logger.removeHandler(self.log_handler)
+        self.log_handler.close()
 
     def _applyConfig(self, cameraConfigs):
         """
@@ -1438,7 +1544,6 @@ class EmergentInstrument:
                 "do not understand %s"
                 % list(map(list, self.parent.externalTriggerStatus))
             )
-            self.startStopButton.state(["disabled"])
 
     def start(self, command):
         """
@@ -1512,13 +1617,15 @@ class EmergentInstrument:
         q : queue.Queue
             Queue containing log messages.
         """
+        if not self._alive:
+            return
         for line in iter_except(q.get_nowait, Empty):
             if line is None:
                 if self._stopRequested:
                     self._resetIdleUI()
                 else:
                     self.logger.info("Restarting VISSS")
-                    self.parent.mainframe.after(5000, self._spawn)
+                    self._after("respawn", 5000, self._spawn)
                 return
             else:
                 line = line.replace(b"\r", b"\n")
@@ -1581,7 +1688,7 @@ class EmergentInstrument:
                             line4Logger = line4Logger.split("|")[-1]
                         thisLogger(line4Logger)
 
-        self.parent.mainframe.after(100, self.update, q)
+        self._after("update", 100, self.update, q)
 
     def display(self, record):
         """
@@ -1612,6 +1719,8 @@ class EmergentInstrument:
         """
         Poll the log queue for new messages to display.
         """
+        if not self._alive:
+            return
         while True:
             try:
                 record = self.log_queue.get(block=False)
@@ -1619,7 +1728,7 @@ class EmergentInstrument:
                 break
             else:
                 self.display(record)
-        self.parent.mainframe.after(100, self.poll_log_queue)
+        self._after("log", 100, self.poll_log_queue)
 
     def _resetIdleUI(self):
         """
@@ -1713,12 +1822,20 @@ class EmergentInstrument:
                 )
                 continue
 
-            if dark_ratio < (self.configuration["wiperThreshold"] / 100):
+            wiperThreshold = self.configuration.get("wiperThreshold")
+            if wiperThreshold is None:
+                self.logger.error(
+                    "wiperThreshold missing from the deployment YAML, cannot decide when to"
+                    " clean"
+                )
+                continue
+
+            if dark_ratio < (wiperThreshold / 100):
                 self.logger.info(f"Image is not blocked ({cam['name']}): {dark_ratio*100}%")
                 continue
 
             self.logger.info(f"Image is blocked ({cam['name']}): {dark_ratio*100}%. Cleaning!")
-            self.parent.root.after(0, self.clean)
+            self._after("clean", 0, self.clean)
             time.sleep(revisitTime)
 
         return
@@ -1744,7 +1861,7 @@ class EmergentInstrument:
             for cam in self.wiperCameras:
                 y = Thread(target=doClean, args=(cam["serialPortWiper"],), daemon=True)
                 y.start()
-            self.parent.root.after(5 * 1000, self.endClean)
+            self._after("endclean", 5 * 1000, self.endClean)
 
     def endClean(self):
         """
@@ -1885,7 +2002,19 @@ class GUI(object):
         if sdk not in ("teledyne", "emergent"):
             raise ValueError("configuration['sdk'] must be 'teledyne' or 'emergent', got %s" % sdk)
 
-        if "camera" in self.configuration.keys():
+        # Every key an app is about to index into self.configuration with, checked up front:
+        # read_settings() returns {} for a missing/broken YAML (it already reported that), and
+        # without this the first KeyError landed deep inside runCpp.__init__/_applyConfig with
+        # a traceback instead of a message naming the file and the missing key.
+        missingKeys = [k for k in REQUIREDCONFIG[sdk] if k not in self.configuration]
+        if ("camera" in self.configuration.keys()) and missingKeys:
+            message = "Configuration %s cannot be used, missing key(s): %s" % (
+                self.settings["configFile"],
+                ", ".join(missingKeys),
+            )
+            self.loggerRoot.error(message)
+            messagebox.showerror(title=None, message=message)
+        elif "camera" in self.configuration.keys():
             cameraConfigs = []
             for cameraConfig1 in self.configuration["camera"]:
                 cameraConfig = deepcopy(DEFAULTCAMERA)
@@ -1951,20 +2080,24 @@ class GUI(object):
 
                 writeHTML(self.triggerHtmlFile, string, "yellow")
 
-                self.loggerRoot.info("STARTING thread for %s trigger" % externalTrigger)
+                self.loggerRoot.info("STARTING polling for %s trigger" % externalTrigger)
 
-                x = Thread(
-                    target=self.queryExternalTrigger,
-                    args=(
+                # Scheduled on the Tk main thread rather than started as a Thread:
+                # queryExternalTrigger touches Tk widgets (and calls statusWatcher(), which
+                # starts/stops camera processes), and Tk may only be used from the thread
+                # running the mainloop. Every call after the first was already on the main
+                # thread via root.after() - this first one was the odd one out.
+                self.root.after(
+                    0,
+                    partial(
+                        self.queryExternalTrigger,
                         ee,
                         trigger,
                         triggerWidget,
                         generation,
+                        **externalTrigger,
                     ),
-                    kwargs=externalTrigger,
-                    daemon=True,
                 )
-                x.start()
         else:
             self.externalTriggerStatus = [[]]
 
@@ -1982,6 +2115,12 @@ class GUI(object):
         for app in self.apps:
             if app.running.get().startswith("Running"):
                 app.quit()
+            # Detach from the root logger before destroy() closes the handlers - buildApps()
+            # is what attached them, so this is where they have to come off again, otherwise
+            # every later loggerRoot record is still queued for a GUI that no longer exists.
+            self.loggerRoot.removeHandler(app.queue_handler)
+            self.loggerRoot.removeHandler(app.log_handler)
+            app.destroy()
             app.frame1.destroy()
         self.apps = []
 
