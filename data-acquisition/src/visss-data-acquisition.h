@@ -202,11 +202,6 @@ unsigned long t_reset_uint_ = 0;
 unsigned long t_reset_uint_applied = 0;
 
 /**
- * @brief ID offset
- */
-unsigned long id_offset = 0;
-
-/**
  * @brief Maximum supported histogram size (bounds fixed-size arrays sized by histSize)
  */
 const int MAX_HIST_SIZE = 8;
@@ -233,16 +228,21 @@ int minMovingPixel = 20;
 
 /**
  * @brief Structure to hold image metadata
+ *
+ * All members are default-initialized: the dry-run capture thread never sets
+ * newFile, and ExposureTime/Gain are only set when queryGain is on, so without
+ * these initializers those fields carry indeterminate values into the storage
+ * worker (newFile decides when a new output file is started).
  */
 struct MatMeta
 {
   cv::Mat MatImage;
-  unsigned long timestamp;
-  unsigned long recordtime;
-  unsigned long id;
-  bool newFile;
-  float ExposureTime;
-  float Gain;
+  unsigned long timestamp = 0;
+  unsigned long recordtime = 0;
+  unsigned long id = 0;
+  bool newFile = false;
+  float ExposureTime = 0;
+  float Gain = 0;
 };
 
 /**

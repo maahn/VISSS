@@ -78,9 +78,9 @@ const char *params =
  * @brief Get a character from standard input
  * @return Character input from user
  */
-char GetKey()
+int GetKey()
 {
-  char key = getchar();
+  int key = getchar();
   while ((key == '\r') || (key == '\n'))
   {
     key = getchar();
@@ -110,13 +110,13 @@ typedef struct tagMY_CONTEXT
   cv::VideoCapture fileHandle;
   std::string csvFile;
   std::string base_name;
-  int enable_sequence;
+  std::atomic<int> enable_sequence;
   int enable_save;
   int live_window_frame_ratio;
   double fps;
   std::string quality;
   std::string preset;
-  bool exit;
+  std::atomic<bool> exit;
 } MY_CONTEXT, *PMY_CONTEXT;
 
 /**
@@ -189,6 +189,16 @@ void *ImageCaptureThread(void *context)
         // copy data form ascii file
         std::vector<std::string> csvLines;
         boost::split(csvLines, csvLine, boost::is_any_of(","));
+        if (csvLines.size() < 3)
+        {
+          // Short/blank line (e.g. the trailing "# Last capture time" footer or
+          // a truncated file): indexing it was undefined behaviour.
+          std::cerr << "FATAL ERROR | " << get_timestamp()
+                    << " | Metadata line has " << csvLines.size()
+                    << " columns, need at least 3: " << csvLine << std::endl;
+          global_error = true;
+          break;
+        }
         ascii_id = atoi(trim(csvLines[2]).c_str());
 
         ascii_timestamp = atol(trim(csvLines[0]).c_str());
@@ -329,7 +339,7 @@ void *ImageCaptureThread(void *context)
       }
       id++;
 
-      if (storeVideo)
+      if (storeVideo && (captureContext->fps > 0))
       {
         // don'be too fast in dry run mode
         int sleeptime = 1000 / captureContext->fps;
@@ -388,16 +398,12 @@ int main(int argc, char **argv)
 
   cv::String videoFileIn;
   std::string videoFileInRaw;
-  MY_CONTEXT context;
+  MY_CONTEXT context{};
   pthread_t tid;
-  char c;
-  int res = 0;
   int writeallframes1;
   int queryGain1;
   int followermode1;
   int minBrightnessChange;
-  FILE *fp = NULL;
-  FILE *fp2 = NULL;
   // char uniqueName[FILENAME_MAX];
   // uint32_t macLow = 0; // Low 32-bits of the mac address (for file naming).
 
@@ -445,6 +451,12 @@ int main(int argc, char **argv)
   nStorageThreads = parser.get<int>("threads");
   std::cout << "DEBUG | " << get_timestamp() << " | PARSER: threads "
             << nStorageThreads << std::endl;
+  if (nStorageThreads < 1)
+  {
+    std::cerr << "FATAL ERROR | " << get_timestamp()
+              << "| threads must be >= 1, got " << nStorageThreads << std::endl;
+    return 1;
+  }
 
   context.live_window_frame_ratio = parser.get<int>("liveratio");
   std::cout << "DEBUG | " << get_timestamp() << " | PARSER: liveratio "
@@ -560,6 +572,7 @@ int main(int argc, char **argv)
             << queryGain << std::endl;
 
   gethostname(hostname, HOST_NAME_MAX);
+  hostname[HOST_NAME_MAX - 1] = '\0'; // POSIX does not promise termination
 
   configFile = "DRYRUN";
   name = "DRYRUN";
@@ -596,12 +609,13 @@ int main(int argc, char **argv)
   // Create a thread to receive images from the API and save them
   context.base_name = output;
   context.exit = false;
+  // Set before the thread starts, not after: the capture loop reads it on its
+  // very first iteration.
+  context.enable_sequence = 1;
   pthread_create(&tid, NULL, ImageCaptureThread, &context);
 
   // Call the main command loop or the example.
   PrintMenu();
-
-  context.enable_sequence = 1;
 
   struct sigaction sigIntHandler;
   sigIntHandler.sa_handler = signal_handler;
@@ -616,11 +630,30 @@ int main(int argc, char **argv)
   sigIntHandler_null.sa_flags = 0;
   sigaction(SIGALRM, &sigIntHandler_null, NULL);
 
+  // See the live binary for why EOF on stdin is handled instead of spun on.
+  bool keyboard = true;
   while (!(global_error) && (!done))
   {
+    if (!keyboard)
+    {
+      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      continue;
+    }
     alarm(1);
-    c = GetKey();
-
+    int c = GetKey();
+    alarm(0);
+    if (c == EOF)
+    {
+      if (feof(stdin))
+      {
+        keyboard = false;
+        std::cout << "INFO | " << get_timestamp()
+                  << " | stdin is not a keyboard, stop with Ctrl-C or SIGTERM"
+                  << std::endl;
+      }
+      clearerr(stdin);
+      continue;
+    }
     if ((c == 0x1b) || (c == 'q') || (c == 'Q'))
     {
       done = true;
@@ -630,4 +663,18 @@ int main(int argc, char **argv)
   context.enable_sequence = 0; // End sequence if active.
 
   context.exit = true;
+
+  // Wait for the capture thread (and, through it, the storage worker) to
+  // finish: without this main() returned while both were still running, so the
+  // last file was never closed and stayed behind in tmp/ unrenamed.
+  pthread_join(tid, NULL);
+
+  if (global_error)
+  {
+    std::cerr << "FATAL ERROR | " << get_timestamp()
+              << " | EXIT due to fatal error" << std::endl;
+    return 1;
+  }
+  std::cout << "INFO | " << get_timestamp() << " | All done" << std::endl;
+  return 0;
 }

@@ -128,11 +128,13 @@ typedef struct tagMY_CONTEXT
 {
   GEV_CAMERA_HANDLE camHandle;
   std::string base_name;
-  int enable_sequence;
+  // Written by main(), read by ImageCaptureThread on every frame - atomic for
+  // the same reason done/global_error are.
+  std::atomic<int> enable_sequence;
   int enable_save;
   int live_window_frame_ratio;
   int fps;
-  bool exit;
+  std::atomic<bool> exit;
 } MY_CONTEXT, *PMY_CONTEXT;
 
 /**
@@ -286,9 +288,9 @@ static void ValidateFeatureValues(const GenApi::CNodePtr &ptrFeature)
  * @brief Get a character from standard input
  * @return Character input from user
  */
-char GetKey()
+int GetKey()
 {
-  char key = getchar();
+  int key = getchar();
   while ((key == '\r') || (key == '\n'))
   {
     key = getchar();
@@ -762,35 +764,23 @@ void *ImageCaptureThread(void *context)
                       << " Status = " << img->status << std::endl;
           }
         }
-        else if (status == GEVLIB_ERROR_TIME_OUT)
-        {
-          if (captureContext->enable_sequence)
-          {
-            // if (followermode) {
-            //     if ((new_file_interval == 0) || (timeNow % new_file_interval
-            //     == 0)) {
-            //         std::cerr << "INFO | " << get_timestamp() <<" | Waiting
-            //         for trigger camera"
-            //         << std::endl;
-            //     } else {
-            //         std::cerr << "STATUS | " << get_timestamp() <<" | Waiting
-            //         for trigger camera"
-            //         << std::endl;
-            //     }
-            // }
-            // else {
-            n_timeouts += 1;
-            std::cerr << "ERROR | " << get_timestamp() << " | Camera time out"
-                      << " #" << n_timeouts << std::endl;
-            // }
-          }
-        }
       }
       else
       {
+        // Every non-OK status lands here, timeouts included: the old
+        // "else if (status == GEVLIB_ERROR_TIME_OUT)" branch sat inside the
+        // status == GEVLIB_OK block above and could never run.
         n_timeouts += 1;
-        std::cerr << "ERROR | " << get_timestamp() << " | Could not get image "
-                  << status << " #" << n_timeouts << std::endl;
+        if (status == GEVLIB_ERROR_TIME_OUT)
+        {
+          std::cerr << "ERROR | " << get_timestamp() << " | Camera time out"
+                    << " #" << n_timeouts << std::endl;
+        }
+        else
+        {
+          std::cerr << "ERROR | " << get_timestamp() << " | Could not get image "
+                    << status << " #" << n_timeouts << std::endl;
+        }
       }
 
       if (n_timeouts > max_n_timeouts1)
@@ -924,9 +914,8 @@ int main(int argc, char *argv[])
   // GEV_DEVICE_INTERFACE  pCamera[MAX_CAMERAS] = {0};
   GEV_STATUS status;
   GEV_STATUS status2;
-  MY_CONTEXT context = {0};
+  MY_CONTEXT context{};
   pthread_t tid;
-  char c;
   int writeallframes1;
   int noptp1;
   int rotateImage1;
@@ -993,6 +982,14 @@ int main(int argc, char *argv[])
   nStorageThreads = parser.get<int>("threads");
   std::cout << "DEBUG | " << get_timestamp() << " | PARSER: threads "
             << nStorageThreads << std::endl;
+  if (nStorageThreads < 1)
+  {
+    // Used as a divisor (fps, round robin queue selection) and as a vector
+    // size, so anything below 1 is an immediate crash rather than a setting.
+    std::cerr << "FATAL ERROR | " << get_timestamp()
+              << "| threads must be >= 1, got " << nStorageThreads << std::endl;
+    return 1;
+  }
 
   context.live_window_frame_ratio = parser.get<int>("liveratio");
   std::cout << "DEBUG | " << get_timestamp() << " | PARSER: liveratio "
@@ -1164,15 +1161,19 @@ int main(int argc, char *argv[])
   cpu_ffmpeg_list = parse_cpu_list(cpu_ffmpeg_str);
 
   gethostname(hostname, HOST_NAME_MAX);
+  hostname[HOST_NAME_MAX - 1] = '\0'; // POSIX does not promise termination
 
   // Open the file.
   fp = fopen(configFile.c_str(), "r");
   if (fp == NULL)
   {
     std::cerr << "FATAL ERROR | " << get_timestamp()
-              << "| Error opening configuration file " << configFile
-              << std::endl;
-    global_error = true;
+              << "| Error opening configuration file " << configFile << ": "
+              << strerror(errno) << std::endl;
+    // Returning here rather than only setting global_error: the camera is
+    // opened further down and its feature-loading loop reads this FILE*
+    // unconditionally, so carrying on meant fscanf(NULL) and a segfault.
+    return 1;
   }
 
   if (!parser.check())
@@ -1240,12 +1241,6 @@ int main(int argc, char *argv[])
   int i;
   int type;
   UINT32 val = 0;
-  UINT32 height = 0;
-  UINT32 width = 0;
-  UINT32 format = 0;
-  UINT32 maxHeight = 1600;
-  UINT32 maxWidth = 2048;
-  UINT32 maxDepth = 2;
   UINT64 size;
   UINT64 payload_size;
   int numBuffers = NUM_BUF;
@@ -1372,6 +1367,9 @@ int main(int argc, char *argv[])
                    "***************"
                 << std::endl;
 
+      fclose(fp);
+      fp = NULL;
+
       // char feature_name2[] = "timestampControlReset";
       // char value_str2[] = "1";
       // // status = 0;
@@ -1412,6 +1410,9 @@ int main(int argc, char *argv[])
       // get device ID
       GevGetFeatureValue(handle, "DeviceID", &type, sizeof(DeviceID),
                          &DeviceID);
+      // The API does not promise a terminator when the value fills the buffer,
+      // and this is concatenated into std::string/file names below.
+      DeviceID[sizeof(DeviceID) - 1] = '\0';
       DeviceIDMeta += DeviceID;
     }
     // End the "streaming feature mode".
@@ -1608,13 +1609,8 @@ int main(int argc, char *argv[])
 
       //===========================================================
       // Set up the frame information.....
-      // printf("Camera ROI set for \n");
-      // GevGetFeatureValue(handle, "Width", &type, sizeof(width), &width);
-      // printf("\tWidth = %d\n", width);
-      // GevGetFeatureValue(handle, "Height", &type, sizeof(height), &height);
-      // printf("\tHeight = %d\n", height);
-      // GevGetFeatureValue(handle, "PixelFormat", &type, sizeof(format),
-      // &format); printf("\tPixelFormat  = 0x%x\n", format);
+      // The ROI (Width/Height/PixelFormat) is whatever the configuration file
+      // set; the transfer only needs the payload size, read below.
 
       if (camOptions.enable_passthru_mode)
       {
@@ -1708,22 +1704,14 @@ int main(int argc, char *argv[])
         // Set up a grab/transfer from this camera based on the settings...
         //
         GevGetPayloadParameters(handle, &payload_size, (UINT32 *)&type);
-        maxHeight = height;
-        maxWidth = width;
-        maxDepth = GetPixelSizeInBytes(format);
 
-        // Calculate the size of the image buffers.
-        // (Adjust the number of lines in the buffer to fit the maximum expected
-        //   chunk size - just in case it gets enabled !!!)
-        {
-          int extra_lines = (MAX_CHUNK_BYTES + width - 1) / width;
-          size = GetPixelSizeInBytes(format) * width * (height + extra_lines);
-        }
-
-        // Allocate image buffers
-        // (Either the image size or the payload_size, whichever is larger -
-        // allows for packed pixel formats and metadata).
-        size = (payload_size > size) ? payload_size : size;
+        // Buffer size straight from the camera's advertised payload, plus room
+        // for the largest chunk data block in case it ever gets enabled. The
+        // width/height/format based calculation that used to live here read
+        // three variables that are never assigned (the GevGetFeatureValue calls
+        // that would have filled them are commented out), so it divided by a
+        // zero width: dead at -O2, a SIGFPE at -O0.
+        size = payload_size + MAX_CHUNK_BYTES;
 
         for (i = 0; i < numBuffers; i++)
         {
@@ -1791,11 +1779,36 @@ int main(int argc, char *argv[])
         sigIntHandler_null.sa_flags = 0;
         sigaction(SIGALRM, &sigIntHandler_null, NULL);
 
+        // The quit key only exists when stdin is a keyboard. Under a service
+        // manager or with stdin on /dev/null, getchar() returns EOF
+        // immediately and forever, which made this a 100% CPU spin on a
+        // SCHED_RR priority 80 thread - detect that once and just wait for the
+        // signal/error flags instead.
+        bool keyboard = true;
         while (!(global_error) && (!done))
         {
+          if (!keyboard)
+          {
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            continue;
+          }
           alarm(1);
-          c = GetKey();
-
+          int c = GetKey();
+          alarm(0);
+          if (c == EOF)
+          {
+            if (feof(stdin))
+            {
+              keyboard = false;
+              std::cout << "INFO | " << get_timestamp()
+                        << " | stdin is not a keyboard, stop with Ctrl-C or SIGTERM"
+                        << std::endl;
+            }
+            // getchar() was interrupted by our own SIGALRM (no SA_RESTART);
+            // clear the flag so the next read starts fresh.
+            clearerr(stdin);
+            continue;
+          }
           if ((c == 0x1b) || (c == 'q') || (c == 'Q'))
           {
             done = true;

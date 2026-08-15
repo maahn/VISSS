@@ -297,16 +297,24 @@ void storage_worker_cv::close_files(unsigned long timestamp)
 
   if (!firstImage)
   {
-    fMeta_ << "# Last capture time: " << std::to_string(timestamp) << "\n";
-    fMeta_.close();
-    std::rename((filename_ + ".txt").c_str(),
-                (filename_final_ + ".txt").c_str());
+    if (storeMeta)
+    {
+      fMeta_ << "# Last capture time: " << std::to_string(timestamp) << "\n";
+      fMeta_.close();
+      std::rename((filename_ + ".txt").c_str(),
+                  (filename_final_ + ".txt").c_str());
+    }
     if (pipeout)
     {
       fflush(pipeout);
       pclose(pipeout);
       pipeout = nullptr;
     }
+    // pclose() closed this descriptor, so the number may be handed out again
+    // by the next open() (very likely the metadata file opened moments later
+    // in open_files()). Leaving it set meant a failed popen() further down the
+    // line would send raw frame bytes into whatever now owns that number.
+    fd = -1;
     if (fileUsed)
     {
       std::rename((filename_ + ".mkv").c_str(),
@@ -511,8 +519,23 @@ void storage_worker_cv::run()
 
   if ((id_ == 0) && showPreview)
   {
-    cv::namedWindow("VISSS Live Image | " + name + " | " + std::to_string(id_),
-                    cv::WINDOW_AUTOSIZE | cv ::WINDOW_KEEPRATIO);
+    // A missing/broken display makes highgui throw. Recording must not depend
+    // on the preview window existing, so give up on the preview instead of
+    // letting the exception escape this thread (which would std::terminate the
+    // whole process). Only worker 0 ever reads showPreview, so clearing it
+    // here races with nobody.
+    try
+    {
+      cv::namedWindow("VISSS Live Image | " + name + " | " + std::to_string(id_),
+                      cv::WINDOW_AUTOSIZE | cv ::WINDOW_KEEPRATIO);
+    }
+    catch (const cv::Exception &e)
+    {
+      showPreview = false;
+      PrintThread{} << "ERROR-" << id_ << " | " << get_timestamp()
+                    << " | Cannot open live window, continuing without preview: "
+                    << e.what() << std::endl;
+    }
   }
 
   try
@@ -696,7 +719,7 @@ void storage_worker_cv::run()
         if (writeallframes || movingPixel || firstImage || image.newFile ||
             statusFrame)
         {
-          if (storeVideo)
+          if (storeVideo && (pipeout != nullptr))
           {
             // writer_.write(imgWithMeta);
             size_t sizeInBytes = imgWithMeta.step[0] * imgWithMeta.rows;
@@ -765,11 +788,22 @@ void storage_worker_cv::run()
         if ((id_ == 0) && showPreview && (previewFrameDivisor > 0) &&
             (frame_count % previewFrameDivisor == 0))
         {
-
-          cv::resize(imgWithMeta, imgSmall, cv::Size(), 0.4, 0.4);
-          cv::imshow("VISSS Live Image | " + name + " | " + std::to_string(id_),
-                     imgSmall);
-          cv::waitKey(1);
+          // Same reasoning as namedWindow() above: losing the display (X
+          // restart, remote session gone) must not stop the recording.
+          try
+          {
+            cv::resize(imgWithMeta, imgSmall, cv::Size(), 0.4, 0.4);
+            cv::imshow("VISSS Live Image | " + name + " | " + std::to_string(id_),
+                       imgSmall);
+            cv::waitKey(1);
+          }
+          catch (const cv::Exception &e)
+          {
+            showPreview = false;
+            PrintThread{} << "ERROR-" << id_ << " | " << get_timestamp()
+                          << " | Live window failed, continuing without preview: "
+                          << e.what() << std::endl;
+          }
         }
 
         firstImage = false;
@@ -797,5 +831,24 @@ void storage_worker_cv::run()
                   << " cancelled, storage worker finished. Closing files."
                   << std::endl;
     close_files(last_timestamp);
+  }
+  catch (const std::exception &e)
+  {
+    // Anything else (cv::Exception from the image operations, bad_alloc, ...)
+    // used to escape this thread and std::terminate the process, losing the
+    // file currently being written. Close it, flag the error so main() shuts
+    // down cleanly, and let the launcher restart us.
+    PrintThread{} << "FATAL ERROR-" << id_ << " | " << get_timestamp()
+                  << " | Storage worker failed: " << e.what() << std::endl;
+    global_error = true;
+    try
+    {
+      close_files(last_timestamp);
+    }
+    catch (const std::exception &e2)
+    {
+      PrintThread{} << "ERROR-" << id_ << " | " << get_timestamp()
+                    << " | Could not close files: " << e2.what() << std::endl;
+    }
   }
 }

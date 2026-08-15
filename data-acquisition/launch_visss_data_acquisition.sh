@@ -174,10 +174,20 @@ do
   # Build the command incrementally
   COMMAND="$EXE -e=$ENCODING -o=$OUTDIR -f=$FPS -n=$NAME -t=$NTHREADS -l=$LIVERATIO -s=$SITE -i=$NEWFILEINTERVAL -w=$STOREALLFRAMES -p=$NOPTP -d=$FOLLOWERMODE -q=$QUERYGAIN -r=$ROTATEIMAGE -b=$MINBRIGHT --cpuserver=$CPUSERVER --cpustream=$CPUSTREAM --cpustorage=$CPUSTORAGE --cpuother=$CPUOTHER --cpuffmpeg=$CPUFFMPEG $CAMERACONFIG $SERIAL"
   
-  # Use taskset to pin the process to CPU if CPUOTHER is set
+  # Restrict the process to the CPUs it is configured to use. This must be the
+  # union of every per-thread pin, not CPUOTHER alone: the binary sets its own
+  # affinities for the capture/stream/server/storage threads and runs each
+  # ffmpeg under taskset, and any CPU outside this mask makes those calls fail
+  # with EINVAL - which quietly collapsed the whole pipeline onto one core.
   if [ $CPUOTHER -gt -1 ]; then
-    /bin/echo "BASH Pinning $EXE to $CPUOTHER"
-    COMMAND="taskset -c $CPUOTHER $COMMAND"
+    CPULIST="$CPUOTHER"
+    for CPU in $CPUSERVER $CPUSTREAM $(echo "$CPUSTORAGE" | tr '@' ' ') $(echo "$CPUFFMPEG" | tr '@' ' '); do
+      if [[ "$CPU" =~ ^[0-9]+$ ]]; then
+        CPULIST="$CPULIST,$CPU"
+      fi
+    done
+    /bin/echo "BASH Pinning $EXE to CPUs $CPULIST"
+    COMMAND="taskset -c $CPULIST $COMMAND"
   fi
   
   echo "BASH $COMMAND"
