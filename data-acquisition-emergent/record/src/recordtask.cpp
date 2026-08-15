@@ -575,7 +575,12 @@ void RecordTask::CloseSegment(bool reuseEncoder)
 
     if (m_timestampFile.is_open())
     {
-        m_timestampFile << "# Last capture time: " << m_lastWrittenTimestampUs << "\n";
+        // Whole seconds, not microseconds: the old Teledyne pipeline writes
+        // this one field in seconds (storage_worker_cv.h passes timestamp_s
+        // while every other timestamp in the file is microseconds), and this
+        // format follows that pipeline rather than diverging from it - one
+        // downstream parser has to cope with both files.
+        m_timestampFile << "# Last capture time: " << (m_lastWrittenTimestampUs / 1000000ULL) << "\n";
     }
     m_timestampFile.close();
 
