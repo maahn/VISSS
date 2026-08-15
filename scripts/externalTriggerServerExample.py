@@ -42,10 +42,15 @@ class S(BaseHTTPRequestHandler):
                 timestamp = np.datetime64('now')
                 # replace with last measurement from the radar
                 measurement = np.random.randint(-10, 10)
-            # could not get radar data, use cached data
-            except:
-                timestamp = cachedDat[instrument]["timestamp"]
-                measurement = cachedDat[instrument]["measurement"]
+            # could not get radar data, use cached data (if there is any)
+            except Exception as e:
+                print("could not read radar data:", e)
+                if cachedDat is None:
+                    timestamp = np.datetime64('now')
+                    measurement = 9999.
+                else:
+                    timestamp = cachedDat[instrument]["timestamp"]
+                    measurement = cachedDat[instrument]["measurement"]
 
             #######
 
@@ -65,7 +70,7 @@ class S(BaseHTTPRequestHandler):
 
         #write data to cache file
         with open(tmpfile, 'w') as f:
-            cachedDat = json.dump(dat, f, default=str)
+            json.dump(dat, f, default=str)
 
 
 def run(server_class=HTTPServer, handler_class=S, addr="localhost", port=8000):

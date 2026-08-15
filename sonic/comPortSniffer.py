@@ -30,7 +30,7 @@ import serial
 
 try:
     com_port = sys.argv[1]
-except:
+except IndexError:
     sys.exit("use: python com.py comPort [sendString]")
 
 try:
@@ -52,13 +52,15 @@ try:
         parity=serial.PARITY_NONE,
     )
     # print(serialPort.name)
-except:
-    sys.exit("Could not open port %s!" % com_port)
+except serial.SerialException as e:
+    sys.exit("Could not open port %s! %s" % (com_port, e))
 
 try:
     if sendData:
         print("S: ", sendString)
-        serialPort.write(sendString + "\r\n")
+        # pyserial writes bytes, not str - passing a str raised TypeError here
+        # and took the whole sniffer down instead of sending the command
+        serialPort.write((sendString + "\r\n").encode("utf-8"))
         sendData = False
     while True:
         # one dataset is around 20000 bytes

@@ -21,43 +21,49 @@ class S(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        # Always answer, whatever happens below: the VISSS launcher treats a
+        # missing/hanging response as "no data" and (with stopOnTimeout) stops
+        # measuring, so failing silently here is worse than reporting the 9999
+        # sentinel value.
+        timestamp = np.datetime64("now")
+        measurement = 9999.0
+
         try:
-            # open MRR file
-            file1 = open("C:\MRR_data\ActData\AveData.ave", "r")
-            Lines = file1.readlines()
+            # open MRR file (raw string: the path contains backslash escapes)
+            with open(r"C:\MRR_data\ActData\AveData.ave", "r") as file1:
+                Lines = file1.readlines()
+
+            Z_profile = None
             for line in Lines:
-                if line[0] == "Z":
+                if line.startswith("Z"):
                     Z_profile = line
 
-            try:
-                timestamp = np.datetime64("now")
-                measurements = np.fromstring(Z_profile[1:], dtype=float, sep=" ")[
-                    1:6
-                ]  # last measurement from the MRR of level 1 to 5
-                measurement = np.mean(measurements)  # mean ≈
-                print(timestamp, measurements, "mean", measurement)
+            if Z_profile is None:
+                raise ValueError("no Z profile line in AveData.ave")
 
-            except Exception as e:
-                print(e)
-
-                timestamp = np.datetime64("now")
-                measurement = 9999.0
-
-            dat = {
-                instrument: {
-                    "timestamp": timestamp,
-                    "unit": "dBz",
-                    "measurement": measurement,
-                }
-            }
-
-            # send data to client
-            self._set_headers()
-            self.wfile.write(json.dumps(dat, default=str).encode("utf-8"))
+            measurements = np.fromstring(Z_profile[1:], dtype=float, sep=" ")[
+                1:6
+            ]  # last measurement from the MRR of level 1 to 5
+            measurement = np.mean(measurements)  # mean ≈
+            print(timestamp, measurements, "mean", measurement)
 
         except Exception as e:
-            print("MAJOR ERROR")
-            print(e)
+            print("could not read MRR data:", e)
+
+        dat = {
+            instrument: {
+                "timestamp": timestamp,
+                "unit": "dBz",
+                "measurement": measurement,
+            }
+        }
+
+        # send data to client
+        try:
+            self._set_headers()
+            self.wfile.write(json.dumps(dat, default=str).encode("utf-8"))
+        except Exception as e:
+            print("could not send response:", e)
 
 
 def run(server_class=HTTPServer, handler_class=S, addr="localhost", port=8000):

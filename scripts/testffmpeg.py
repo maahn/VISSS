@@ -1,9 +1,12 @@
 
 import os
+import subprocess
 import time
 from ffmpeg_quality_metrics import FfmpegQualityMetrics as ffqm
 import pickle
 
+
+os.makedirs("testoutput", exist_ok=True)
 
 options = {}
 
@@ -34,9 +37,15 @@ for name, option in options.items():
     command = f"ffmpeg  -y -i lossless/visss_visss_trigger_S1145792_20211223-150621_0.mov {option} testoutput/bm_{name}.mkv"
     print(name, option, command)
 
-    t1 = time.time()  
-    os.system(command)
-    t2 = time.time()  
+    t1 = time.time()
+    returncode = subprocess.call(command, shell=True)
+    t2 = time.time()
+
+    if returncode != 0:
+        # e.g. a codec/preset combination this ffmpeg build does not have -
+        # skip it instead of dying on the missing output file below
+        print(f"SKIP {name}: ffmpeg exited with {returncode}")
+        continue
 
     elTime = t2-t1
     fSize = os.path.getsize(f"testoutput/bm_{name}.mkv")

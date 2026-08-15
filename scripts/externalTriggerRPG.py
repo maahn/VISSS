@@ -49,11 +49,17 @@ class S(BaseHTTPRequestHandler):
                     )  # last measurement from the radar in lowest height level
                     print(timestamp, measurement)
 
-                except:
+                except Exception as e:
+                    # fall back to the cached sample, but only if there is one -
+                    # otherwise report the 9999 sentinel like the outer handler
+                    print("could not read sample:", e)
+                    if cachedDat is None:
+                        raise
                     timestamp = cachedDat[instrument]["timestamp"]
                     measurement = cachedDat[instrument]["measurement"]
 
-            except:
+            except Exception as e:
+                print("could not reach radar:", e)
                 timestamp = np.datetime64("now")
                 measurement = 9999.0
 
@@ -75,7 +81,7 @@ class S(BaseHTTPRequestHandler):
 
         # write data to cache file
         with open(tmpfile, "w") as f:
-            cachedDat = json.dump(dat, f, default=str)
+            json.dump(dat, f, default=str)
 
 
 def run(server_class=HTTPServer, handler_class=S, addr="localhost", port=8000):

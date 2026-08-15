@@ -52,9 +52,12 @@ def checksum(st):
     Returns
     -------
     str
-        Hexadecimal checksum string in uppercase.
+        Hexadecimal checksum string in uppercase, always two digits.
     """
-    return hex(reduce(lambda x, y: x ^ y, map(ord, st)))[2:].upper()
+    # Zero padded to two digits: the sensor always sends two hex characters
+    # (that is what line[-3:-1] compares against below), so hex()'s single
+    # digit for values < 0x10 made one in sixteen good lines look corrupt.
+    return "%02X" % reduce(lambda x, y: x ^ y, map(ord, st))
 
 
 # make sure the clock is already set!
@@ -86,7 +89,7 @@ fname = fpath + "/" + yearMonth + Day + "_" + hour + "." + fsuffix
 #   count = count + 1
 #   fname = fpath+"/"+yearMonth+Day+"_"+str(count)+"."+fsuffix
 
-outFile = open(fname, "at+")
+outFile = open(fname, "at+", buffering=1)
 
 
 print("Sonic serial data logger")
@@ -112,7 +115,6 @@ try:
             # print(p.stderr.readline())
             print(line)
             raise SystemError("%s stopped" % " ".join(command))
-            break
         # print(line)
 
         # no short lines
@@ -155,7 +157,7 @@ try:
             hour = today[8:10]
             fname = fpath + "/" + yearMonth + Day + "_" + hour + "." + fsuffix
 
-            outFile = open(fname, "at+")
+            outFile = open(fname, "at+", buffering=1)
             print(today, fname)
 
         # write data
@@ -165,7 +167,8 @@ except KeyboardInterrupt:
     print("stopping...")
 
 finally:
-    # p.terminate()
+    # the sniffer child holds the serial port open, so it has to go too
+    p.terminate()
     outFile.close()
     print("file closed")
     errorFile.close()
