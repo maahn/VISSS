@@ -537,6 +537,20 @@ void PollCameraStatus(const std::vector<Camera>& cams,
     }
 }
 
+// A single failed GetValue() call is tolerated as a transient hiccup (logged as a WARNING, same as
+// before). But PrintStatusHeartbeat runs at ~1s cadence (see the main poll loop), so
+// c_heartbeatFailureThreshold *consecutive* failures on one camera means it's been unreachable for
+// several seconds straight - a real connection loss, not a blip. Previously nothing ever escalated
+// past that WARNING: a lost connection just spammed "status heartbeat failed" forever without the
+// process ever exiting, and since the Python launcher's crash-restart loop only fires on the C++
+// process itself exiting (see launch_visss_data_acquisition.py's update()), that meant no recovery
+// at all until someone noticed and restarted it by hand. Throwing here instead lets the existing
+// top-level catch in main() end the process, which the launcher then respawns after 5s -
+// restart-on-disconnect, the same "better exit (and restart)" strategy the old Teledyne pipeline
+// used for its own status-read failures (visss-data-acquisition.cpp's global_error sites, e.g. the
+// temperature/ptpStatus read at line ~500 there).
+const int c_heartbeatFailureThreshold = 5;
+
 // Periodic per-camera "STATUS" heartbeat (~1s, see the main poll loop), the client-side
 // equivalent of the old Teledyne pipeline's once-per-second STATUS line
 // (storage_worker_cv.h:743: "STATUS<id> | ts | Queue:N | ID:N | M:...") - downstream tooling (the
@@ -557,9 +571,14 @@ void PollCameraStatus(const std::vector<Camera>& cams,
 // cadence a per-heartbeat temperature read/line would be almost entirely redundant noise (sensor
 // temperature drifts on the order of minutes, not seconds) for both the console and the
 // TimedRotatingFileHandler-backed Python log file.
+//
+// heartbeatFailureCounts tracks consecutive failures per camera (keyed by serial, same convention
+// as cameraFramerates) so a run of c_heartbeatFailureThreshold can be detected and escalated to a
+// thrown exception - see c_heartbeatFailureThreshold's comment for why.
 void PrintStatusHeartbeat(const std::vector<Camera>& cams,
                           const std::vector<std::pair<std::string, uint32_t>>& cameraFramerates,
-                          const std::chrono::steady_clock::time_point& startTime)
+                          const std::chrono::steady_clock::time_point& startTime,
+                          std::vector<std::pair<std::string, int>>& heartbeatFailureCounts)
 {
     const auto elapsedMs =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - startTime).count();
@@ -579,17 +598,41 @@ void PrintStatusHeartbeat(const std::vector<Camera>& cams,
         }
         const uint64_t estimatedFrames = (static_cast<uint64_t>(elapsedMs) * framerate) / 1000;
 
+        int* failureCount = nullptr;
+        for (auto& entry : heartbeatFailureCounts)
+        {
+            if (entry.first == serial)
+            {
+                failureCount = &entry.second;
+                break;
+            }
+        }
+
         try
         {
             const std::string ptpStatus = cam.GetParameter<EnumCameraParam>("PtpStatus").GetValue();
             std::cout << LogLine("STATUS", serial,
                                   "frames~" + std::to_string(estimatedFrames) + " | PTP " + ptpStatus)
                       << std::endl;
+            if (failureCount != nullptr)
+            {
+                *failureCount = 0;
+            }
         }
         catch (const std::exception& ex)
         {
             std::cout << LogLine("WARNING", serial, std::string("status heartbeat failed: ") + ex.what())
                       << std::endl;
+            if (failureCount != nullptr)
+            {
+                (*failureCount)++;
+                if (*failureCount >= c_heartbeatFailureThreshold)
+                {
+                    throw std::runtime_error("Camera " + serial + " status heartbeat failed " +
+                                             std::to_string(*failureCount) +
+                                             " consecutive times - connection presumed lost: " + ex.what());
+                }
+            }
         }
     }
 }
@@ -1056,6 +1099,8 @@ int main(int argc, char* argv[])
         // Each camera's server recording path (OutputRoot) - used by PrintNewFileNotice to
         // reconstruct RecordTask's own final file path client-side (see its comment for why).
         std::vector<std::pair<std::string, std::string>> cameraOutputRoots;
+        // Per-camera consecutive PrintStatusHeartbeat failure count - see c_heartbeatFailureThreshold.
+        std::vector<std::pair<std::string, int>> heartbeatFailureCounts;
 
         // Initialize pipeline
         for (auto& server : system.GetServers())
@@ -1169,6 +1214,7 @@ int main(int argc, char* argv[])
                 recordTasksLastEvent.push_back(std::vector<std::string>(c_recordEventParamNames.size(), ""));
                 cameraFramerates.push_back(std::make_pair(deviceId, framerateParam.GetValue()));
                 cameraOutputRoots.push_back(std::make_pair(deviceId, recordPath));
+                heartbeatFailureCounts.push_back(std::make_pair(deviceId, 0));
             }
         }
 
@@ -1264,7 +1310,7 @@ int main(int argc, char* argv[])
 
             if (std::chrono::duration_cast<std::chrono::seconds>(now - lastHeartbeatTime).count() >= 1)
             {
-                PrintStatusHeartbeat(cams, cameraFramerates, startTime);
+                PrintStatusHeartbeat(cams, cameraFramerates, startTime, heartbeatFailureCounts);
                 lastHeartbeatTime = now;
             }
 
