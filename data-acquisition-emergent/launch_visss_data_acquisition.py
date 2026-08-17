@@ -1944,7 +1944,11 @@ class GUI(object):
         self.sunAltitude = 999
         self.sunOldAltitude = 999
 
-        self.root = tk.Tk()
+        # className sets WM_CLASS so the GNOME dock can match this window back to
+        # visss_gui.desktop's StartupWMClass (plain tk.Tk() leaves WM_CLASS at the Tkinter
+        # default ("tk", "Tk") - shared by every Tk app on the system, so the shell has nothing
+        # distinctive to match against and never shows the running-indicator dot on the dock icon).
+        self.root = tk.Tk(className="visss_gui")
 
         self.root.title("VISSS data acquisition")
         self.root.bind("<Configure>", self.save_settings)
