@@ -589,6 +589,34 @@ void storage_worker_cv::run()
           nPixelA[ii] = nPixelA[ii] + nPixelA[ii + 1];
         }
 
+        // Motion criterion: a frame is stored if, for any brightness-change
+        // threshold ll, at least max(minMovingPixel / 2^ll, 2) pixels
+        // changed.
+        //
+        // Evaluation of this filter (VISSSlib
+        // scripts/eval_motion_filter.py, Nov 2026). The 10 s status frames
+        // are stored regardless of motion, so they are an unbiased sample
+        // of all frames. VISSSlib detection was run on them, leader camera
+        // only, Nov 2022 - Oct 2026, 30 random plus 30 particle-rich
+        // 10 min files per deployment.
+        // With minMovingPixel = 20, the share of level2-quality sightings
+        // (blur cut passed) on frames this filter would drop:
+        //   VISSS1 0.7-1.1%, VISSS2 0.7-1.6%, VISSS3 0.8-1.2%.
+        //   Almost all lost particles are faint and 1-3 px (3-14% of the
+        //   < 2 px bin); essentially none >= 5 px, none >= 10 px.
+        //   A lost sighting is not necessarily a lost particle: it may be
+        //   seen in neighbouring frames.
+        // Lower minMovingPixel (lost sightings, extra stored frames relative
+        // to the frames that pass the motion test now):
+        //   14: 0.3-0.9%, +3-4%
+        //   10: 0.1-0.4%, +4-10%
+        //    6: 0-0.3%,   +7-16%
+        // The extra frames are a lower bound: noise-only frames in periods
+        // without snow are not included.
+        // Changing the floor of 2 to 1 makes no difference.
+        // If minMovingPixel is changed, VISSSlib's
+        // level1detect.minMovingPixels must be lowered by the same factor,
+        // otherwise processing drops those frames again.
         movingPixel = false;
         tt = 1;
         for (uint ll = 0; ll < nPixelA.size(); ll++)
